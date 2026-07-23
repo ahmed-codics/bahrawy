@@ -1,0 +1,480 @@
+'use client';
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Archive, Edit3, Plus } from 'lucide-react';
+import toast from 'react-hot-toast';
+import {
+  Badge,
+  Button,
+  DataTable,
+  Drawer,
+  ErrorState,
+  FilterBar,
+  Input,
+  PageHeader,
+  PageSkeleton,
+  Select,
+} from '@bahrawy/ui';
+import { API_BASE, fetchApi } from '../../../lib/api';
+
+type Course = {
+  id: string;
+  code: string;
+  titleAr: string;
+  status: string;
+};
+
+type Price = {
+  id: string;
+  amount: number | string;
+  currency: string;
+  billingPeriod: string;
+  status: string;
+  createdAt: string;
+};
+
+type Product = {
+  id: string;
+  code: string;
+  titleAr: string;
+  titleEn?: string | null;
+  descriptionAr?: string | null;
+  coverImageUrl?: string | null;
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  publishAt?: string | null;
+  unpublishAt?: string | null;
+  version: number;
+  courses: { course: Course }[];
+  unitEntries: unknown[];
+  prices: Price[];
+  _count?: { entitlements: number };
+};
+
+type ProductForm = {
+  titleAr: string;
+  titleEn: string;
+  code: string;
+  descriptionAr: string;
+  status: Product['status'];
+  publishAt: string;
+  unpublishAt: string;
+  courseIds: string[];
+  priceAmount: string;
+  billingPeriod: string;
+};
+
+const EMPTY_FORM: ProductForm = {
+  titleAr: '',
+  titleEn: '',
+  code: '',
+  descriptionAr: '',
+  status: 'DRAFT',
+  publishAt: '',
+  unpublishAt: '',
+  courseIds: [],
+  priceAmount: '',
+  billingPeriod: 'ONCE',
+};
+
+function toLocalDateTime(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function statusBadge(product: Product) {
+  if (product.status === 'ARCHIVED') return <Badge tone="neutral">مؤرشفة</Badge>;
+  if (product.status === 'DRAFT') return <Badge tone="amber">مسودة</Badge>;
+  if (product.publishAt && new Date(product.publishAt) > new Date()) {
+    return <Badge tone="blue">مجدولة</Badge>;
+  }
+  return <Badge tone="success">منشورة</Badge>;
+}
+
+function currentPrice(product: Product) {
+  return product.prices.find((price) => price.status === 'ACTIVE') ?? product.prices[0];
+}
+
+export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [productResponse, courseResponse] = await Promise.all([
+        fetchApi('/admin/v1/products'),
+        fetchApi('/admin/v1/courses'),
+      ]);
+      setProducts(productResponse.data as Product[]);
+      setCourses(courseResponse.data as Course[]);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الباقات');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return products.filter(
+      (product) =>
+        (!status || product.status === status) &&
+        (!query ||
+          product.titleAr.toLowerCase().includes(query) ||
+          product.code.toLowerCase().includes(query)),
+    );
+  }, [products, search, status]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setCoverFile(null);
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (product: Product) => {
+    const price = currentPrice(product);
+    setEditing(product);
+    setCoverFile(null);
+    setForm({
+      titleAr: product.titleAr,
+      titleEn: product.titleEn ?? '',
+      code: product.code,
+      descriptionAr: product.descriptionAr ?? '',
+      status: product.status === ('ACTIVE' as Product['status']) ? 'PUBLISHED' : product.status,
+      publishAt: toLocalDateTime(product.publishAt),
+      unpublishAt: toLocalDateTime(product.unpublishAt),
+      courseIds: product.courses.map((entry) => entry.course.id),
+      priceAmount: '',
+      billingPeriod: price?.billingPeriod ?? 'ONCE',
+    });
+    setDrawerOpen(true);
+  };
+
+  const updateForm = <TKey extends keyof ProductForm>(key: TKey, value: ProductForm[TKey]) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const toggleCourse = (courseId: string) => {
+    updateForm(
+      'courseIds',
+      form.courseIds.includes(courseId)
+        ? form.courseIds.filter((id) => id !== courseId)
+        : [...form.courseIds, courseId],
+    );
+  };
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      let coverImageUrl = editing?.coverImageUrl;
+      if (coverFile) {
+        const upload = new FormData();
+        upload.append('file', coverFile);
+        const uploaded = await fetchApi('/storage/upload', {
+          method: 'POST',
+          body: upload,
+          timeoutMs: 60_000,
+        });
+        coverImageUrl = `/storage/${uploaded.data.storedObjectId}`;
+      }
+      const payload = {
+        titleAr: form.titleAr.trim(),
+        titleEn: form.titleEn.trim() || undefined,
+        code: form.code.trim(),
+        descriptionAr: form.descriptionAr.trim() || undefined,
+        coverImageUrl,
+        status: form.status,
+        publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : null,
+        unpublishAt: form.unpublishAt ? new Date(form.unpublishAt).toISOString() : null,
+        courseIds: form.courseIds,
+        ...(form.priceAmount !== ''
+          ? {
+              priceAmount: Number(form.priceAmount),
+              currency: 'EGP',
+              billingPeriod: form.billingPeriod,
+            }
+          : {}),
+        ...(editing ? { version: editing.version } : {}),
+      };
+      await fetchApi(editing ? `/admin/v1/products/${editing.id}` : '/admin/v1/products', {
+        method: editing ? 'PATCH' : 'POST',
+        body: JSON.stringify(payload),
+      });
+      toast.success(editing ? 'تم تحديث الباقة' : 'تم إنشاء الباقة');
+      setDrawerOpen(false);
+      await load();
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : 'تعذر حفظ الباقة');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const archive = async (product: Product) => {
+    if (!confirm(`أرشفة باقة "${product.titleAr}"؟`)) return;
+    await fetchApi(`/admin/v1/products/${product.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'ARCHIVED', version: product.version }),
+    });
+    toast.success('تمت أرشفة الباقة');
+    await load();
+  };
+
+  if (loading && !products.length) return <PageSkeleton cards={5} />;
+  if (error && !products.length) {
+    return <ErrorState title="تعذر تحميل الباقات" description={error} onRetry={load} />;
+  }
+
+  return (
+    <div className="space-y-5" dir="rtl">
+      <PageHeader
+        eyebrow="الكتالوج والأسعار"
+        title="الباقات"
+        description="إدارة محتوى كل باقة ودورة نشرها وسجل أسعارها."
+        actions={
+          <Button leadingIcon={<Plus className="size-4" />} onClick={openCreate}>
+            باقة جديدة
+          </Button>
+        }
+      />
+      <FilterBar
+        value={search}
+        onSearch={setSearch}
+        searchPlaceholder="ابحث بالاسم أو الكود"
+        filters={
+          <Select
+            aria-label="تصفية بالحالة"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">كل الحالات</option>
+            <option value="DRAFT">مسودة</option>
+            <option value="PUBLISHED">منشورة</option>
+            <option value="ARCHIVED">مؤرشفة</option>
+          </Select>
+        }
+      />
+      <DataTable
+        loading={loading}
+        emptyMessage="لا توجد باقات مطابقة"
+        data={visible}
+        keyExtractor={(product) => product.id}
+        columns={[
+          {
+            id: 'product',
+            header: 'الباقة',
+            cell: (product: Product) => (
+              <div className="min-w-48">
+                <strong>{product.titleAr}</strong>
+                <p className="text-xs text-ink-3" dir="ltr">
+                  {product.code}
+                </p>
+              </div>
+            ),
+          },
+          { id: 'status', header: 'النشر', cell: statusBadge },
+          {
+            id: 'courses',
+            header: 'الكورسات',
+            cell: (product: Product) => (
+              <span title={product.courses.map((entry) => entry.course.titleAr).join('، ')}>
+                {product.courses.length}
+              </span>
+            ),
+            align: 'center',
+          },
+          {
+            id: 'price',
+            header: 'السعر الحالي',
+            cell: (product: Product) => {
+              const price = currentPrice(product);
+              return price ? `${price.amount} ${price.currency}` : 'بدون سعر';
+            },
+          },
+          {
+            id: 'history',
+            header: 'سجل الأسعار',
+            cell: (product: Product) => product.prices.length,
+            align: 'center',
+          },
+          {
+            id: 'entitlements',
+            header: 'الاشتراكات',
+            cell: (product: Product) => product._count?.entitlements ?? 0,
+            align: 'center',
+          },
+        ]}
+        rowActions={(product) => (
+          <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="تعديل الباقة"
+              onClick={() => openEdit(product)}
+            >
+              <Edit3 className="size-4" />
+            </Button>
+            {product.status !== 'ARCHIVED' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="أرشفة الباقة"
+                onClick={() => void archive(product)}
+              >
+                <Archive className="size-4" />
+              </Button>
+            )}
+          </div>
+        )}
+      />
+
+      <Drawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={editing ? 'تعديل الباقة' : 'إنشاء باقة'}
+        footer={
+          <Button form="product-form" type="submit" loading={saving}>
+            حفظ
+          </Button>
+        }
+      >
+        <form id="product-form" className="space-y-5" onSubmit={save}>
+          <Input
+            label="اسم الباقة بالعربية"
+            value={form.titleAr}
+            onChange={(event) => updateForm('titleAr', event.target.value)}
+            required
+          />
+          <Input
+            label="الاسم بالإنجليزية"
+            value={form.titleEn}
+            onChange={(event) => updateForm('titleEn', event.target.value)}
+            directionMode="ltr"
+          />
+          <Input
+            label="الكود"
+            value={form.code}
+            onChange={(event) => updateForm('code', event.target.value)}
+            directionMode="ltr"
+            disabled={Boolean(editing)}
+            required
+          />
+          <Input
+            label="الوصف"
+            value={form.descriptionAr}
+            onChange={(event) => updateForm('descriptionAr', event.target.value)}
+          />
+          <Select
+            label="الحالة"
+            value={form.status}
+            onChange={(event) => updateForm('status', event.target.value as Product['status'])}
+          >
+            <option value="DRAFT">مسودة</option>
+            <option value="PUBLISHED">منشورة</option>
+            <option value="ARCHIVED">مؤرشفة</option>
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              type="datetime-local"
+              label="موعد النشر"
+              value={form.publishAt}
+              onChange={(event) => updateForm('publishAt', event.target.value)}
+            />
+            <Input
+              type="datetime-local"
+              label="موعد إيقاف النشر"
+              value={form.unpublishAt}
+              onChange={(event) => updateForm('unpublishAt', event.target.value)}
+            />
+          </div>
+          <label className="block space-y-2 text-sm font-bold text-ink">
+            صورة الباقة
+            {editing?.coverImageUrl && !coverFile && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`${API_BASE}${editing.coverImageUrl}`}
+                alt={editing.titleAr}
+                className="aspect-video w-full border border-border object-cover"
+              />
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+              className="block w-full border border-border bg-surface-1 p-3 text-sm"
+            />
+          </label>
+          <fieldset className="space-y-2 border-y border-border py-4">
+            <legend className="px-2 text-sm font-bold">الكورسات المشمولة</legend>
+            {courses.map((course) => (
+              <label key={course.id} className="flex cursor-pointer items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={form.courseIds.includes(course.id)}
+                  onChange={() => toggleCourse(course.id)}
+                  className="size-4 accent-brand-600"
+                />
+                <span className="flex-1">{course.titleAr}</span>
+                <span className="text-xs text-ink-3" dir="ltr">
+                  {course.code}
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              label={editing ? 'سعر جديد (اختياري)' : 'السعر'}
+              value={form.priceAmount}
+              onChange={(event) => updateForm('priceAmount', event.target.value)}
+            />
+            <Select
+              label="نوع الدفع"
+              value={form.billingPeriod}
+              onChange={(event) => updateForm('billingPeriod', event.target.value)}
+            >
+              <option value="ONCE">مرة واحدة</option>
+              <option value="MONTHLY">شهري</option>
+              <option value="TERM">فصل دراسي</option>
+            </Select>
+          </div>
+          {editing && (
+            <section className="space-y-2 border-t border-border pt-4">
+              <h3 className="text-sm font-bold">سجل الأسعار</h3>
+              {editing.prices.map((price) => (
+                <div key={price.id} className="flex justify-between gap-3 text-sm">
+                  <span>
+                    {price.amount} {price.currency} · {price.billingPeriod}
+                  </span>
+                  <span className="text-ink-3">
+                    {price.status} · {new Date(price.createdAt).toLocaleDateString('ar-EG')}
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
+        </form>
+      </Drawer>
+    </div>
+  );
+}

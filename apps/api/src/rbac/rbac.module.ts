@@ -1,0 +1,10 @@
+import { Module, Global } from '@nestjs/common';
+import { RbacService } from './rbac.service';
+import { PermissionsGuard } from './permissions.guard';
+
+@Global()
+@Module({
+  providers: [RbacService, PermissionsGuard],
+  exports: [RbacService, PermissionsGuard],
+})
+export class RbacModule {}
