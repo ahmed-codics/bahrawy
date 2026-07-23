@@ -15,7 +15,11 @@ import { AuthService } from './auth.service';
 import { SessionAuthGuard } from './session-auth.guard';
 import { PermissionsGuard } from '../rbac/permissions.guard';
 import { RequirePermission } from '../rbac/permissions.decorator';
-import { getSessionCookieName, SESSION_COOKIE_SECURE } from './session-cookie';
+import {
+  getSessionCookieName,
+  SESSION_COOKIE_SECURE,
+  SESSION_COOKIE_NAMES,
+} from './session-cookie';
 import { db } from '@bahrawy/db';
 import { StaffPermission } from '@bahrawy/types';
 import { RbacService } from '../rbac/rbac.service';
@@ -41,12 +45,14 @@ export class AuthController {
   }
 
   private clearSessionCookie(req: Request, res: Response) {
-    res.clearCookie(getSessionCookieName(req), {
-      httpOnly: true,
-      secure: SESSION_COOKIE_SECURE,
-      sameSite: 'lax',
-      path: '/',
-    });
+    for (const name of SESSION_COOKIE_NAMES) {
+      res.clearCookie(name, {
+        httpOnly: true,
+        secure: SESSION_COOKIE_SECURE,
+        sameSite: 'lax',
+        path: '/',
+      });
+    }
   }
 
   @Post('check-phone')
