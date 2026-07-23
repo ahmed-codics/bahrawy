@@ -768,25 +768,25 @@
 
   .academy-grade-card--bg {
     background:
-      linear-gradient(rgb(9 35 63 / 0.2), rgb(9 35 63 / 0.25)),
+      linear-gradient(rgb(9 35 63 / 0.04), rgb(9 35 63 / 0.08)),
       url('/images/g3-prep-bg.png') center / contain no-repeat;
   }
 
   .academy-grade-card--bg1 {
     background:
-      linear-gradient(rgb(9 35 63 / 0.2), rgb(9 35 63 / 0.25)),
+      linear-gradient(rgb(9 35 63 / 0.04), rgb(9 35 63 / 0.08)),
       url('/images/g1-sec-bg.png') center / contain no-repeat;
   }
 
   .academy-grade-card--bg2 {
     background:
-      linear-gradient(rgb(9 35 63 / 0.2), rgb(9 35 63 / 0.25)),
+      linear-gradient(rgb(9 35 63 / 0.04), rgb(9 35 63 / 0.08)),
       url('/images/g2-sec-bg.png') center / contain no-repeat;
   }
 
   .academy-grade-card--bg3 {
     background:
-      linear-gradient(rgb(9 35 63 / 0.2), rgb(9 35 63 / 0.25)),
+      linear-gradient(rgb(9 35 63 / 0.04), rgb(9 35 63 / 0.08)),
       url('/images/g3-sec-bg.png') center / contain no-repeat;
   }
 
