@@ -17,7 +17,7 @@ import { PermissionsGuard } from '../rbac/permissions.guard';
 import { RequirePermission } from '../rbac/permissions.decorator';
 import {
   getSessionCookieName,
-  SESSION_COOKIE_SECURE,
+  SESSION_COOKIE_OPTIONS,
   SESSION_COOKIE_NAMES,
 } from './session-cookie';
 import { db } from '@bahrawy/db';
@@ -36,22 +36,12 @@ export class AuthController {
   ) {}
 
   private setSessionCookie(req: Request, res: Response, token: string) {
-    res.cookie(getSessionCookieName(req), token, {
-      httpOnly: true,
-      secure: SESSION_COOKIE_SECURE,
-      sameSite: 'lax',
-      path: '/',
-    });
+    res.cookie(getSessionCookieName(req), token, SESSION_COOKIE_OPTIONS);
   }
 
   private clearSessionCookie(req: Request, res: Response) {
     for (const name of SESSION_COOKIE_NAMES) {
-      res.clearCookie(name, {
-        httpOnly: true,
-        secure: SESSION_COOKIE_SECURE,
-        sameSite: 'lax',
-        path: '/',
-      });
+      res.clearCookie(name, SESSION_COOKIE_OPTIONS);
     }
   }
 

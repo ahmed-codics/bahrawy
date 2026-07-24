@@ -1,3 +1,5 @@
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
 export function getSessionCookieName(req: any): string {
   const referer = req.headers?.referer || '';
   const origin = req.headers?.origin || '';
@@ -10,10 +12,7 @@ export function getSessionCookieName(req: any): string {
     referer.includes('admin') ||
     origin.includes('admin');
 
-  if (
-    process.env.NODE_ENV === 'production' &&
-    process.env.COOKIE_FORCE_SECURE === 'true'
-  ) {
+  if (IS_PRODUCTION) {
     return isStaff
       ? '__Host-Session-Token-Staff'
       : '__Host-Session-Token-Student';
@@ -29,6 +28,20 @@ export const SESSION_COOKIE_NAMES = [
   '__Host-bahrawy_session_staff',
   '__Host-bahrawy_session_student',
 ];
+
+export const SESSION_COOKIE_SECURE = IS_PRODUCTION;
+
+export const SESSION_COOKIE_OPTIONS: {
+  httpOnly: true;
+  secure: boolean;
+  sameSite: 'lax';
+  path: '/';
+} = {
+  httpOnly: true,
+  secure: SESSION_COOKIE_SECURE,
+  sameSite: 'lax',
+  path: '/',
+};
 
 export function getSessionTokenFromCookies(req: any): string | null {
   const preferredCookieName = getSessionCookieName(req);
@@ -52,7 +65,3 @@ export function getSessionTokenFromCookies(req: any): string | null {
     null
   );
 }
-
-export const SESSION_COOKIE_SECURE =
-  process.env.NODE_ENV === 'production' &&
-  process.env.COOKIE_FORCE_SECURE === 'true';
