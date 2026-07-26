@@ -26,11 +26,11 @@ export class SupportController {
   async createTicket(
     @Req() req: any,
     @Body()
-    body: { subject: string; description: string; organizationId: string },
+    body: { subject: string; description: string; organizationId?: string },
   ) {
     const data = await this.supportService.createTicket(
       req.account.id,
-      body.organizationId,
+      body.organizationId || req.account.organizationId,
       body.subject,
       body.description,
     );

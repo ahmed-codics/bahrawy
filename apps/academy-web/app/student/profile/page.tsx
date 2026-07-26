@@ -24,6 +24,7 @@ export default function StudentProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -33,12 +34,14 @@ export default function StudentProfilePage() {
         setSelectedGradeId(student.data.profile.gradeId || '');
         setGrades(gradeList.data || []);
       })
+      .catch(() => setError('تعذر تحميل بيانات الحساب. حاول مرة أخرى.'))
       .finally(() => setLoading(false));
   }, []);
   const save = async () => {
     if (!selectedGradeId) return;
     setSaving(true);
     setMessage('');
+    setError('');
     try {
       await fetchApi('/dashboard/student/profile', {
         method: 'PUT',
@@ -46,6 +49,8 @@ export default function StudentProfilePage() {
       });
       setProfile((current) => (current ? { ...current, gradeId: selectedGradeId } : current));
       setMessage('تم حفظ المرحلة الدراسية.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'تعذر حفظ المرحلة الدراسية. حاول مرة أخرى.');
     } finally {
       setSaving(false);
     }
@@ -53,15 +58,20 @@ export default function StudentProfilePage() {
 
   if (loading) return <PageSkeleton cards={2} />;
   return (
-    <PageIntro className="space-y-8">
+    <PageIntro className="min-w-0 space-y-6 sm:space-y-8">
       <PageHeader
         eyebrow="إعدادات حسابك"
         title="حسابي"
         description="راجع بياناتك وحدد المرحلة الصحيحة حتى تظهر لك الباقات المناسبة."
       />
-      <div className="grid gap-6 lg:grid-cols-[0.7fr_1.3fr]">
+      {error && (
+        <div role="alert" className="rounded-2xl border border-danger/20 bg-danger/10 p-4 text-sm font-bold text-danger">
+          {error}
+        </div>
+      )}
+      <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[0.7fr_1.3fr]">
         <Card tone="blue">
-          <CardContent className="pt-6 text-center">
+          <CardContent className="px-4 pt-5 text-center sm:px-6 sm:pt-6">
             <span className="mx-auto flex size-20 items-center justify-center rounded-[1.5rem] bg-brand-500 text-white dark:bg-brand-400 dark:text-brand-950">
               <UserRound className="size-9" />
             </span>
@@ -78,7 +88,7 @@ export default function StudentProfilePage() {
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
                   <GraduationCap className="size-5" />
                 </span>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <h2 className="font-heading text-xl font-black">المرحلة الدراسية</h2>
                   <p className="mt-1 text-sm text-text-muted">
                     تغيير المرحلة يؤثر على الباقات التي تظهر لك.
@@ -99,6 +109,7 @@ export default function StudentProfilePage() {
                       ))}
                     </Select>
                     <Button
+                      className="w-full sm:w-auto"
                       onClick={save}
                       loading={saving}
                       loadingText="جاري الحفظ..."

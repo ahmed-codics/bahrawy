@@ -52,7 +52,6 @@ export default function StudentSupportPage() {
         body: JSON.stringify({
           subject: subject.trim(),
           description: description.trim(),
-          organizationId: 'org_1',
         }),
       });
       setSubject('');
@@ -69,20 +68,20 @@ export default function StudentSupportPage() {
   if (loading) return <PageSkeleton cards={3} />;
 
   return (
-    <PageIntro className="space-y-8">
+    <PageIntro className="min-w-0 space-y-6 sm:space-y-8">
       <PageHeader
         eyebrow="نحن معك"
         title="الدعم الفني"
         description="اشرح المشكلة بوضوح، وسيتابع فريق الأكاديمية طلبك من نفس الصفحة."
       />
-      <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+      <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Card tone="cyan">
           <CardContent className="pt-5 sm:pt-6">
             <div className="mb-6 flex items-start gap-4">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500 text-white">
                 <Headphones className="size-6" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <h2 className="font-heading text-xl font-black">تذكرة جديدة</h2>
                 <p className="mt-1 text-sm text-text-muted">
                   أضف عنواناً مختصراً وتفاصيل تساعدنا نفهم المشكلة.
@@ -150,9 +149,9 @@ export default function StudentSupportPage() {
             <div className="space-y-3">
               {tickets.map((ticket) => (
                 <Card key={ticket.id}>
-                  <CardContent className="pt-5 sm:pt-6">
+                  <CardContent className="min-w-0 px-4 pt-5 sm:px-6 sm:pt-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <h3 className="font-heading text-lg font-black">{ticket.subject}</h3>
                         <p className="mt-2 line-clamp-2 text-sm text-text-muted">
                           {ticket.description}
