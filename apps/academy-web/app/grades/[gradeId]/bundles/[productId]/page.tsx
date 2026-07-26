@@ -153,7 +153,7 @@ export default function BundleDetailPage({
               </div>
             </div>
 
-            <div className="relative min-h-72 overflow-hidden bg-brand-50 lg:m-5 lg:rounded-[1.5rem] dark:bg-brand-950/30">
+            <div className="relative order-first aspect-[4/3] overflow-hidden bg-brand-50 lg:order-none lg:m-5 lg:aspect-auto lg:min-h-72 lg:rounded-[1.5rem] dark:bg-brand-950/30">
               {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
