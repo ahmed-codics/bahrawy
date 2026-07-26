@@ -745,7 +745,7 @@ export class CatalogService {
 
   async getEntitledCourses(accountId: string): Promise<any[]> {
     const now = new Date();
-    const entitlements = await db.entitlement.findMany({
+    const [entitlements, freeProducts] = await Promise.all([db.entitlement.findMany({
       where: {
         accountId,
         status: 'ACTIVE',
@@ -762,7 +762,14 @@ export class CatalogService {
           },
         },
       },
-    });
+    }), db.product.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PUBLISHED'] },
+        prices: { some: { status: 'ACTIVE', amount: 0 } },
+        courses: { some: { course: { status: 'PUBLISHED' } } },
+      },
+      include: { courses: { include: { course: true } } },
+    })]);
 
     const coursesMap = new Map<string, any>();
     for (const ent of entitlements) {
@@ -770,6 +777,11 @@ export class CatalogService {
         if (!coursesMap.has(pc.course.id)) {
           coursesMap.set(pc.course.id, pc.course);
         }
+      }
+    }
+    for (const product of freeProducts) {
+      for (const pc of product.courses) {
+        if (!coursesMap.has(pc.course.id)) coursesMap.set(pc.course.id, pc.course);
       }
     }
     return Array.from(coursesMap.values());
