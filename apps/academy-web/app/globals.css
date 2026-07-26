@@ -3542,3 +3542,99 @@
     transform: translateY(0);
   }
 }
+
+/* Mobile foundation: keep every academy surface inside the viewport. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+img,
+video,
+iframe {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 640px) {
+  .academy-container {
+    width: min(100% - 1.25rem, 74rem);
+  }
+
+  .academy-public-nav {
+    min-height: 4.25rem;
+  }
+
+  .academy-public-footer-grid {
+    padding-block: 2.5rem;
+  }
+
+  .student-main {
+    max-width: 100%;
+  }
+
+  .student-hero,
+  .student-panel,
+  .student-course-card {
+    min-width: 0;
+    border-radius: 1.25rem;
+  }
+
+  .student-hero h1 {
+    max-width: 100%;
+    font-size: clamp(1.9rem, 9vw, 2.55rem);
+    overflow-wrap: anywhere;
+  }
+
+  .student-hero p {
+    font-size: 0.9rem;
+    line-height: 1.8;
+  }
+
+  .student-course-card > * {
+    min-width: 0;
+  }
+
+  .student-cover {
+    min-height: 0;
+  }
+
+  .student-main input,
+  .student-main select,
+  .student-main textarea,
+  .student-main button {
+    min-height: 2.75rem;
+  }
+
+  .academy-login-form-wrap h1,
+  .academy-courses-hero h1 {
+    font-size: clamp(1.9rem, 9vw, 2.6rem);
+    overflow-wrap: anywhere;
+  }
+
+  .academy-login-form,
+  .academy-login-form-wrap,
+  .academy-courses-content,
+  .academy-courses-hero-inner {
+    min-width: 0;
+  }
+}

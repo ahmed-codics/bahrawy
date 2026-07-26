@@ -173,7 +173,7 @@ export default function LessonDetailPage({
                     <iframe
                       src={pdfUrl}
                       title={lesson.titleAr}
-                      className="h-[70dvh] min-h-[32rem] w-full rounded-2xl border border-border-default bg-white"
+                      className="aspect-video h-auto min-h-0 w-full rounded-2xl border border-border-default bg-white sm:h-[70dvh] sm:min-h-[32rem]"
                     />
                     <Button
                       variant="outline"

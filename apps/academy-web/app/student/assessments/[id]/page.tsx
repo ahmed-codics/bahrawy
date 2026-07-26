@@ -371,7 +371,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
       />
       <div className="grid items-start gap-8 lg:grid-cols-[1fr_280px]">
         <div className="space-y-7">
-          <div className="sticky top-20 z-20 grid gap-3 rounded-2xl border border-border-default bg-surface/95 p-4 shadow-sm backdrop-blur sm:grid-cols-[1fr_auto_auto] sm:items-center">
+          <div className="sticky top-[4.5rem] z-20 grid gap-3 rounded-2xl border border-border-default bg-surface/95 p-3 shadow-sm backdrop-blur sm:top-20 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
             <ProgressBar
               value={questions.length ? (answeredCount / questions.length) * 100 : 0}
               label={`${answeredCount} من ${questions.length} سؤال`}

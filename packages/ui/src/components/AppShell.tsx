@@ -97,7 +97,15 @@ function NavButton({
 
 export function LearnerShell({ children, user, navigation, onNavigate, onLogout }: BaseShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const bottomItems = navigation.slice(0, 5);
+  const primaryBottomHrefs = [
+    '/student',
+    '/student/courses',
+    '/student/products',
+    '/student/profile',
+  ];
+  const bottomItems = primaryBottomHrefs
+    .map((href) => navigation.find((item) => item.href === href))
+    .filter((item): item is NavigationItem => Boolean(item));
 
   return (
     <div className="student-app min-h-dvh bg-canvas text-ink" dir="rtl">
@@ -140,7 +148,9 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
                 className="ba-focus flex items-center gap-2 rounded-xl px-2 py-1.5 text-start hover:bg-surface-3"
               >
                 <Avatar user={user} size="sm" />
-                <span className="max-w-32 truncate text-sm font-bold">{user?.name || 'طالب البحراوي'}</span>
+                <span className="max-w-32 truncate text-sm font-bold">
+                  {user?.name || 'طالب البحراوي'}
+                </span>
               </button>
               <Button variant="ghost" size="icon" aria-label="تسجيل الخروج" onClick={onLogout}>
                 <LogOut className="size-4 text-danger" />
@@ -162,13 +172,16 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
         </div>
       </header>
 
-      <main id="main-content" className="student-main ba-page min-h-[calc(100dvh-4rem)] w-full px-5 pb-24 pt-6 lg:px-8 lg:pb-12 lg:pt-9">
+      <main
+        id="main-content"
+        className="student-main ba-page min-h-[calc(100dvh-4rem)] w-full min-w-0 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-9"
+      >
         {children}
       </main>
 
       <nav
         aria-label="التنقل الرئيسي للهاتف"
-        className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-start justify-around border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
       >
         {bottomItems.map((item) => (
           <button
@@ -185,6 +198,17 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
             <span className="max-w-full truncate">{item.label}</span>
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          className="ba-focus flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-ink-3"
+          aria-label="فتح المزيد"
+        >
+          <span className="flex size-5 items-center justify-center">
+            <Menu className="size-5" />
+          </span>
+          <span>المزيد</span>
+        </button>
       </nav>
 
       <AnimatePresence>
