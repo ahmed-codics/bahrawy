@@ -11,6 +11,12 @@ import { db } from '@bahrawy/db';
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
+  @Get('settings')
+  async getSettings() {
+    const data = await this.catalogService.getOrganizationSettings();
+    return { status: 'SUCCESS', data };
+  }
+
   @Get('grades')
   async getPublicGrades() {
     // Re-use admin service or simple query

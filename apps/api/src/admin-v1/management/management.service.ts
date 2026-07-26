@@ -235,6 +235,8 @@ export class AdminV1ManagementService {
         name: input.name,
         timezone: input.timezone,
         currency: input.currency,
+        paymentInstapay: input.paymentInstapay,
+        paymentWallet: input.paymentWallet,
         version: { increment: 1 },
       },
     });

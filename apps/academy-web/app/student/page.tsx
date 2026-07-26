@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BookOpen, CheckCircle2, Clock3, Compass, Play, Sparkles, Target } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle2, Clock3, Compass, Play, Sparkles, Target, X } from 'lucide-react';
 import { Badge, Button, EmptyState, PageSkeleton, ProgressBar } from '@bahrawy/ui';
 import { API_BASE, fetchApi } from '../../lib/api';
 
@@ -15,10 +15,13 @@ type Course = {
   progressPercentage?: number;
 };
 type Notification = { id: string; title?: string; message?: string; titleAr?: string; bodyAr?: string; createdAt?: string };
+type PaymentOrder = { id: string; status: string; amountRequested: number; createdAt: string; product: { titleAr: string } };
 type DashboardData = {
   profile?: { displayName?: string };
   enrolledCourses?: Course[];
   recentNotifications?: Notification[];
+  recentOrders?: PaymentOrder[];
+  activeAssessments?: any[];
 };
 
 const number = new Intl.NumberFormat('ar-EG');
@@ -63,6 +66,34 @@ export default function StudentDashboard() {
       </div>
     </section>
 
+    {data?.activeAssessments && data.activeAssessments.length > 0 && (
+      <section className="rounded-[1.6rem] border border-warning/20 bg-warning/5 p-6 sm:p-8">
+        <div className="mb-5 flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-warning/20 text-warning-800 dark:bg-warning/10 dark:text-warning-300">
+            <Clock3 className="size-5" />
+          </span>
+          <div>
+            <h2 className="ba-heading text-2xl text-warning-900 dark:text-warning-100">اختبارات قيد الإجراء</h2>
+            <p className="text-sm text-warning-800/80 dark:text-warning-300/80">لديك اختبارات لم يتم إرسالها بعد.</p>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {data.activeAssessments.map((attempt) => (
+            <article key={attempt.id} className="flex flex-col justify-between rounded-xl border border-warning/10 bg-surface p-5 shadow-sm">
+              <div>
+                <p className="text-sm font-black text-warning-700 dark:text-warning-400">تنبيه</p>
+                <h3 className="ba-heading mt-2 text-xl">{attempt.assessment.titleAr}</h3>
+                <p className="mt-2 text-xs text-text-muted">بدأ في: {new Date(attempt.startedAt).toLocaleString('ar-EG')}</p>
+              </div>
+              <Button className="mt-5 w-full bg-warning text-warning-950 hover:bg-warning-600 dark:hover:bg-warning-500" onClick={() => router.push(`/student/assessments/${attempt.assessmentId}`)}>
+                متابعة الاختبار
+              </Button>
+            </article>
+          ))}
+        </div>
+      </section>
+    )}
+
     <section className="grid gap-4 sm:grid-cols-3">
       <Metric icon={<BookOpen className="size-5" />} label="كورساتك" value={number.format(courses.length)} accent="cyan" />
       <Metric icon={<CheckCircle2 className="size-5" />} label="دروس خلصتها" value={number.format(completed)} accent="green" />
@@ -71,8 +102,17 @@ export default function StudentDashboard() {
 
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <div>
-        <div className="mb-4 flex items-end justify-between gap-4"><div><p className="text-sm font-black text-brand-700 dark:text-brand-300">مسارك الحالي</p><h2 className="ba-heading mt-1 text-3xl">كمّل من مكانك</h2></div>{courses.length > 1 && <Button variant="ghost" onClick={() => router.push('/student/courses')}>كل الكورسات</Button>}</div>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4"><div><p className="text-sm font-black text-brand-700 dark:text-brand-300">مسارك الحالي</p><h2 className="ba-heading mt-1 text-3xl">كمّل من مكانك</h2></div>{courses.length > 1 && <Button variant="ghost" className="w-full sm:w-auto" onClick={() => router.push('/student/courses')}>كل الكورسات</Button>}</div>
         {activeCourse ? <ContinueCard course={activeCourse} onOpen={() => router.push(`/student/courses/${activeCourse.id}`)} /> : <EmptyState icon={<Compass className="size-7" />} title="رحلتك جاهزة تبدأ" description="استعرض الكورسات والباقات، وشوف تفاصيل كل درس قبل الاشتراك." actionLabel="استكشف المحتوى" onAction={() => router.push('/student/courses')} />}
+        
+        {data?.recentOrders && data.recentOrders.length > 0 && (
+          <div className="mt-10">
+            <h3 className="ba-heading mb-4 text-xl">طلبات الشراء</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {data.recentOrders.map(order => <OrderCard key={order.id} order={order} onReload={() => window.location.reload()} />)}
+            </div>
+          </div>
+        )}
       </div>
       <aside className="student-panel p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-black text-brand-700 dark:text-brand-300">آخر التحديثات</p><h2 className="ba-heading mt-1 text-2xl">مهم ليك</h2></div><span className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"><Sparkles className="size-5" /></span></div>
@@ -97,4 +137,42 @@ function ContinueCard({ course, onOpen }: { course: Course; onOpen: () => void }
 
 function QuickNote({ text }: { text: string }) {
   return <div className="flex gap-3 rounded-xl bg-surface-soft p-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand-600" /><p className="text-sm leading-6 text-text-muted">{text}</p></div>;
+}
+
+function OrderCard({ order, onReload }: { order: PaymentOrder; onReload?: () => void }) {
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
+  const isPending = order.status === 'PENDING_REVIEW';
+  const tone = isPending ? 'amber' : 'danger';
+  const label = isPending ? 'قيد المراجعة' : 'مرفوض';
+  
+  const removeOrder = async () => {
+    try {
+      setDeleting(true);
+      await fetchApi(`/payment/orders/${order.id}`, { method: 'DELETE' });
+      if (onReload) onReload();
+      else router.refresh();
+    } catch (error) {
+      console.error('Failed to delete order:', error);
+      alert('Failed to delete the order. Please check the console for details.');
+      setDeleting(false);
+    }
+  };
+  
+  return (
+    <article className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border-default bg-surface p-4 shadow-sm hover:shadow-md transition-shadow">
+      <div>
+        <p className="text-sm font-bold text-text">{order.product?.titleAr || 'عنصر غير معروف'}</p>
+        <p className="mt-1 text-xs text-text-muted">{new Date(order.createdAt).toLocaleDateString('ar-EG')}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge tone={tone} className="w-fit">{label}</Badge>
+        {order.status === 'REJECTED' && (
+          <button type="button" onClick={removeOrder} disabled={deleting} className="flex size-7 items-center justify-center rounded-full bg-surface-soft hover:bg-danger/10 hover:text-danger text-text-muted transition-colors" title="حذف الطلب">
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+    </article>
+  );
 }

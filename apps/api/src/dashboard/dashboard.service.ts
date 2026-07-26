@@ -42,49 +42,134 @@ export class DashboardService {
                 },
               },
             },
+            unitEntries: {
+              include: {
+                unit: {
+                  include: {
+                    chapter: {
+                      include: {
+                        course: {
+                          include: {
+                            chapters: {
+                              include: {
+                                units: {
+                                  include: { lessons: true },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
-    const coursesList = [];
+
+    const coursesMap = new Map();
     for (const ent of entitlements) {
       for (const pc of ent.product.courses) {
-        const course = pc.course;
-        let totalLessons = 0;
-        const lessonIds = [];
-        for (const chap of course.chapters) {
-          for (const u of chap.units) {
-            for (const les of u.lessons) {
-              if (les.status === 'PUBLISHED') {
-                totalLessons++;
-                lessonIds.push(les.id);
-              }
+        if (!coursesMap.has(pc.course.id)) {
+          coursesMap.set(pc.course.id, pc.course);
+        }
+      }
+      for (const pu of ent.product.unitEntries) {
+        const course = pu.unit?.chapter?.course;
+        if (course && !coursesMap.has(course.id)) {
+          coursesMap.set(course.id, course);
+        }
+      }
+    }
+
+    const coursesList = [];
+    for (const course of coursesMap.values()) {
+      let totalLessons = 0;
+      const lessonIds = [];
+      for (const chap of course.chapters) {
+        for (const u of chap.units) {
+          for (const les of u.lessons) {
+            if (les.status === 'PUBLISHED') {
+              totalLessons++;
+              lessonIds.push(les.id);
             }
           }
         }
-        const completedLessons = await db.lessonProgress.count({
-          where: {
-            accountId,
-            lessonId: { in: lessonIds },
-            completedAt: { not: null },
-          },
-        });
-        coursesList.push({
-          id: course.id,
-          titleAr: course.titleAr,
-          coverImageUrl: course.coverImageUrl,
-          totalLessons,
-          completedLessons,
-          progressPercentage:
-            totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0,
-        });
       }
+      const completedLessons = await db.lessonProgress.count({
+        where: {
+          accountId,
+          lessonId: { in: lessonIds },
+          completedAt: { not: null },
+        },
+      });
+      coursesList.push({
+        id: course.id,
+        titleAr: course.titleAr,
+        coverImageUrl: course.coverImageUrl,
+        totalLessons,
+        completedLessons,
+        progressPercentage:
+          totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0,
+      });
     }
     const notifications = await db.inAppNotification.findMany({
       where: { accountId },
       orderBy: { createdAt: 'desc' },
       take: 5,
     });
+
+    const rawOrders = await db.paymentOrder.findMany({
+      where: { 
+        accountId, 
+        status: { in: ['PENDING_REVIEW', 'REJECTED'] } 
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
+    const recentOrders = await Promise.all(
+      rawOrders.map(async (order) => {
+        const product = await db.product.findUnique({
+          where: { id: order.productId },
+          select: { titleAr: true },
+        });
+        return {
+          ...order,
+          product,
+        };
+      })
+    );
+    const rawActiveAssessments = await db.assessmentAttempt.findMany({
+      where: {
+        accountId,
+        submittedAt: null,
+      },
+      include: {
+        assessment: {
+          select: {
+            titleAr: true,
+            passingScore: true,
+          }
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 20,
+    });
+
+    const activeAssessments = [];
+    const seenAssessmentIds = new Set<string>();
+    for (const attempt of rawActiveAssessments) {
+      if (!seenAssessmentIds.has(attempt.assessmentId)) {
+        activeAssessments.push(attempt);
+        seenAssessmentIds.add(attempt.assessmentId);
+        if (activeAssessments.length === 5) break;
+      }
+    }
+
     return {
       profile: {
         displayName: student.displayName,
@@ -92,6 +177,8 @@ export class DashboardService {
       },
       enrolledCourses: coursesList,
       recentNotifications: notifications,
+      recentOrders,
+      activeAssessments,
     };
   }
 

@@ -12,7 +12,7 @@ type Lesson = {
   id: string;
   titleAr: string;
   available?: boolean;
-  access?: { hasAccess: boolean; reason?: string };
+  access?: { hasAccess: boolean; hasEntitlement?: boolean; reason?: string };
   lessons?: { id: string; titleAr: string; contentType: string; durationSeconds?: number }[];
   purchaseProduct?: Product | null;
   prerequisiteAssessment?: { titleAr: string } | null;
@@ -67,7 +67,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 }
 
 function LessonCard({ lesson, index, courseAccess, onOpen, onBuy }: { lesson: Lesson; index: number; courseAccess: boolean; onOpen: () => void; onBuy: (id: string) => void }) {
-  const owned = courseAccess || Boolean(lesson.access?.hasAccess);
+  const owned = courseAccess || Boolean(lesson.access?.hasAccess) || Boolean(lesson.access?.hasEntitlement);
   const price = money(lesson.purchaseProduct);
   const duration = lesson.lessons?.reduce((total, material) => total + (material.durationSeconds || 0), 0) || 0;
   return <article className="student-course-card flex h-full flex-col">

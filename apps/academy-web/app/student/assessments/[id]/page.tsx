@@ -267,12 +267,70 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
             </div>
           </CardContent>
         </Card>
+        {resultsReleased && result?.assessment?.questions?.length > 0 && (
+          <div className="mt-16 animate-fade-up" style={{ animationDelay: '100ms' }}>
+            <h2 className="mb-8 text-center font-heading text-3xl font-black">تفاصيل الإجابات</h2>
+            <div className="grid gap-6">
+              {[...result.assessment.questions].sort((a, b) => a.sort - b.sort).map((aq, index) => {
+                const question = aq.question;
+                const studentAnswer = (result.autosavedAnswers || {})[question.id];
+                const isCorrect = String(studentAnswer) === String(question.correctOptionId) || 
+                                  question.options.find((o: any) => o.id === studentAnswer)?.text === question.correctOptionId;
+                const correctOption = question.options.find((o: any) => String(o.id) === String(question.correctOptionId) || o.text === question.correctOptionId);
+                const studentOption = question.options.find((o: any) => String(o.id) === String(studentAnswer) || o.text === studentAnswer);
+
+                return (
+                  <Card key={question.id} tone={isCorrect ? 'cyan' : 'coral'}>
+                    <CardContent className="p-6 sm:p-8">
+                      <div className="mb-6 flex items-start gap-4">
+                        <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl font-black ${isCorrect ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                          {index + 1}
+                        </div>
+                        <div className="mt-1 flex-1">
+                          <p className="font-bold text-lg leading-relaxed">{question.titleAr}</p>
+                          
+                          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                            <div className={`flex items-start gap-3 rounded-xl p-4 border ${isCorrect ? 'bg-success/5 border-success/10 text-success' : 'bg-danger/5 border-danger/10 text-danger'}`}>
+                              {isCorrect ? (
+                                <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+                              ) : (
+                                <XCircle className="mt-0.5 size-5 shrink-0" />
+                              )}
+                              <div>
+                                <p className="font-bold">إجابتك:</p>
+                                {studentAnswer ? (
+                                  <p className="mt-1 font-medium">{studentOption?.text || studentAnswer}</p>
+                                ) : (
+                                  <p className="mt-1 font-medium">لم يتم الإجابة</p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {!isCorrect && correctOption && (
+                              <div className="flex items-start gap-3 rounded-xl bg-success/5 p-4 text-success border border-success/10">
+                                <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+                                <div>
+                                  <p className="font-bold">الإجابة الصحيحة:</p>
+                                  <p className="mt-1 font-medium">{correctOption.text}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </PageIntro>
     );
   }
 
   return (
-    <PageIntro className="mx-auto max-w-4xl space-y-7">
+    <PageIntro className="mx-auto max-w-[1200px] space-y-7">
       <PageHeader
         eyebrow="اختبار إلكتروني"
         title={attempt?.assessment.titleAr || 'الاختبار'}
@@ -283,97 +341,132 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
           </Button>
         }
       />
-      <div className="sticky top-20 z-20 grid gap-3 rounded-2xl border border-border-default bg-surface/95 p-4 shadow-sm backdrop-blur sm:grid-cols-[1fr_auto_auto] sm:items-center">
-        <ProgressBar
-          value={questions.length ? (answeredCount / questions.length) * 100 : 0}
-          label={`${answeredCount} من ${questions.length} سؤال`}
-          tone="violet"
-        />
-        <Badge
-          tone={hasTimeLimit && remainingSeconds < 300 ? 'coral' : 'blue'}
-          className="justify-center"
-        >
-          <Clock3 className="size-4" />
-          {hasTimeLimit ? (
-            <span className="ba-number">
-              {String(Math.floor(remainingSeconds / 60)).padStart(2, '0')}:
-              {String(remainingSeconds % 60).padStart(2, '0')}
-            </span>
-          ) : (
-            <span>بدون حد زمني</span>
-          )}
-        </Badge>
-        <span
-          className={`flex items-center gap-1.5 text-xs font-bold ${saveState === 'error' ? 'text-danger' : 'text-text-muted'}`}
-        >
-          <Save className="size-4" />
-          {saveState === 'saving'
-            ? 'جاري الحفظ'
-            : saveState === 'error'
-              ? 'تعذر الحفظ'
-              : 'محفوظ تلقائياً'}
-        </span>
-      </div>
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-danger/20 bg-danger/10 p-4 font-bold text-danger"
-        >
-          {error}
-        </div>
-      )}
-      <div className="space-y-5">
-        {questions.map((entry, index) => (
-          <Card key={entry.questionId}>
-            <CardContent className="pt-5 sm:pt-6">
-              <div className="flex items-start gap-4">
-                <span className="ba-number flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-black text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
-                  {index + 1}
+      <div className="grid items-start gap-8 lg:grid-cols-[1fr_280px]">
+        <div className="space-y-7">
+          <div className="sticky top-20 z-20 grid gap-3 rounded-2xl border border-border-default bg-surface/95 p-4 shadow-sm backdrop-blur sm:grid-cols-[1fr_auto_auto] sm:items-center">
+            <ProgressBar
+              value={questions.length ? (answeredCount / questions.length) * 100 : 0}
+              label={`${answeredCount} من ${questions.length} سؤال`}
+              tone="violet"
+            />
+            <Badge
+              tone={hasTimeLimit && remainingSeconds < 300 ? 'coral' : 'blue'}
+              className="justify-center"
+            >
+              <Clock3 className="size-4" />
+              {hasTimeLimit ? (
+                <span className="ba-number">
+                  {String(Math.floor(remainingSeconds / 60)).padStart(2, '0')}:
+                  {String(remainingSeconds % 60).padStart(2, '0')}
                 </span>
-                <div className="flex-1">
-                  <h2
-                    dir="auto"
-                    className="text-start font-heading text-lg font-black leading-8 [unicode-bidi:plaintext]"
-                  >
-                    {entry.question.titleAr}
-                  </h2>
-                  <div className="mt-5 grid gap-3">
-                    {normalizeOptions(entry.question.options).map((option) => {
-                      const selected = answers[entry.questionId] === option.id;
-                      return (
-                        <label
-                          key={option.id}
-                          className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${selected ? 'border-violet-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200' : 'border-border-default hover:border-violet-300 hover:bg-surface-soft'}`}
-                        >
-                          <input
-                            type="radio"
-                            className="size-5 accent-violet-600"
-                            name={entry.questionId}
-                            value={option.id}
-                            checked={selected}
-                            onChange={() => chooseAnswer(entry.questionId, option.id)}
-                          />
-                          <span
-                            dir="auto"
-                            className="flex-1 text-start font-bold [unicode-bidi:plaintext]"
-                          >
-                            {option.text}
-                          </span>
-                          {selected && <CheckCircle2 className="ms-auto size-5" />}
-                        </label>
-                      );
-                    })}
+              ) : (
+                <span>بدون حد زمني</span>
+              )}
+            </Badge>
+            <span
+              className={`flex items-center gap-1.5 text-xs font-bold ${saveState === 'error' ? 'text-danger' : 'text-text-muted'}`}
+            >
+              <Save className="size-4" />
+              {saveState === 'saving'
+                ? 'جاري الحفظ'
+                : saveState === 'error'
+                  ? 'تعذر الحفظ'
+                  : 'محفوظ تلقائياً'}
+            </span>
+          </div>
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-danger/20 bg-danger/10 p-4 font-bold text-danger"
+            >
+              {error}
+            </div>
+          )}
+          <div className="space-y-5">
+            {questions.map((entry, index) => (
+              <Card key={entry.questionId} id={`question-${index}`}>
+                <CardContent className="pt-5 sm:pt-6">
+                  <div className="flex items-start gap-4">
+                    <span className="ba-number flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-black text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1">
+                      <h2
+                        dir="auto"
+                        className="text-start font-heading text-lg font-black leading-8 [unicode-bidi:plaintext]"
+                      >
+                        {entry.question.titleAr}
+                      </h2>
+                      <div className="mt-5 grid gap-3">
+                        {normalizeOptions(entry.question.options).map((option) => {
+                          const selected = answers[entry.questionId] === option.id;
+                          return (
+                            <label
+                              key={option.id}
+                              className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${selected ? 'border-violet-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200' : 'border-border-default hover:border-violet-300 hover:bg-surface-soft'}`}
+                            >
+                              <input
+                                type="radio"
+                                className="size-5 accent-violet-600"
+                                name={entry.questionId}
+                                value={option.id}
+                                checked={selected}
+                                onChange={() => chooseAnswer(entry.questionId, option.id)}
+                              />
+                              <span
+                                dir="auto"
+                                className="flex-1 text-start font-bold [unicode-bidi:plaintext]"
+                              >
+                                {option.text}
+                              </span>
+                              {selected && <CheckCircle2 className="ms-auto size-5" />}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="flex justify-end border-t border-border-default pt-6">
+            <Button size="lg" loading={submitting} loadingText="جاري التسليم..." onClick={submit}>
+              إنهاء وتسليم الاختبار
+            </Button>
+          </div>
+        </div>
+        
+        {/* Right Sidebar Navigation Grid */}
+        <div className="sticky top-20 z-10 hidden lg:block">
+          <Card>
+            <CardContent className="p-5">
+              <h3 className="mb-4 font-bold text-lg">أرقام الأسئلة</h3>
+              <div className="flex flex-wrap gap-2">
+                {questions.map((entry, index) => {
+                  const isAnswered = !!answers[entry.questionId];
+                  return (
+                    <button
+                      key={entry.questionId}
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById(`question-${index}`);
+                        if (el) {
+                          const y = el.getBoundingClientRect().top + window.scrollY - 100;
+                          window.scrollTo({ top: y, behavior: 'smooth' });
+                        }
+                      }}
+                      className={`ba-number flex size-10 items-center justify-center rounded-xl font-bold transition hover:scale-105 ${isAnswered ? 'bg-violet-600 text-white shadow-md' : 'bg-surface-soft text-text-muted hover:bg-surface-hover hover:text-text'}`}
+                      title={isAnswered ? 'تمت الإجابة' : 'لم يتم الإجابة'}
+                    >
+                      {index + 1}
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
-      <div className="flex justify-end border-t border-border-default pt-6">
-        <Button size="lg" loading={submitting} loadingText="جاري التسليم..." onClick={submit}>
-          إنهاء وتسليم الاختبار
-        </Button>
+        </div>
       </div>
     </PageIntro>
   );

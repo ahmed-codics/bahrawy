@@ -23,6 +23,18 @@ export class CatalogService {
     return !!entitlement;
   }
 
+  async getOrganizationSettings() {
+    const org = await db.organization.findFirst({
+      select: {
+        name: true,
+        currency: true,
+        paymentInstapay: true,
+        paymentWallet: true,
+      },
+    });
+    return org || {};
+  }
+
   async hasEntitlementToCourse(
     accountId: string,
     courseId: string,
@@ -586,8 +598,8 @@ export class CatalogService {
           include: {
             questions: true,
             attempts: {
-              where: { accountId, submittedAt: { not: null } },
-              orderBy: { submittedAt: 'desc' },
+              where: { accountId },
+              orderBy: { startedAt: 'desc' },
               take: 1,
             },
           },

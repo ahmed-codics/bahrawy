@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   Req,
@@ -315,6 +316,22 @@ export class PaymentPlanController {
       throw new ForbiddenException('You do not own this payment order');
     }
     return { status: 'SUCCESS', data: order };
+  }
+
+  @Delete('orders/:orderId')
+  async deleteOwnOrder(@Req() req: any, @Param('orderId') orderId: string) {
+    const order = await db.paymentOrder.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Payment order not found');
+    }
+    if (order.accountId !== req.account.id) {
+      throw new ForbiddenException('You do not own this payment order');
+    }
+    if (order.status !== 'REJECTED') {
+      throw new BadRequestException('Only rejected orders can be deleted');
+    }
+    await db.paymentOrder.delete({ where: { id: orderId } });
+    return { status: 'SUCCESS' };
   }
 
   @Get('staff/pending')

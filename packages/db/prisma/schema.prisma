@@ -44,6 +44,9 @@ model Organization {
   updatedAt  DateTime  @updatedAt
   archivedAt DateTime?
   version    Int       @default(1)
+  
+  paymentInstapay String?
+  paymentWallet   String?
 
   branches      Branch[]
   academicYears AcademicYear[]

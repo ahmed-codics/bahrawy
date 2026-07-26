@@ -344,7 +344,7 @@ export function VideoPlayer({
         try {
           await video.play();
         } catch {
-          setError('ØªØ¹Ø°Ø± Ø§Ø³ØªØ¦Ù†Ø§Ù Ø§Ù„ÙÙŠØ¯ÙŠÙˆ Ø¨Ø§Ù„Ø³Ø±Ø¹Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©.');
+          setError('تعذر استئناف الفيديو بالسرعة الجديدة.');
         }
       }
     }
@@ -409,7 +409,7 @@ export function VideoPlayer({
           aria-live="polite"
         >
           <div className="size-11 animate-spin rounded-full border-4 border-white/25 border-t-brand-400" />
-          <p className="text-sm font-bold">Ø¬Ø§Ø±ÙŠ Ø¶Ø¨Ø· Ø³Ø±Ø¹Ø© Ø§Ù„ØªØ´ØºÙŠÙ„...</p>
+          <p className="text-sm font-bold">جاري ضبط سرعة التشغيل...</p>
         </div>
       )}
 

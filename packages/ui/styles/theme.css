@@ -133,16 +133,16 @@
   }
 
   .dark {
-    --color-canvas: #111113;
-    --color-surface: #1c1c1f;
-    --color-surface-2: #232326;
-    --color-surface-3: #2a2a2e;
-    --color-border: #2e2e32;
-    --color-border-2: #3f3f46;
-    --color-ink: #fafafa;
-    --color-ink-2: #d4d4d8;
-    --color-ink-3: #a1a1aa;
-    --color-ink-4: #71717a;
+    --color-canvas: #071620;
+    --color-surface: #0d202c;
+    --color-surface-2: #102b38;
+    --color-surface-3: #1a3d4c;
+    --color-border: #23424f;
+    --color-border-2: #2a4d5c;
+    --color-ink: #edfaff;
+    --color-ink-2: #c3e4ed;
+    --color-ink-3: #a8c1ca;
+    --color-ink-4: #6a8c99;
   }
 
   * {

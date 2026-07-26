@@ -18,11 +18,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
-  const paymentHandle = process.env.NEXT_PUBLIC_INSTAPAY_HANDLE || 'تواصل مع الدعم للحصول على بيانات التحويل';
+  const [orgSettings, setOrgSettings] = useState<{ paymentInstapay?: string | null; paymentWallet?: string | null } | null>(null);
 
   useEffect(() => {
-    fetchApi(`/catalog/products/${productId}`)
-      .then((response) => setProduct(response.data))
+    Promise.all([
+      fetchApi(`/catalog/products/${productId}`).then((res) => res.data),
+      fetchApi('/catalog/settings').then((res) => res.data),
+    ])
+      .then(([productData, orgData]) => {
+        setProduct(productData);
+        setOrgSettings(orgData);
+      })
       .catch(() => setError('تعذر تحميل بيانات عملية الشراء.'))
       .finally(() => setLoading(false));
   }, [productId]);
@@ -65,7 +71,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
     <div className="grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
       <aside className="space-y-4">
         <section className="student-hero p-6"><Badge tone="cyan">ملخص الطلب</Badge><h2 className="ba-heading mt-5 text-2xl">{product.titleAr}</h2><div className="my-5 h-px bg-white/10" /><p className="text-sm font-bold text-cyan-50/60">المبلغ المطلوب</p><p className="ba-number mt-1 text-4xl font-black">{price ? Number(price.amount).toLocaleString('ar-EG') : '—'} <span className="font-sans text-sm">{price?.currency || 'EGP'}</span></p><div className="mt-6 flex gap-2 text-xs leading-6 text-cyan-50/70"><LockKeyhole className="mt-1 size-4 shrink-0 text-[#69ddeb]" /><p>الوصول يفتح بعد مراجعة الإدارة واعتماد الدفع.</p></div></section>
-        <section className="student-panel p-5"><div className="flex items-start gap-3"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300"><Landmark className="size-5" /></span><div className="min-w-0"><p className="text-xs font-bold text-text-muted">حوّل عبر InstaPay إلى</p><p dir="ltr" className="ba-number mt-2 break-all text-base font-black">{paymentHandle}</p></div></div><Button variant="ghost" className="mt-4 w-full" leadingIcon={copied ? <Check className="size-4" /> : <Copy className="size-4" />} onClick={async () => { await navigator.clipboard.writeText(paymentHandle); setCopied(true); setTimeout(() => setCopied(false), 1800); }}>{copied ? 'تم النسخ' : 'نسخ بيانات التحويل'}</Button></section>
+        {orgSettings?.paymentInstapay && (
+          <PaymentInstruction method="InstaPay" title="حوّل عبر InstaPay إلى" value={orgSettings.paymentInstapay} />
+        )}
+        {orgSettings?.paymentWallet && (
+          <PaymentInstruction method="Wallet" title="حوّل محفظة إلكترونية إلى" value={orgSettings.paymentWallet} />
+        )}
+        {!orgSettings?.paymentInstapay && !orgSettings?.paymentWallet && (
+          <PaymentInstruction method="Support" title="بيانات التحويل" value="تواصل مع الدعم للحصول على بيانات التحويل" />
+        )}
         <div className="flex gap-3 rounded-2xl border border-success/20 bg-success/5 p-4 text-sm text-success"><ShieldCheck className="size-5 shrink-0" /><p className="font-bold">الموافقة تمنح الوصول للدرس المشترى فقط.</p></div>
       </aside>
 
@@ -83,3 +97,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
 }
 
 function Step({ number, text }: { number: string; text: string }) { return <li className="flex items-center gap-2 rounded-xl bg-surface-soft p-3 text-sm font-bold"><span className="ba-number flex size-7 items-center justify-center rounded-lg bg-brand-700 text-xs text-white">{number}</span>{text}</li>; }
+
+function PaymentInstruction({ method, title, value }: { method: string; title: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <section className="student-panel p-5">
+      <div className="flex items-start gap-3">
+        <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${method === 'InstaPay' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300'}`}>
+          <Landmark className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-text-muted">{title}</p>
+          <p dir="ltr" className="ba-number mt-2 break-all text-base font-black">{value}</p>
+        </div>
+      </div>
+      <Button variant="ghost" className="mt-4 w-full" leadingIcon={copied ? <Check className="size-4" /> : <Copy className="size-4" />} onClick={async () => { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1800); }}>
+        {copied ? 'تم النسخ' : 'نسخ بيانات التحويل'}
+      </Button>
+    </section>
+  );
+}

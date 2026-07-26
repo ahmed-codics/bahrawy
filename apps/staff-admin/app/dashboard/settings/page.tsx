@@ -12,6 +12,8 @@ type Organization = {
   timezone: string;
   currency: string;
   status: string;
+  paymentInstapay: string | null;
+  paymentWallet: string | null;
   version: number;
 };
 
@@ -77,6 +79,8 @@ export default function SettingsPage() {
           <option value="SAR">SAR · ريال سعودي</option>
           <option value="USD">USD · دولار أمريكي</option>
         </Select>
+        <Input name="paymentInstapay" label="حساب InstaPay" defaultValue={organization.paymentInstapay || ''} directionMode="ltr" />
+        <Input name="paymentWallet" label="رقم المحفظة الإلكترونية (فودافون كاش، اتصالات، أورانج)" defaultValue={organization.paymentWallet || ''} directionMode="ltr" />
         <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
           <span className="text-sm text-ink-3">الحالة الحالية: {organization.status}</span>
           <Button type="submit" loading={saving}>

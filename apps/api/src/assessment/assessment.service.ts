@@ -239,11 +239,28 @@ export class AssessmentService {
           submittedAt: { not: null },
         },
       });
-      return buildAttemptOutcome(
+      const outcome = buildAttemptOutcome(
         attempt.assessment,
         attempt as Record<string, any>,
         attemptsUsed,
       );
+      return {
+        ...outcome,
+        assessment: {
+          ...attempt.assessment,
+          questions: attempt.assessment.questions.map(
+            (entry: AttemptQuestionEntry) => ({
+              ...entry,
+              question: {
+                ...entry.question,
+                options: normalizeVisibleQuestionOptions(entry.question.options),
+                correctOptionId: attempt.resultsReleased ? entry.question.correctOptionId : undefined,
+                explanation: attempt.resultsReleased ? entry.question.explanation : undefined,
+              },
+            }),
+          ),
+        },
+      };
     }
     let totalPoints = 0;
     let earnedPoints = 0;
@@ -274,11 +291,28 @@ export class AssessmentService {
         submittedAt: { not: null },
       },
     });
-    return buildAttemptOutcome(
+    const outcome = buildAttemptOutcome(
       attempt.assessment,
       submitted as Record<string, any>,
       attemptsUsed,
     );
+    return {
+      ...outcome,
+      assessment: {
+        ...attempt.assessment,
+        questions: attempt.assessment.questions.map(
+          (entry: AttemptQuestionEntry) => ({
+            ...entry,
+            question: {
+              ...entry.question,
+              options: normalizeVisibleQuestionOptions(entry.question.options),
+              correctOptionId: resultsReleased ? entry.question.correctOptionId : undefined,
+              explanation: resultsReleased ? entry.question.explanation : undefined,
+            },
+          }),
+        ),
+      },
+    };
   }
 
   async listAssessments(accountId: string, courseId: string): Promise<any[]> {
@@ -340,7 +374,9 @@ export class AssessmentService {
                     titleAr: true,
                     options: true,
                     points: true,
-                  }, // Hide correctOptionId
+                    correctOptionId: true,
+                    explanation: true,
+                  },
                 },
               },
             },
@@ -373,6 +409,8 @@ export class AssessmentService {
             question: {
               ...entry.question,
               options: normalizeVisibleQuestionOptions(entry.question.options),
+              correctOptionId: attempt.resultsReleased ? entry.question.correctOptionId : undefined,
+              explanation: attempt.resultsReleased ? entry.question.explanation : undefined,
             },
           }),
         ),

@@ -6,6 +6,7 @@ import {
   IsString,
   Min,
   MinLength,
+  IsOptional,
 } from 'class-validator';
 
 export class CreateStaffDto {
@@ -55,4 +56,12 @@ export class UpdateOrganizationDto {
   @IsInt()
   @Min(1)
   version!: number;
+
+  @IsString()
+  @IsOptional()
+  paymentInstapay?: string;
+
+  @IsString()
+  @IsOptional()
+  paymentWallet?: string;
 }

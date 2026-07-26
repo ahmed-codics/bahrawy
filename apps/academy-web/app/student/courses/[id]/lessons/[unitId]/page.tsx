@@ -16,13 +16,14 @@ type ContentItem = {
   questionCount?: number;
   completedAt?: string | null;
   available?: boolean;
+  attempt?: { submittedAt?: string | null; startedAt?: string } | null;
 };
 type UnitDetail = {
   unit: { id: string; titleAr: string; chapter: { titleAr: string; course: { id: string; titleAr: string } }; prerequisiteAssessment?: { titleAr: string } | null };
   lessonProduct?: Product | null;
   contentItems: ContentItem[];
   hasAccess: boolean;
-  access?: { reason?: string; prerequisite?: { titleAr: string } };
+  access?: { reason?: string; prerequisite?: { titleAr: string }; hasEntitlement?: boolean };
 };
 
 export default function LessonPage({ params }: { params: Promise<{ id: string; unitId: string }> }) {
@@ -61,7 +62,42 @@ export default function LessonPage({ params }: { params: Promise<{ id: string; u
       </div>
     </section>
 
-    {!hasAccess && <section className="student-panel grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="text-sm font-black text-brand-700 dark:text-brand-300">شراء الدرس منفرداً</p><h2 className="ba-heading mt-2 text-3xl">افتح {unit.titleAr}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted">بعد رفع إيصال الدفع والرقم المرجعي، تراجع الإدارة الطلب. عند الموافقة سيفتح هذا الدرس فقط.</p>{detail.access?.reason === 'PREREQUISITE' && <p className="mt-3 text-sm font-bold text-warning">أكمل {detail.access.prerequisite?.titleAr || unit.prerequisiteAssessment?.titleAr} أولاً.</p>}</div><div className="min-w-56 rounded-2xl border border-brand-200 bg-brand-50 p-5 text-center dark:border-brand-900 dark:bg-brand-950/25"><p className="text-xs font-bold text-text-muted">سعر الدرس</p><p className="ba-number mt-2 text-3xl font-black">{priceText || 'غير محدد بعد'}</p>{lessonProduct && priceText && <Button className="mt-5 w-full" variant="accent" leadingIcon={<ShoppingBag className="size-4" />} onClick={() => router.push(`/student/checkout/${lessonProduct.id}`)}>اشترِ الدرس الآن</Button>}</div></section>}
+    {!hasAccess && (
+      <section className="student-panel grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-sm font-black text-brand-700 dark:text-brand-300">
+            {detail.access?.hasEntitlement ? 'متطلب سابق' : 'شراء الدرس منفرداً'}
+          </p>
+          <h2 className="ba-heading mt-2 text-3xl">افتح {unit.titleAr}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted">
+            {detail.access?.hasEntitlement
+              ? 'هذا الدرس متاح في حسابك، لكنه محمي بمتطلب سابق يجب إكماله أولاً للوصول إلى المحتوى.'
+              : 'بعد رفع إيصال الدفع والرقم المرجعي، تراجع الإدارة الطلب. عند الموافقة سيفتح هذا الدرس فقط.'}
+          </p>
+          {detail.access?.reason === 'PREREQUISITE' && (
+            <p className="mt-3 text-sm font-bold text-warning">
+              أكمل {detail.access.prerequisite?.titleAr || unit.prerequisiteAssessment?.titleAr} أولاً.
+            </p>
+          )}
+        </div>
+        {!detail.access?.hasEntitlement && (
+          <div className="min-w-56 rounded-2xl border border-brand-200 bg-brand-50 p-5 text-center dark:border-brand-900 dark:bg-brand-950/25">
+            <p className="text-xs font-bold text-text-muted">سعر الدرس</p>
+            <p className="ba-number mt-2 text-3xl font-black">{priceText || 'غير محدد بعد'}</p>
+            {lessonProduct && priceText && (
+              <Button
+                className="mt-5 w-full"
+                variant="accent"
+                leadingIcon={<ShoppingBag className="size-4" />}
+                onClick={() => router.push(`/student/checkout/${lessonProduct.id}`)}
+              >
+                اشترِ الدرس الآن
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+    )}
 
     <section><div className="mb-5"><p className="text-sm font-black text-brand-700 dark:text-brand-300">داخل الدرس</p><h2 className="ba-heading mt-1 text-3xl">محتوى {unit.titleAr}</h2></div>{!contentItems.length ? <EmptyState title="لا يوجد محتوى منشور بعد" description="سيظهر الفيديو والملفات هنا بعد نشرها." /> : <div className="grid gap-4 md:grid-cols-2">{contentItems.map((item, index) => <ContentCard key={item.lessonId || item.assessmentId || `${item.type}-${index}`} item={item} index={index + 1} hasAccess={hasAccess} onOpen={() => openItem(item)} />)}</div>}</section>
 
@@ -72,5 +108,35 @@ export default function LessonPage({ params }: { params: Promise<{ id: string; u
 function ContentCard({ item, index, hasAccess, onOpen }: { item: ContentItem; index: number; hasAccess: boolean; onOpen: () => void }) {
   const allowed = hasAccess && item.available !== false;
   const Icon = item.type === 'VIDEO' ? PlayCircle : item.type === 'ASSESSMENT' ? ClipboardCheck : FileText;
-  return <article className={`student-course-card p-5 ${!allowed ? 'opacity-90' : ''}`}><div className="flex items-start gap-4"><span className="ba-number flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-soft text-sm font-black">{index}</span><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-200"><Icon className="size-5" /></span><div className="min-w-0 flex-1"><p className="text-xs font-black text-brand-700 dark:text-brand-300">{item.type === 'VIDEO' ? 'فيديو' : item.type === 'ASSESSMENT' ? 'واجب أو اختبار' : 'ملف ومذاكرة'}</p><h3 className="ba-heading mt-1 text-xl">{item.titleAr}</h3>{item.durationSeconds ? <p className="mt-1 text-xs text-text-muted">{Math.ceil(item.durationSeconds / 60)} دقيقة</p> : item.questionCount ? <p className="mt-1 text-xs text-text-muted">{item.questionCount} أسئلة</p> : null}</div></div><Button className="mt-5 w-full" variant={allowed ? 'primary' : 'outline'} disabled={!allowed} trailingIcon={allowed ? <ArrowLeft className="size-4" /> : <LockKeyhole className="size-4" />} onClick={onOpen}>{allowed ? (item.completedAt ? 'راجع المحتوى' : 'افتح المحتوى') : 'مقفل حتى فتح الدرس'}</Button></article>;
+  const isActiveAssessment = item.type === 'ASSESSMENT' && item.attempt && !item.attempt.submittedAt;
+  
+  return (
+    <article className={`student-course-card relative p-5 ${!allowed ? 'opacity-90' : ''}`}>
+      {isActiveAssessment && (
+        <Badge tone="amber" className="absolute left-4 top-4">قيد الإجراء</Badge>
+      )}
+      <div className="flex items-start gap-4">
+        <span className="ba-number flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-soft text-sm font-black">{index}</span>
+        <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${isActiveAssessment ? 'bg-warning/20 text-warning-700 dark:bg-warning/10 dark:text-warning-300' : 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-200'}`}>
+          <Icon className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-black text-brand-700 dark:text-brand-300">
+            {item.type === 'VIDEO' ? 'فيديو' : item.type === 'ASSESSMENT' ? 'واجب أو اختبار' : 'ملف ومذاكرة'}
+          </p>
+          <h3 className="ba-heading mt-1 text-xl">{item.titleAr}</h3>
+          {item.durationSeconds ? <p className="mt-1 text-xs text-text-muted">{Math.ceil(item.durationSeconds / 60)} دقيقة</p> : item.questionCount ? <p className="mt-1 text-xs text-text-muted">{item.questionCount} أسئلة</p> : null}
+        </div>
+      </div>
+      <Button 
+        className="mt-5 w-full" 
+        variant={allowed ? 'primary' : 'outline'} 
+        disabled={!allowed} 
+        trailingIcon={allowed ? <ArrowLeft className="size-4" /> : <LockKeyhole className="size-4" />} 
+        onClick={onOpen}
+      >
+        {allowed ? (isActiveAssessment ? 'متابعة الاختبار' : (item.completedAt ? 'راجع المحتوى' : 'افتح المحتوى')) : 'مقفل حتى فتح الدرس'}
+      </Button>
+    </article>
+  );
 }
