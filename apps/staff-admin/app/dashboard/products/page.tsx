@@ -22,7 +22,11 @@ type Course = {
   code: string;
   titleAr: string;
   status: string;
+  gradeId?: string | null;
+  grade?: { id: string; nameAr: string } | null;
 };
+
+type Grade = { id: string; nameAr: string; code: string };
 
 type Price = {
   id: string;
@@ -44,6 +48,8 @@ type Product = {
   publishAt?: string | null;
   unpublishAt?: string | null;
   version: number;
+  grade?: Grade | null;
+  gradeId?: string | null;
   courses: { course: Course }[];
   unitEntries: unknown[];
   prices: Price[];
@@ -58,6 +64,7 @@ type ProductForm = {
   status: Product['status'];
   publishAt: string;
   unpublishAt: string;
+  gradeId: string;
   courseIds: string[];
   priceAmount: string;
   billingPeriod: string;
@@ -71,6 +78,7 @@ const EMPTY_FORM: ProductForm = {
   status: 'DRAFT',
   publishAt: '',
   unpublishAt: '',
+  gradeId: '',
   courseIds: [],
   priceAmount: '',
   billingPeriod: 'ONCE',
@@ -99,6 +107,7 @@ function currentPrice(product: Product) {
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -113,12 +122,14 @@ export default function ProductsPage() {
     setLoading(true);
     setError('');
     try {
-      const [productResponse, courseResponse] = await Promise.all([
+      const [productResponse, courseResponse, academicResponse] = await Promise.all([
         fetchApi('/admin/v1/products'),
         fetchApi('/admin/v1/courses'),
+        fetchApi('/admin/v1/academic'),
       ]);
       setProducts(productResponse.data as Product[]);
       setCourses(courseResponse.data as Course[]);
+      setGrades(academicResponse.data.grades as Grade[]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الباقات');
     } finally {
@@ -160,6 +171,7 @@ export default function ProductsPage() {
       status: product.status === ('ACTIVE' as Product['status']) ? 'PUBLISHED' : product.status,
       publishAt: toLocalDateTime(product.publishAt),
       unpublishAt: toLocalDateTime(product.unpublishAt),
+      gradeId: product.gradeId ?? product.grade?.id ?? product.courses[0]?.course.gradeId ?? '',
       courseIds: product.courses.map((entry) => entry.course.id),
       priceAmount: '',
       billingPeriod: price?.billingPeriod ?? 'ONCE',
@@ -180,8 +192,22 @@ export default function ProductsPage() {
     );
   };
 
+  const changeGrade = (gradeId: string) => {
+    setForm((current) => ({
+      ...current,
+      gradeId,
+      courseIds: current.courseIds.filter(
+        (courseId) => courses.find((course) => course.id === courseId)?.gradeId === gradeId,
+      ),
+    }));
+  };
+
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (!form.gradeId) {
+      toast.error('اختر المرحلة الدراسية للباقة');
+      return;
+    }
     setSaving(true);
     try {
       let coverImageUrl = editing?.coverImageUrl;
@@ -201,6 +227,7 @@ export default function ProductsPage() {
         code: form.code.trim(),
         descriptionAr: form.descriptionAr.trim() || undefined,
         coverImageUrl,
+        gradeId: form.gradeId,
         status: form.status,
         publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : null,
         unpublishAt: form.unpublishAt ? new Date(form.unpublishAt).toISOString() : null,
@@ -291,6 +318,11 @@ export default function ProductsPage() {
             ),
           },
           { id: 'status', header: 'النشر', cell: statusBadge },
+          {
+            id: 'grade',
+            header: 'المرحلة',
+            cell: (product: Product) => product.grade?.nameAr || 'غير محددة',
+          },
           {
             id: 'courses',
             header: 'الكورسات',
@@ -383,6 +415,19 @@ export default function ProductsPage() {
             onChange={(event) => updateForm('descriptionAr', event.target.value)}
           />
           <Select
+            label="المرحلة الدراسية"
+            value={form.gradeId}
+            onChange={(event) => changeGrade(event.target.value)}
+            required
+          >
+            <option value="">اختر المرحلة</option>
+            {grades.map((grade) => (
+              <option key={grade.id} value={grade.id}>
+                {grade.nameAr}
+              </option>
+            ))}
+          </Select>
+          <Select
             label="الحالة"
             value={form.status}
             onChange={(event) => updateForm('status', event.target.value as Product['status'])}
@@ -424,20 +469,22 @@ export default function ProductsPage() {
           </label>
           <fieldset className="space-y-2 border-y border-border py-4">
             <legend className="px-2 text-sm font-bold">الكورسات المشمولة</legend>
-            {courses.map((course) => (
-              <label key={course.id} className="flex cursor-pointer items-center gap-3 py-2">
-                <input
-                  type="checkbox"
-                  checked={form.courseIds.includes(course.id)}
-                  onChange={() => toggleCourse(course.id)}
-                  className="size-4 accent-brand-600"
-                />
-                <span className="flex-1">{course.titleAr}</span>
-                <span className="text-xs text-ink-3" dir="ltr">
-                  {course.code}
-                </span>
-              </label>
-            ))}
+            {courses
+              .filter((course) => !form.gradeId || course.gradeId === form.gradeId)
+              .map((course) => (
+                <label key={course.id} className="flex cursor-pointer items-center gap-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={form.courseIds.includes(course.id)}
+                    onChange={() => toggleCourse(course.id)}
+                    className="size-4 accent-brand-600"
+                  />
+                  <span className="flex-1">{course.titleAr}</span>
+                  <span className="text-xs text-ink-3" dir="ltr">
+                    {course.code}
+                  </span>
+                </label>
+              ))}
           </fieldset>
           <div className="grid grid-cols-2 gap-3">
             <Input

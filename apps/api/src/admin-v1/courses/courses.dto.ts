@@ -164,3 +164,13 @@ export class ReorderContentDto {
   @IsString({ each: true })
   ids!: string[];
 }
+
+export class UpdateLessonLifecycleDto {
+  @IsIn(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
+  status!: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  version!: number;
+}

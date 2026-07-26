@@ -360,6 +360,46 @@ export class AdminV1CoursesService {
     return { ids };
   }
 
+  async updateLessonLifecycle(
+    organizationId: string,
+    unitId: string,
+    status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+    version: number,
+  ) {
+    const unit = await db.unit.findFirst({
+      where: { id: unitId, chapter: { course: { organizationId } } },
+      include: { chapter: true },
+    });
+    if (!unit) throw new NotFoundException('Lesson not found');
+    if (unit.version !== version) this.versionConflict();
+
+    const archivedAt = status === 'ARCHIVED' ? new Date() : null;
+    return db.$transaction(async (tx: any) => {
+      if (status === 'PUBLISHED' && unit.chapter.status !== 'PUBLISHED') {
+        await tx.chapter.update({
+          where: { id: unit.chapterId },
+          data: {
+            status: 'PUBLISHED',
+            archivedAt: null,
+            version: { increment: 1 },
+          },
+        });
+      }
+      await tx.lesson.updateMany({
+        where: { unitId },
+        data: { status, archivedAt, version: { increment: 1 } },
+      });
+      return tx.unit.update({
+        where: { id: unitId },
+        data: {
+          status,
+          archivedAt,
+          version: { increment: 1 },
+        },
+      });
+    });
+  }
+
   private async validateReferences(
     organizationId: string,
     input: Partial<CreateCourseDto>,

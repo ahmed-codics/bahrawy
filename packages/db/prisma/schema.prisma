@@ -112,6 +112,7 @@ model Grade {
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   cohorts         Cohort[]
   courses         Course[]
+  products        Product[]
   studentProfiles StudentProfile[]
 
   @@unique([organizationId, code])
@@ -647,6 +648,7 @@ model CoursePrerequisite {
 model Product {
   id             String    @id @default(uuid())
   organizationId String
+  gradeId        String?
   code           String
   titleAr        String
   titleEn        String?
@@ -662,6 +664,7 @@ model Product {
   version        Int       @default(1)
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  grade        Grade?          @relation(fields: [gradeId], references: [id], onDelete: Restrict)
   prices       Price[]
   courses      ProductCourse[]
   unitEntries  ProductUnit[]
@@ -669,6 +672,7 @@ model Product {
 
   @@unique([organizationId, code])
   @@index([organizationId])
+  @@index([gradeId])
   @@index([status, publishAt, unpublishAt])
 }
 

@@ -24,6 +24,7 @@ import {
   ReorderContentDto,
   UpdateContentNodeDto,
   UpdateCourseDto,
+  UpdateLessonLifecycleDto,
 } from './courses.dto';
 import { AdminV1CoursesService } from './courses.service';
 
@@ -144,6 +145,20 @@ export class AdminV1CoursesController {
       nodeType,
       parentId,
       input.ids,
+    );
+  }
+
+  @Patch('units/:unitId/lifecycle')
+  updateLessonLifecycle(
+    @Req() request: AdminRequest,
+    @Param('unitId') unitId: string,
+    @Body() input: UpdateLessonLifecycleDto,
+  ) {
+    return this.coursesService.updateLessonLifecycle(
+      request.account.organizationId,
+      unitId,
+      input.status,
+      input.version,
     );
   }
 }

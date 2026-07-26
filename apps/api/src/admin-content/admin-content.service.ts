@@ -194,7 +194,10 @@ export class AdminContentService {
     return db.product.findMany({
       where: {
         type: 'BUNDLE',
-        courses: { some: { course: { gradeId } } },
+        OR: [
+          { gradeId },
+          { gradeId: null, courses: { some: { course: { gradeId } } } },
+        ],
         status: { not: 'ARCHIVED' },
       },
       include: {
@@ -214,6 +217,7 @@ export class AdminContentService {
     return db.product.create({
       data: {
         organizationId,
+        gradeId,
         code,
         type: 'BUNDLE',
         titleAr: data.titleAr,
@@ -244,6 +248,7 @@ export class AdminContentService {
         titleEn: data.titleEn,
         descriptionAr: data.descriptionAr,
         coverImageUrl: data.coverImageUrl,
+        gradeId: data.gradeId,
         status: data.status,
       },
       include: { prices: { where: { status: 'ACTIVE' }, take: 1 } },
@@ -336,6 +341,7 @@ export class AdminContentService {
     return db.product.create({
       data: {
         organizationId: unit.chapter.course.organizationId,
+        gradeId: unit.chapter.course.gradeId,
         code: data.code ?? `lesson-${unitId}-${Date.now()}`,
         type: 'LESSON',
         titleAr: data.titleAr ?? unit.titleAr,
@@ -392,6 +398,7 @@ export class AdminContentService {
     return db.product.create({
       data: {
         organizationId: course.organizationId,
+        gradeId: course.gradeId,
         code: data.code ?? `course-${courseId}-${Date.now()}`,
         type: 'COURSE',
         titleAr: data.titleAr ?? course.titleAr,

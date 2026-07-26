@@ -439,10 +439,12 @@ async function main() {
 
   const product = await db.product.upsert({
     where: { organizationId_code: { organizationId: org.id, code: 'prod-eng-g3-t1' } },
-    update: {},
+    update: { gradeId: mainGradeId, type: 'BUNDLE' },
     create: {
       organizationId: org.id,
+      gradeId: mainGradeId,
       code: 'prod-eng-g3-t1',
+      type: 'BUNDLE',
       titleAr: '[DEV] كورس الإنجليزي كامل',
       status: 'ACTIVE',
       prices: {

@@ -2,17 +2,13 @@
 
 import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { ImageIcon, LoaderCircle, LockKeyhole, Pencil, Save, Trash2 } from 'lucide-react';
-import { Button } from '@bahrawy/ui';
+import { Archive, ImageIcon, LoaderCircle, LockKeyhole, Pencil, Save } from 'lucide-react';
+import { Badge, Button } from '@bahrawy/ui';
 import { fetchApi } from '../../../../../lib/api';
 import { HomeworkSection } from './HomeworkSection';
 import { PdfUploadArea } from './PdfUploadArea';
 import { VideoUploadArea } from './VideoUploadArea';
-import type {
-  AssessmentPrerequisiteOption,
-  AssessmentRecord,
-  UnitRecord,
-} from './types';
+import type { AssessmentPrerequisiteOption, AssessmentRecord, UnitRecord } from './types';
 
 type LessonCardProps = {
   unit: UnitRecord;
@@ -46,6 +42,7 @@ export function LessonCard({
   );
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
 
   useEffect(() => {
     setSelectedPrerequisite(unit.prerequisiteAssessmentId ?? '');
@@ -102,8 +99,7 @@ export function LessonCard({
     [unit.lessons],
   );
   const homework =
-    unit.assessments[0] ??
-    (videoItem ? assessmentByLessonId?.[videoItem.id] ?? null : null);
+    unit.assessments[0] ?? (videoItem ? (assessmentByLessonId?.[videoItem.id] ?? null) : null);
   const eligiblePrerequisites = prerequisiteOptions.filter(
     (option) => option.position < unitPosition,
   );
@@ -120,17 +116,11 @@ export function LessonCard({
           version: unit.version,
         }),
       });
-      toast.success(
-        prerequisiteAssessmentId
-          ? 'تم حفظ المتطلب السابق'
-          : 'تم إلغاء المتطلب السابق',
-      );
+      toast.success(prerequisiteAssessmentId ? 'تم حفظ المتطلب السابق' : 'تم إلغاء المتطلب السابق');
       await onReload();
     } catch (error) {
       setSelectedPrerequisite(previous);
-      toast.error(
-        error instanceof Error ? error.message : 'فشل حفظ المتطلب السابق',
-      );
+      toast.error(error instanceof Error ? error.message : 'فشل حفظ المتطلب السابق');
     } finally {
       setSavingPrerequisite(false);
     }
@@ -156,17 +146,28 @@ export function LessonCard({
     }
   };
 
-  const deleteUnit = async () => {
-    if (!confirm(`هل أنت متأكد من حذف الدرس "${unit.titleAr}"؟`)) return;
+  const changeLifecycle = async (status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') => {
+    if (status === 'ARCHIVED' && !confirm(`هل أنت متأكد من أرشفة الدرس "${unit.titleAr}"؟`)) {
+      return;
+    }
+    setChangingStatus(true);
     try {
-      await fetchApi(`/admin/v1/courses/unit/${unit.id}/content`, {
+      await fetchApi(`/admin/v1/courses/units/${unit.id}/lifecycle`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: 'ARCHIVED', version: unit.version }),
+        body: JSON.stringify({ status, version: unit.version }),
       });
-      toast.success('تم حذف الدرس');
+      toast.success(
+        status === 'PUBLISHED'
+          ? 'تم نشر الدرس ومحتواه'
+          : status === 'ARCHIVED'
+            ? 'تمت أرشفة الدرس'
+            : 'تم تحويل الدرس إلى مسودة',
+      );
       await onReload();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'فشل حذف الدرس');
+      toast.error(error instanceof Error ? error.message : 'فشل تغيير حالة الدرس');
+    } finally {
+      setChangingStatus(false);
     }
   };
 
@@ -195,10 +196,40 @@ export function LessonCard({
               className="flex-1 border-b border-brand-500 bg-transparent text-base font-semibold outline-none"
             />
           ) : (
-            <span className="text-base font-semibold text-primary">{unit.titleAr}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-base font-semibold text-primary">{unit.titleAr}</span>
+              <Badge
+                tone={
+                  unit.status === 'PUBLISHED'
+                    ? 'success'
+                    : unit.status === 'ARCHIVED'
+                      ? 'neutral'
+                      : 'amber'
+                }
+              >
+                {unit.status === 'PUBLISHED'
+                  ? 'منشور'
+                  : unit.status === 'ARCHIVED'
+                    ? 'مؤرشف'
+                    : 'مسودة'}
+              </Badge>
+            </div>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <select
+            aria-label={`حالة الدرس ${unit.titleAr}`}
+            value={unit.status}
+            disabled={changingStatus}
+            onChange={(event) =>
+              void changeLifecycle(event.target.value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')
+            }
+            className="h-9 rounded-lg border border-border-default bg-surface px-2 text-xs font-bold text-primary disabled:opacity-60"
+          >
+            <option value="DRAFT">مسودة</option>
+            <option value="PUBLISHED">منشور</option>
+            <option value="ARCHIVED">مؤرشف</option>
+          </select>
           <button
             type="button"
             onClick={() => {
@@ -212,11 +243,12 @@ export function LessonCard({
           </button>
           <button
             type="button"
-            onClick={() => void deleteUnit()}
+            onClick={() => void changeLifecycle('ARCHIVED')}
+            disabled={changingStatus || unit.status === 'ARCHIVED'}
             className="rounded p-1.5 text-text-muted transition-colors hover:bg-danger/10 hover:text-danger"
-            aria-label="حذف الدرس"
+            aria-label="أرشفة الدرس"
           >
-            <Trash2 className="size-4" />
+            <Archive className="size-4" />
           </button>
         </div>
       </div>
@@ -279,11 +311,29 @@ export function LessonCard({
           <span className="mb-2 block text-sm font-bold text-primary">صورة غلاف الدرس</span>
           <span className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border-default bg-surface px-3 text-sm font-semibold text-text-muted hover:border-brand-400 hover:text-brand-700">
             <ImageIcon className="size-4" />
-            <span className="truncate">{coverFile?.name || (unit.lessonProduct?.coverImageUrl ? 'تغيير الصورة الحالية' : 'اختر صورة')}</span>
-            <input type="file" accept="image/*" className="sr-only" onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)} />
+            <span className="truncate">
+              {coverFile?.name ||
+                (unit.lessonProduct?.coverImageUrl ? 'تغيير الصورة الحالية' : 'اختر صورة')}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+            />
           </span>
         </label>
-        <Button disabled={savingProduct} leadingIcon={savingProduct ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />} onClick={() => void saveProduct()}>
+        <Button
+          disabled={savingProduct}
+          leadingIcon={
+            savingProduct ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )
+          }
+          onClick={() => void saveProduct()}
+        >
           {unit.lessonProduct ? 'حفظ التعديلات' : 'تفعيل شراء الدرس'}
         </Button>
       </div>

@@ -274,9 +274,20 @@ export class CatalogService {
     return db.product.findMany({
       where: {
         status: { in: ['ACTIVE', 'PUBLISHED'] },
-        ...(gradeId ? { courses: { some: { course: { gradeId } } } } : {}),
+        ...(gradeId
+          ? {
+              OR: [
+                { gradeId },
+                {
+                  gradeId: null,
+                  courses: { some: { course: { gradeId } } },
+                },
+              ],
+            }
+          : {}),
       },
       include: {
+        grade: true,
         prices: { where: { status: 'ACTIVE' } },
         courses: {
           include: {
@@ -338,7 +349,9 @@ export class CatalogService {
       const product = entitlement.product;
       if (
         gradeId &&
-        !product.courses.some((entry) => entry.course.gradeId === gradeId)
+        (product.gradeId
+          ? product.gradeId !== gradeId
+          : !product.courses.some((entry) => entry.course.gradeId === gradeId))
       ) {
         continue;
       }
@@ -377,7 +390,10 @@ export class CatalogService {
       where: {
         type: 'BUNDLE',
         status: { in: ['ACTIVE', 'PUBLISHED'] },
-        courses: { some: { course: { gradeId } } },
+        OR: [
+          { gradeId },
+          { gradeId: null, courses: { some: { course: { gradeId } } } },
+        ],
       },
       include: {
         prices: { where: { status: 'ACTIVE' }, take: 1 },

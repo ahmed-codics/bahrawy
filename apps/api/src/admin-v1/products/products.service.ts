@@ -14,6 +14,7 @@ export class AdminV1ProductsService {
       where: { organizationId },
       orderBy: { updatedAt: 'desc' },
       include: {
+        grade: true,
         prices: { orderBy: { createdAt: 'desc' } },
         courses: { include: { course: true } },
         unitEntries: {
@@ -29,12 +30,14 @@ export class AdminV1ProductsService {
   async create(organizationId: string, input: ProductInputDto) {
     await this.validateMembership(
       organizationId,
+      input.gradeId,
       input.courseIds,
       input.unitIds,
     );
     return db.product.create({
       data: {
         organizationId,
+        gradeId: input.gradeId,
         code: input.code,
         titleAr: input.titleAr,
         titleEn: input.titleEn,
@@ -69,7 +72,7 @@ export class AdminV1ProductsService {
             }
           : {}),
       },
-      include: { prices: true, courses: true, unitEntries: true },
+      include: { grade: true, prices: true, courses: true, unitEntries: true },
     });
   }
 
@@ -87,6 +90,7 @@ export class AdminV1ProductsService {
     }
     await this.validateMembership(
       organizationId,
+      input.gradeId,
       input.courseIds,
       input.unitIds,
     );
@@ -96,6 +100,7 @@ export class AdminV1ProductsService {
         where: { id },
         data: {
           titleAr: input.titleAr,
+          gradeId: input.gradeId,
           titleEn: input.titleEn,
           descriptionAr: input.descriptionAr,
           coverImageUrl: input.coverImageUrl,
@@ -165,6 +170,7 @@ export class AdminV1ProductsService {
       return tx.product.findUnique({
         where: { id },
         include: {
+          grade: true,
           prices: { orderBy: { createdAt: 'desc' } },
           courses: { include: { course: true } },
           unitEntries: true,
@@ -175,9 +181,19 @@ export class AdminV1ProductsService {
 
   private async validateMembership(
     organizationId: string,
+    gradeId?: string,
     courseIds?: string[],
     unitIds?: string[],
   ) {
+    if (gradeId) {
+      const grade = await db.grade.findFirst({
+        where: { id: gradeId, organizationId, archivedAt: null },
+        select: { id: true },
+      });
+      if (!grade) {
+        throw new BadRequestException('Grade is invalid');
+      }
+    }
     if (courseIds) {
       const count = await db.course.count({
         where: { organizationId, id: { in: [...new Set(courseIds)] } },

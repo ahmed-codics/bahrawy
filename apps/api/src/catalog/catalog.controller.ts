@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Param, Req, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Req,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { PermissionsGuard } from '../rbac/permissions.guard';
@@ -105,11 +113,22 @@ export class CatalogController {
   }
 
   @Get('courses')
-  async getPublishedCourses() {
+  async getPublishedCourses(@Query('gradeId') gradeId?: string) {
     const data = await db.course.findMany({
-      where: { status: 'PUBLISHED' },
+      where: {
+        status: 'PUBLISHED',
+        archivedAt: null,
+        ...(gradeId ? { gradeId } : {}),
+        OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }],
+        AND: [
+          {
+            OR: [{ unpublishAt: null }, { unpublishAt: { gt: new Date() } }],
+          },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       include: {
+        grade: true,
         products: {
           include: {
             product: {

@@ -37,6 +37,10 @@ export class ProductInputDto {
   type?: string;
 
   @IsOptional()
+  @IsString()
+  gradeId?: string;
+
+  @IsOptional()
   @IsIn(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
