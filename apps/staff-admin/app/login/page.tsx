@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, KeyRound, LockKeyhole, Mail } from 'lucide-react';
+import { AlertCircle, LockKeyhole, Mail } from 'lucide-react';
 import { BrandMark, Button, Card, Input } from '@bahrawy/ui';
 import { fetchApi, fetchCsrfToken } from '../../lib/api';
 
 export default function StaffLoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [totpToken, setTotpToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -25,7 +24,6 @@ export default function StaffLoginPage() {
         body: JSON.stringify({
           email: identifier,
           password,
-          ...(totpToken ? { totpToken } : {}),
         }),
       });
       await fetchCsrfToken();
@@ -42,7 +40,6 @@ export default function StaffLoginPage() {
   const fillDev = () => {
     setIdentifier('admin@bahrawy.test');
     setPassword('owner_secret');
-    setTotpToken('');
   };
 
   return (
@@ -54,7 +51,7 @@ export default function StaffLoginPage() {
         <Card className="p-8 shadow-[var(--shadow-sm)]">
           <h1 className="font-heading text-2xl font-bold text-ink">Staff sign in</h1>
           <p className="mb-6 mt-1 text-sm text-ink-3">
-            Use your staff account and authenticator code if enabled.
+            Use your staff email and password to continue.
           </p>
           <form onSubmit={login} className="space-y-5">
             {error && (
@@ -87,16 +84,6 @@ export default function StaffLoginPage() {
               disabled={loading}
               directionMode="ltr"
               leadingIcon={<LockKeyhole className="size-4" />}
-            />
-            <Input
-              label="Authenticator code"
-              hint="Leave empty if two-factor authentication is not enabled for your account."
-              inputMode="numeric"
-              value={totpToken}
-              onChange={(event) => setTotpToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
-              disabled={loading}
-              directionMode="ltr"
-              leadingIcon={<KeyRound className="size-4" />}
             />
             <Button type="submit" size="lg" className="w-full" loading={loading}>
               Sign in
