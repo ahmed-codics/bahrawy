@@ -106,33 +106,33 @@ export default function BundleDetailPage({
 
   return (
     <PublicShell active="courses">
-      <div className="academy-container pb-16 pt-7 sm:pt-10">
+      <div className="academy-container pb-12 pt-5 sm:pb-16 sm:pt-10">
         <Link
           href={`/courses?gradeId=${encodeURIComponent(gradeId)}`}
-          className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-text-muted transition-colors hover:text-brand-600"
+          className="mb-4 inline-flex items-center gap-2 text-xs font-bold text-text-muted transition-colors hover:text-brand-600 sm:mb-5 sm:text-sm"
         >
           <ArrowLeft className="size-4 rotate-180" aria-hidden="true" />
           العودة إلى محتوى المرحلة
         </Link>
 
-        <section className="overflow-hidden rounded-[2rem] border border-border-default bg-surface shadow-[0_24px_70px_rgba(2,20,30,0.10)]">
+        <section className="overflow-hidden rounded-2xl border border-border-default bg-surface shadow-[0_18px_50px_rgba(2,20,30,0.10)] sm:rounded-[2rem] sm:shadow-[0_24px_70px_rgba(2,20,30,0.10)]">
           <div className="grid items-stretch lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
-            <div className="flex flex-col justify-center p-6 sm:p-9 lg:p-12">
-              <span className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3.5 py-2 text-xs font-black text-brand-700 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-200">
+            <div className="flex flex-col justify-center p-5 sm:p-9 lg:p-12">
+              <span className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-[11px] font-black text-brand-700 sm:mb-5 sm:px-3.5 sm:py-2 sm:text-xs dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-200">
                 <PackageOpen className="size-4" aria-hidden="true" />
                 تفاصيل الباقة
               </span>
 
-              <h1 className="max-w-3xl font-heading text-3xl font-black leading-tight text-text sm:text-4xl lg:text-5xl">
+              <h1 className="max-w-3xl font-heading text-[2rem] font-black leading-[1.18] text-text sm:text-4xl lg:text-5xl">
                 {product.titleAr}
               </h1>
-              <p className="mt-5 max-w-2xl text-base leading-8 text-text-muted">
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted sm:mt-5 sm:text-base sm:leading-8">
                 {product.descriptionAr ||
                   'كل الدروس والكورسات المشمولة داخل هذه الباقة في مكان واحد.'}
               </p>
 
-              <div className="mt-7 flex flex-wrap gap-3">
-                <span className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-surface-soft px-4 py-3 text-sm font-bold">
+              <div className="mt-5 flex flex-wrap gap-2 sm:mt-7 sm:gap-3">
+                <span className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-surface-soft px-3 py-2.5 text-xs font-bold sm:px-4 sm:py-3 sm:text-sm">
                   <Layers3 className="size-5 text-brand-600" aria-hidden="true" />
                   {courses.length} {courses.length === 1 ? 'كورس' : 'كورسات'}
                 </span>
@@ -144,17 +144,17 @@ export default function BundleDetailPage({
                 )}
               </div>
 
-              <div className="mt-8 flex flex-col gap-4 border-t border-border-default pt-7 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-6 flex flex-col gap-4 border-t border-border-default pt-5 sm:mt-8 sm:flex-row sm:items-center sm:justify-between sm:pt-7">
                 <div>
                   <span className="block text-xs font-bold text-text-muted">سعر الباقة</span>
-                  <strong className="mt-1 block font-heading text-3xl font-black text-text">
+                  <strong className="mt-1 block font-heading text-2xl font-black text-text sm:text-3xl">
                     {price?.amount ?? '—'}{' '}
                     <span className="text-base text-text-muted">{price?.currency || 'EGP'}</span>
                   </strong>
                 </div>
                 <button
                   type="button"
-                  className="academy-button academy-button-lg justify-center"
+                  className="academy-button w-full justify-center sm:w-auto sm:px-7 sm:py-4"
                   onClick={goToAction}
                 >
                   {actionLabel}
@@ -163,7 +163,7 @@ export default function BundleDetailPage({
               </div>
             </div>
 
-            <div className="relative order-first aspect-[4/3] overflow-hidden bg-brand-50 lg:order-none lg:m-5 lg:aspect-auto lg:min-h-72 lg:rounded-[1.5rem] dark:bg-brand-950/30">
+            <div className="relative order-first aspect-video overflow-hidden bg-brand-50 sm:aspect-[4/3] lg:order-none lg:m-5 lg:aspect-auto lg:min-h-72 lg:rounded-[1.5rem] dark:bg-brand-950/30">
               {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -181,11 +181,13 @@ export default function BundleDetailPage({
           </div>
         </section>
 
-        <section className="mt-12">
+        <section className="mt-9 sm:mt-12">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <span className="text-sm font-black text-brand-600">ابدأ التعلّم</span>
-              <h2 className="mt-1 font-heading text-3xl font-black text-text">محتوى الباقة</h2>
+              <h2 className="mt-1 font-heading text-2xl font-black text-text sm:text-3xl">
+                محتوى الباقة
+              </h2>
             </div>
             <p className="max-w-xl text-sm leading-7 text-text-muted">
               افتح كل درس لمعرفة الفيديوهات والاختبارات الموجودة بداخله.
@@ -198,7 +200,7 @@ export default function BundleDetailPage({
             <div className="space-y-8">
               {courses.length > 0 && (
                 <div>
-                  <h3 className="mb-4 font-heading text-xl font-black text-text">
+                  <h3 className="mb-3 font-heading text-lg font-black text-text sm:mb-4 sm:text-xl">
                     الكورسات المشمولة
                   </h3>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -209,8 +211,8 @@ export default function BundleDetailPage({
                           key={course.id}
                           className="group overflow-hidden rounded-2xl border border-border-default bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                         >
-                          <div className="grid min-h-44 grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[160px_minmax(0,1fr)]">
-                            <div className="relative overflow-hidden bg-brand-50 dark:bg-brand-950/30">
+                          <div className="grid sm:min-h-44 sm:grid-cols-[160px_minmax(0,1fr)]">
+                            <div className="relative aspect-[16/8] overflow-hidden bg-brand-50 sm:aspect-auto dark:bg-brand-950/30">
                               {courseCover ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -224,12 +226,12 @@ export default function BundleDetailPage({
                                 </div>
                               )}
                             </div>
-                            <div className="flex min-w-0 flex-col justify-between p-4 sm:p-5">
+                            <div className="flex min-w-0 flex-col justify-between p-5">
                               <div>
                                 <span className="text-xs font-black text-brand-600">
                                   كورس داخل الباقة
                                 </span>
-                                <h4 className="mt-2 font-heading text-lg font-black leading-snug text-text">
+                                <h4 className="mt-2 font-heading text-xl font-black leading-snug text-text sm:text-lg">
                                   {course.titleAr}
                                 </h4>
                                 {course.descriptionAr && (
@@ -238,12 +240,13 @@ export default function BundleDetailPage({
                                   </p>
                                 )}
                               </div>
-                              <div className="mt-4 flex items-center justify-between gap-3">
+                              <div className="mt-5 flex flex-col gap-3 sm:mt-4 sm:flex-row sm:items-center sm:justify-between">
                                 <span className="text-xs font-bold text-text-muted">
                                   {course.unitCount || 0} دروس منشورة
                                 </span>
                                 <Button
                                   size="sm"
+                                  className="w-full justify-center sm:w-auto"
                                   onClick={() =>
                                     router.push(
                                       hasEntitlement
