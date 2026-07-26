@@ -40,6 +40,9 @@ export function LessonCard({
   const [priceAmount, setPriceAmount] = useState(
     String(unit.lessonProduct?.prices?.[0]?.amount ?? ''),
   );
+  const [isFree, setIsFree] = useState(
+    Number(unit.lessonProduct?.prices?.[0]?.amount ?? -1) === 0,
+  );
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [savingProduct, setSavingProduct] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
@@ -50,10 +53,11 @@ export function LessonCard({
 
   useEffect(() => {
     setPriceAmount(String(unit.lessonProduct?.prices?.[0]?.amount ?? ''));
+    setIsFree(Number(unit.lessonProduct?.prices?.[0]?.amount ?? -1) === 0);
   }, [unit.lessonProduct]);
 
   const saveProduct = async () => {
-    const parsedPrice = Number(priceAmount);
+    const parsedPrice = isFree ? 0 : Number(priceAmount);
     if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
       toast.error('اكتب سعر صحيح للدرس');
       return;
@@ -302,10 +306,20 @@ export function LessonCard({
               value={priceAmount}
               onChange={(event) => setPriceAmount(event.target.value)}
               placeholder="مثال: 100"
+              disabled={isFree}
               className="h-11 w-full rounded-lg border border-border-default bg-surface px-3 pl-14 text-sm font-semibold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
             />
             <span className="absolute left-3 top-3 text-xs font-bold text-text-muted">EGP</span>
           </div>
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-brand-200 bg-brand-50/60 px-3 text-sm font-semibold text-primary">
+          <input
+            type="checkbox"
+            checked={isFree}
+            onChange={(event) => setIsFree(event.target.checked)}
+            className="size-4 accent-brand-600"
+          />
+          <span>هذا الدرس مجاني</span>
         </label>
         <label className="block">
           <span className="mb-2 block text-sm font-bold text-primary">صورة غلاف الدرس</span>

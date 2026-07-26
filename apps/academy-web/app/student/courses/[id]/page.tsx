@@ -46,8 +46,10 @@ type Course = {
 
 function money(product?: Product | null) {
   const price = product?.prices?.[0];
-  return price
-    ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
+  return price && Number(price.amount) === 0
+    ? 'مجاني'
+    : price
+      ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
     : null;
 }
 

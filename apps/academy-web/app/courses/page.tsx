@@ -190,7 +190,9 @@ export default async function CoursesPage({
                     const price = purchaseProduct?.prices?.[0];
                     const cover = publicCoverUrl(course.coverImageUrl);
                     const checkoutPath = purchaseProduct
-                      ? `/student/checkout/${purchaseProduct.id}`
+                      ? Number(price?.amount) === 0
+                        ? `/courses/${course.id}`
+                        : `/student/checkout/${purchaseProduct.id}`
                       : null;
                     return (
                       <article className="academy-course-card" key={course.id}>
@@ -231,8 +233,11 @@ export default async function CoursesPage({
                                 {purchaseProduct?.type === 'BUNDLE' ? 'متاح ضمن باقة' : 'السعر'}
                               </small>
                               <strong>
-                                {price?.amount ? arNumber.format(Number(price.amount)) : '—'}{' '}
-                                <em>{price?.currency || 'EGP'}</em>
+                                {price && Number(price.amount) === 0
+                                  ? 'مجاني'
+                                  : price
+                                    ? `${arNumber.format(Number(price.amount))} ${price.currency || 'EGP'}`
+                                    : '—'}
                               </strong>
                             </span>
                             {checkoutPath ? (
@@ -267,7 +272,9 @@ export default async function CoursesPage({
                   {bundles.map((product) => {
                     const price = product.prices?.[0];
                     const cover = publicCoverUrl(product.coverImageUrl);
-                    const checkoutPath = `/student/checkout/${product.id}`;
+                    const checkoutPath = Number(price?.amount) === 0
+                      ? `/student/products`
+                      : `/student/checkout/${product.id}`;
                     return (
                       <article className="academy-course-card" key={product.id}>
                         <div className="academy-course-cover">
@@ -305,8 +312,11 @@ export default async function CoursesPage({
                             <span>
                               <small>السعر</small>
                               <strong>
-                                {price?.amount ? arNumber.format(Number(price.amount)) : '—'}{' '}
-                                <em>{price?.currency || 'EGP'}</em>
+                                {price && Number(price.amount) === 0
+                                  ? 'مجاني'
+                                  : price
+                                    ? `${arNumber.format(Number(price.amount))} ${price.currency || 'EGP'}`
+                                    : '—'}
                               </strong>
                             </span>
                             <Link

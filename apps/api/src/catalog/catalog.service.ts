@@ -20,7 +20,16 @@ export class CatalogService {
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
     });
-    return !!entitlement;
+    if (entitlement) return true;
+    const freeProduct = await db.product.findFirst({
+      where: {
+        id: productId,
+        status: { in: ['ACTIVE', 'PUBLISHED'] },
+        prices: { some: { status: 'ACTIVE', amount: 0 } },
+      },
+      select: { id: true },
+    });
+    return !!freeProduct;
   }
 
   async getOrganizationSettings() {
@@ -58,7 +67,16 @@ export class CatalogService {
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
     });
-    return !!activeEntitlement;
+    if (activeEntitlement) return true;
+    const freeProduct = await db.product.findFirst({
+      where: {
+        id: { in: productIds },
+        status: { in: ['ACTIVE', 'PUBLISHED'] },
+        prices: { some: { status: 'ACTIVE', amount: 0 } },
+      },
+      select: { id: true },
+    });
+    return !!freeProduct;
   }
 
   async getUnitAccess(accountId: string, unitId: string, isStaff = false) {
@@ -111,6 +129,26 @@ export class CatalogService {
     });
 
     if (!entitlement) {
+      const freeProduct = await db.product.findFirst({
+        where: {
+          status: { in: ['ACTIVE', 'PUBLISHED'] },
+          prices: { some: { status: 'ACTIVE', amount: 0 } },
+          OR: [
+            { type: 'BUNDLE', courses: { some: { courseId: unit.chapter.courseId } } },
+            { type: 'COURSE', courses: { some: { courseId: unit.chapter.courseId } } },
+            { type: 'LESSON', unitEntries: { some: { unitId } } },
+          ],
+        },
+        select: { id: true, type: true },
+      });
+      if (freeProduct) {
+        return {
+          hasAccess: true,
+          hasEntitlement: true,
+          reason: freeProduct.type === 'LESSON' ? ('LESSON' as const) : freeProduct.type === 'COURSE' ? ('COURSE' as const) : ('BUNDLE' as const),
+          productId: freeProduct.id,
+        };
+      }
       return { hasAccess: false, reason: 'NONE' as const };
     }
 
@@ -342,7 +380,10 @@ export class CatalogService {
     const productsById = new Map(
       products.map((product) => [
         product.id,
-        { ...product, isEntitled: false },
+        {
+          ...product,
+          isEntitled: Number(product.prices?.[0]?.amount) === 0,
+        },
       ]),
     );
     for (const entitlement of entitlements) {

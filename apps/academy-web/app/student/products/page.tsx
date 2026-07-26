@@ -163,8 +163,11 @@ function BundleCard({
         <div className="mt-6 border-t border-border-default pt-5">
           <p className="text-xs font-bold text-text-muted">إجمالي الاشتراك</p>
           <p className="ba-number mt-1 text-3xl font-black">
-            {price ? Number(price.amount).toLocaleString('ar-EG') : '—'}{' '}
-            <span className="font-sans text-sm">{price?.currency || 'EGP'}</span>
+            {price && Number(price.amount) === 0
+              ? 'مجاني'
+              : price
+                ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
+                : '—'}
           </p>
         </div>
         <Button

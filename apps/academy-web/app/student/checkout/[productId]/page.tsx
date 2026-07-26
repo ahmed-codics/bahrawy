@@ -42,6 +42,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
       .then(([productData, orgData]) => {
         setProduct(productData);
         setOrgSettings(orgData);
+        if (Number(productData.prices?.[0]?.amount) === 0) {
+          router.replace('/student/courses');
+        }
       })
       .catch(() => setError('تعذر تحميل بيانات عملية الشراء.'))
       .finally(() => setLoading(false));

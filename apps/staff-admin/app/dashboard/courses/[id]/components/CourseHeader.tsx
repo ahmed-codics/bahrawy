@@ -24,6 +24,9 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [isFree, setIsFree] = useState(
+    Number(course.courseProduct?.prices?.[0]?.amount ?? -1) === 0,
+  );
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,7 +59,7 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
           version: course.version,
         }),
       });
-      if (String(values.priceAmount || '').trim()) {
+      if (isFree || String(values.priceAmount || '').trim()) {
         await fetchApi(`/admin/courses/${course.id}/product`, {
           method: course.courseProduct ? 'PATCH' : 'POST',
           body: JSON.stringify({
@@ -64,7 +67,7 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
             titleEn: values.titleEn || undefined,
             descriptionAr: values.descriptionAr || undefined,
             coverImageUrl,
-            priceAmount: Number(values.priceAmount),
+            priceAmount: isFree ? 0 : Number(values.priceAmount),
             status: 'ACTIVE',
           }),
         });
@@ -150,7 +153,17 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
             label="سعر شراء الكورس كاملاً (EGP)"
             defaultValue={String(course.courseProduct?.prices?.[0]?.amount ?? '')}
             placeholder="مثال: 500"
+            disabled={isFree}
           />
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-sm font-semibold text-ink">
+            <input
+              type="checkbox"
+              checked={isFree}
+              onChange={(event) => setIsFree(event.target.checked)}
+              className="size-4 accent-brand-600"
+            />
+            <span>هذا الكورس مجاني</span>
+          </label>
           <Select name="status" label="الحالة" defaultValue={course.status}>
             <option value="DRAFT">مسودة</option>
             <option value="PUBLISHED">منشور</option>

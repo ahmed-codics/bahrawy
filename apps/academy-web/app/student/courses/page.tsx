@@ -135,7 +135,10 @@ export default function StudentCoursesPage() {
               course={course}
               owned={ownedMap.get(course.id)}
               onOpen={() => router.push(`/student/courses/${course.id}`)}
-              onBuy={(productId) => router.push(`/student/checkout/${productId}`)}
+              onBuy={(productId) => {
+                const product = course.products?.map((entry) => entry.product).find((item) => item.id === productId);
+                router.push(Number(product?.prices?.[0]?.amount) === 0 ? `/student/courses/${course.id}` : `/student/checkout/${productId}`);
+              }}
             />
           ))}
         </section>
@@ -219,8 +222,10 @@ function CourseCard({
             <div>
               <p className="text-xs font-bold text-text-muted">يبدأ من</p>
               <p className="ba-number mt-1 text-xl font-black">
-                {price
-                  ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
+                {price && Number(price.amount) === 0
+                  ? 'مجاني'
+                  : price
+                    ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
                   : 'شاهد الخيارات'}
               </p>
             </div>
@@ -230,7 +235,7 @@ function CourseCard({
         <div className="mt-5 grid gap-2">
           {!owned && courseProduct && (
             <Button className="w-full" variant="accent" onClick={() => onBuy(courseProduct.id)}>
-              شراء الكورس
+              {Number(price?.amount) === 0 ? 'ابدأ التعلم مجاناً' : 'شراء الكورس'}
             </Button>
           )}
           <Button

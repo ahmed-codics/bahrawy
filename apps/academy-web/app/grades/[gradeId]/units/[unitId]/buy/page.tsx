@@ -76,7 +76,7 @@ export default function UnitBuyPage({
           price={firstBundle?.prices?.[0]}
           disabled={!firstBundle}
           buttonLabel="اشتري الباقة"
-          onBuy={() => firstBundle && router.push(`/student/checkout/${firstBundle.id}`)}
+          onBuy={() => firstBundle && router.push(Number(firstBundle.prices?.[0]?.amount) === 0 ? `/login?next=/student/products` : `/student/checkout/${firstBundle.id}`)}
         />
         <BuyCard
           icon={<BookOpen className="size-6" />}
@@ -85,7 +85,7 @@ export default function UnitBuyPage({
           price={lessonProduct?.prices?.[0]}
           disabled={!lessonProduct}
           buttonLabel="اشتري الدرس"
-          onBuy={() => lessonProduct && router.push(`/student/checkout/${lessonProduct.id}`)}
+          onBuy={() => lessonProduct && router.push(Number(lessonProduct.prices?.[0]?.amount) === 0 ? `/login?next=/student/courses` : `/student/checkout/${lessonProduct.id}`)}
         />
       </div>
     </PageIntro>
@@ -121,7 +121,8 @@ function BuyCard({
         <div>
           <h2 className="font-heading text-2xl font-black">{title}</h2>
           <p className="ba-number mt-3 text-3xl font-black">
-            {price?.amount ?? '—'} <span className="text-sm">{price?.currency || 'EGP'}</span>
+            {price && Number(price.amount) === 0 ? 'مجاني' : price?.amount ?? '—'}{' '}
+            {price && Number(price.amount) !== 0 && <span className="text-sm">{price.currency || 'EGP'}</span>}
           </p>
         </div>
         <Button
@@ -130,7 +131,7 @@ function BuyCard({
           trailingIcon={<ArrowLeft className="size-4" />}
           onClick={onBuy}
         >
-          {buttonLabel}
+          {price && Number(price.amount) === 0 ? 'ابدأ مجاناً' : buttonLabel}
         </Button>
       </CardContent>
     </Card>

@@ -67,6 +67,7 @@ type ProductForm = {
   gradeId: string;
   courseIds: string[];
   priceAmount: string;
+  isFree: boolean;
   billingPeriod: string;
 };
 
@@ -81,6 +82,7 @@ const EMPTY_FORM: ProductForm = {
   gradeId: '',
   courseIds: [],
   priceAmount: '',
+  isFree: false,
   billingPeriod: 'ONCE',
 };
 
@@ -174,6 +176,7 @@ export default function ProductsPage() {
       gradeId: product.gradeId ?? product.grade?.id ?? product.courses[0]?.course.gradeId ?? '',
       courseIds: product.courses.map((entry) => entry.course.id),
       priceAmount: '',
+      isFree: Number(price?.amount) === 0,
       billingPeriod: price?.billingPeriod ?? 'ONCE',
     });
     setDrawerOpen(true);
@@ -232,9 +235,9 @@ export default function ProductsPage() {
         publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : null,
         unpublishAt: form.unpublishAt ? new Date(form.unpublishAt).toISOString() : null,
         courseIds: form.courseIds,
-        ...(form.priceAmount !== ''
+        ...(form.isFree || form.priceAmount !== ''
           ? {
-              priceAmount: Number(form.priceAmount),
+              priceAmount: form.isFree ? 0 : Number(form.priceAmount),
               currency: 'EGP',
               billingPeriod: form.billingPeriod,
             }
@@ -338,7 +341,11 @@ export default function ProductsPage() {
             header: 'السعر الحالي',
             cell: (product: Product) => {
               const price = currentPrice(product);
-              return price ? `${price.amount} ${price.currency}` : 'بدون سعر';
+              return price
+                ? Number(price.amount) === 0
+                  ? 'مجاني'
+                  : `${price.amount} ${price.currency}`
+                : 'بدون سعر';
             },
           },
           {
@@ -494,6 +501,7 @@ export default function ProductsPage() {
               label={editing ? 'سعر جديد (اختياري)' : 'السعر'}
               value={form.priceAmount}
               onChange={(event) => updateForm('priceAmount', event.target.value)}
+              disabled={form.isFree}
             />
             <Select
               label="نوع الدفع"
@@ -505,6 +513,15 @@ export default function ProductsPage() {
               <option value="TERM">فصل دراسي</option>
             </Select>
           </div>
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-sm font-semibold text-ink">
+            <input
+              type="checkbox"
+              checked={form.isFree}
+              onChange={(event) => updateForm('isFree', event.target.checked)}
+              className="size-4 accent-brand-600"
+            />
+            <span>هذا المنتج مجاني</span>
+          </label>
           {editing && (
             <section className="space-y-2 border-t border-border pt-4">
               <h3 className="text-sm font-bold">سجل الأسعار</h3>
