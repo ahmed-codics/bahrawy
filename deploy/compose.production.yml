@@ -1,0 +1,171 @@
+name: bahrawy
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: 5
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 2g
+    logging: *default-logging
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    restart: unless-stopped
+    command: ['valkey-server', '--appendonly', 'yes', '--loglevel', 'warning']
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    logging: *default-logging
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: migrate
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    logging: *default-logging
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: api
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
+    volumes:
+      - ../data/uploads:/app/apps/api/.uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    mem_limit: 1g
+    logging: *default-logging
+
+  academy-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: academy-web
+      args:
+        NEXT_PUBLIC_API_URL: https://${ACADEMY_HOST}/api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3001
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    mem_limit: 1g
+    logging: *default-logging
+
+  staff-admin:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: staff-admin
+      args:
+        NEXT_PUBLIC_API_URL: https://${ADMIN_HOST}/api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3002
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3002/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    mem_limit: 1g
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      ACADEMY_HOST: ${ACADEMY_HOST}
+      ADMIN_HOST: ${ADMIN_HOST}
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      academy-web:
+        condition: service_healthy
+      staff-admin:
+        condition: service_healthy
+    mem_limit: 256m
+    logging: *default-logging
+
+volumes:
+  postgres-data:
+  valkey-data:
+  caddy-data:
+  caddy-config:

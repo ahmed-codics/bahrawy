@@ -4,6 +4,7 @@ dist/
 .next/
 coverage/
 .env
+.env.production
 .env.local
 .env.development.local
 .env.test.local
@@ -26,3 +27,4 @@ __pycache__/
 packages/db/backups/
 packages/db/scripts/temp-verify.js
 packages/db/temp-db/
+/data/

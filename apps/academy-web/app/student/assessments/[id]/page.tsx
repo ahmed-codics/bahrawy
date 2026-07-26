@@ -20,7 +20,14 @@ type Option = { id: string; text: string };
 type AssessmentQuestion = {
   questionId: string;
   sort: number;
-  question: { id: string; titleAr: string; options: unknown; points: number };
+  question: {
+    id: string;
+    titleAr: string;
+    options: unknown;
+    points: number;
+    correctOptionId?: string | null;
+    explanation?: string | null;
+  };
 };
 type Attempt = {
   id: string;
@@ -48,6 +55,8 @@ type Result = {
   passed?: boolean | null;
   attemptsUsed?: number;
   attemptsRemaining?: number | null;
+  autosavedAnswers?: Record<string, string>;
+  assessment?: Attempt['assessment'];
 };
 
 function normalizeOptions(options: unknown): Option[] {
@@ -205,6 +214,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
     const passed = result.passed ?? (hasPassingScore ? score >= Number(result.passingScore) : null);
     const successful = !resultsReleased || passed !== false;
     const canRetry = resultsReleased && result.attemptsRemaining !== 0;
+    const resultQuestions = result.assessment?.questions ?? [];
     return (
       <PageIntro className="mx-auto max-w-2xl">
         <Card tone={successful ? 'cyan' : 'coral'}>
@@ -267,61 +277,79 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
             </div>
           </CardContent>
         </Card>
-        {resultsReleased && result?.assessment?.questions?.length > 0 && (
+        {resultsReleased && resultQuestions.length > 0 && (
           <div className="mt-16 animate-fade-up" style={{ animationDelay: '100ms' }}>
             <h2 className="mb-8 text-center font-heading text-3xl font-black">تفاصيل الإجابات</h2>
             <div className="grid gap-6">
-              {[...result.assessment.questions].sort((a, b) => a.sort - b.sort).map((aq, index) => {
-                const question = aq.question;
-                const studentAnswer = (result.autosavedAnswers || {})[question.id];
-                const isCorrect = String(studentAnswer) === String(question.correctOptionId) || 
-                                  question.options.find((o: any) => o.id === studentAnswer)?.text === question.correctOptionId;
-                const correctOption = question.options.find((o: any) => String(o.id) === String(question.correctOptionId) || o.text === question.correctOptionId);
-                const studentOption = question.options.find((o: any) => String(o.id) === String(studentAnswer) || o.text === studentAnswer);
+              {[...resultQuestions]
+                .sort((a, b) => a.sort - b.sort)
+                .map((aq, index) => {
+                  const question = aq.question;
+                  const options = normalizeOptions(question.options);
+                  const studentAnswer = (result.autosavedAnswers || {})[question.id];
+                  const isCorrect =
+                    String(studentAnswer) === String(question.correctOptionId) ||
+                    options.find((option) => option.id === studentAnswer)?.text ===
+                      question.correctOptionId;
+                  const correctOption = options.find(
+                    (option) =>
+                      String(option.id) === String(question.correctOptionId) ||
+                      option.text === question.correctOptionId,
+                  );
+                  const studentOption = options.find(
+                    (option) =>
+                      String(option.id) === String(studentAnswer) || option.text === studentAnswer,
+                  );
 
-                return (
-                  <Card key={question.id} tone={isCorrect ? 'cyan' : 'coral'}>
-                    <CardContent className="p-6 sm:p-8">
-                      <div className="mb-6 flex items-start gap-4">
-                        <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl font-black ${isCorrect ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-                          {index + 1}
-                        </div>
-                        <div className="mt-1 flex-1">
-                          <p className="font-bold text-lg leading-relaxed">{question.titleAr}</p>
-                          
-                          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                            <div className={`flex items-start gap-3 rounded-xl p-4 border ${isCorrect ? 'bg-success/5 border-success/10 text-success' : 'bg-danger/5 border-danger/10 text-danger'}`}>
-                              {isCorrect ? (
-                                <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
-                              ) : (
-                                <XCircle className="mt-0.5 size-5 shrink-0" />
-                              )}
-                              <div>
-                                <p className="font-bold">إجابتك:</p>
-                                {studentAnswer ? (
-                                  <p className="mt-1 font-medium">{studentOption?.text || studentAnswer}</p>
+                  return (
+                    <Card key={question.id} tone={isCorrect ? 'cyan' : 'coral'}>
+                      <CardContent className="p-6 sm:p-8">
+                        <div className="mb-6 flex items-start gap-4">
+                          <div
+                            className={`flex size-10 shrink-0 items-center justify-center rounded-xl font-black ${isCorrect ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}
+                          >
+                            {index + 1}
+                          </div>
+                          <div className="mt-1 flex-1">
+                            <p className="font-bold text-lg leading-relaxed">{question.titleAr}</p>
+
+                            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                              <div
+                                className={`flex items-start gap-3 rounded-xl p-4 border ${isCorrect ? 'bg-success/5 border-success/10 text-success' : 'bg-danger/5 border-danger/10 text-danger'}`}
+                              >
+                                {isCorrect ? (
+                                  <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
                                 ) : (
-                                  <p className="mt-1 font-medium">لم يتم الإجابة</p>
+                                  <XCircle className="mt-0.5 size-5 shrink-0" />
                                 )}
-                              </div>
-                            </div>
-                            
-                            {!isCorrect && correctOption && (
-                              <div className="flex items-start gap-3 rounded-xl bg-success/5 p-4 text-success border border-success/10">
-                                <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
                                 <div>
-                                  <p className="font-bold">الإجابة الصحيحة:</p>
-                                  <p className="mt-1 font-medium">{correctOption.text}</p>
+                                  <p className="font-bold">إجابتك:</p>
+                                  {studentAnswer ? (
+                                    <p className="mt-1 font-medium">
+                                      {studentOption?.text || studentAnswer}
+                                    </p>
+                                  ) : (
+                                    <p className="mt-1 font-medium">لم يتم الإجابة</p>
+                                  )}
                                 </div>
                               </div>
-                            )}
+
+                              {!isCorrect && correctOption && (
+                                <div className="flex items-start gap-3 rounded-xl bg-success/5 p-4 text-success border border-success/10">
+                                  <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+                                  <div>
+                                    <p className="font-bold">الإجابة الصحيحة:</p>
+                                    <p className="mt-1 font-medium">{correctOption.text}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
             </div>
           </div>
         )}
@@ -436,7 +464,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
             </Button>
           </div>
         </div>
-        
+
         {/* Right Sidebar Navigation Grid */}
         <div className="sticky top-20 z-10 hidden lg:block">
           <Card>
