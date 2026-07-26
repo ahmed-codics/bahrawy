@@ -9,7 +9,9 @@ let encryptionKey: Buffer;
 if (rawEncKey.length === 64 && /^[0-9a-fA-F]+$/.test(rawEncKey)) {
   encryptionKey = Buffer.from(rawEncKey, 'hex');
 } else {
-  throw new Error('FATAL: ENCRYPTION_KEY must be exactly 64 hex characters (no fallback to weak key)');
+  throw new Error(
+    'FATAL: ENCRYPTION_KEY must be exactly 64 hex characters (no fallback to weak key)',
+  );
 }
 
 let hmacKey: Buffer;
@@ -50,8 +52,22 @@ async function hashPassword(password: string): Promise<string> {
   });
 }
 
+function seedCredential(name: string, developmentFallback: string): string {
+  const value = process.env[name];
+  if (process.env.NODE_ENV === 'production') {
+    if (!value || value.length < 12) {
+      throw new Error(`${name} must contain at least 12 characters in production`);
+    }
+    return value;
+  }
+  return value || developmentFallback;
+}
+
 async function main() {
   console.log('Seeding development/test data for Bahrawy Academy...');
+  const staffPassword = seedCredential('SEED_STAFF_PASSWORD', 'owner_secret');
+  const studentPassword = seedCredential('SEED_STUDENT_PASSWORD', 'student_secret');
+  const guardianPassword = seedCredential('SEED_GUARDIAN_PASSWORD', 'guardian_secret');
 
   // 1. Organization & Hierarchy
   const org = await db.organization.upsert({
@@ -183,7 +199,7 @@ async function main() {
       update: {},
       create: { code: p, description: p },
     });
-    
+
     await db.rolePermission.upsert({
       where: {
         roleId_permissionId: {
@@ -219,7 +235,7 @@ async function main() {
       kind: 'STAFF',
       phoneEncrypted: encrypt(staffPhone),
       phoneHmac: generatePhoneHmac(staffPhone),
-      passwordHash: await hashPassword('owner_secret'),
+      passwordHash: await hashPassword(staffPassword),
       status: 'ACTIVE',
       accountRoles: {
         create: {
@@ -264,7 +280,7 @@ async function main() {
       kind: 'STUDENT',
       phoneEncrypted: encrypt(studentPhone),
       phoneHmac: generatePhoneHmac(studentPhone),
-      passwordHash: await hashPassword('student_secret'),
+      passwordHash: await hashPassword(studentPassword),
       status: 'ACTIVE',
       studentProfile: {
         create: {
@@ -292,7 +308,7 @@ async function main() {
       kind: 'GUARDIAN',
       phoneEncrypted: encrypt(guardianPhone),
       phoneHmac: generatePhoneHmac(guardianPhone),
-      passwordHash: await hashPassword('guardian_secret'),
+      passwordHash: await hashPassword(guardianPassword),
       status: 'ACTIVE',
       guardianProfile: {
         create: {
