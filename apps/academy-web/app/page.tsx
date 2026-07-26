@@ -250,6 +250,9 @@ export default async function Home() {
               <Menu aria-hidden="true" />
             </summary>
             <div className="academy-mobile-menu-panel">
+              <span className="academy-mobile-menu-theme">
+                <ThemeSelector />
+              </span>
               <a href="#levels">المراحل</a>
               <a href="#teacher">هتتعلم إزاي؟</a>
               <a href="#learning-path">عن مستر البحراوي</a>
