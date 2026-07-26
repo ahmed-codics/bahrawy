@@ -55,7 +55,8 @@ CMD ["npm", "run", "migrate:deploy"]
 FROM source AS academy-build
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN npm run build -w academy-web
+RUN npm run build -w @bahrawy/types \
+ && npm run build -w academy-web
 
 FROM node:24-alpine AS academy-web
 WORKDIR /app
@@ -72,7 +73,8 @@ CMD ["node", "apps/academy-web/server.js"]
 FROM source AS staff-build
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN npm run build -w staff-admin
+RUN npm run build -w @bahrawy/types \
+ && npm run build -w staff-admin
 
 FROM node:24-alpine AS staff-admin
 WORKDIR /app
