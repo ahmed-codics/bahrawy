@@ -187,11 +187,13 @@ function QuestionImagePicker({
 function QuestionForm({
   assessmentId,
   question,
+  questionNumber,
   onSaved,
   onCancel,
 }: {
   assessmentId: string;
   question?: QuestionRecord;
+  questionNumber?: number;
   onSaved: () => void;
   onCancel?: () => void;
 }) {
@@ -289,7 +291,9 @@ function QuestionForm({
 
   return (
     <div className="space-y-5 rounded-xl border-2 border-interactive/30 bg-surface p-6">
-      <h3 className="text-lg font-bold text-primary">{isEditing ? 'تعديل السؤال' : 'سؤال جديد'}</h3>
+      <h3 className="text-lg font-bold text-primary">
+        {isEditing ? 'تعديل السؤال' : `سؤال جديد${questionNumber ? ` رقم ${questionNumber}` : ''}`}
+      </h3>
 
       <QuestionImagePicker
         imagePreview={imagePreview}
@@ -812,6 +816,7 @@ export default function AssessmentEditorPage({
             <QuestionForm
               key={`new-question-${questionsRemaining}`}
               assessmentId={assessmentId}
+              questionNumber={questions.length + 1}
               onSaved={() => {
                 if (questionsRemaining > 1) {
                   setQuestionsRemaining((count) => count - 1);
