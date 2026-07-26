@@ -266,7 +266,7 @@ export class AuthService {
   ) {
     const phoneHmac = this.securityService.generatePhoneHmac(phone);
     const account = await db.account.findFirst({
-      where: { phoneHmac, deletedAt: null },
+      where: { phoneHmac, kind: { not: 'STAFF' }, deletedAt: null },
       include: { totpFactor: true },
     });
 
@@ -280,6 +280,60 @@ export class AuthService {
       throw new UnauthorizedException('Invalid phone number or password');
     }
 
+    return this.authenticateAccount(
+      account,
+      password,
+      totpToken,
+      ipAddress,
+      userAgent,
+      phoneHmac,
+      'Invalid phone number or password',
+    );
+  }
+
+  async staffLogin(
+    email: string,
+    password: string,
+    totpToken?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const emailHmac = this.securityService.generateEmailHmac(email);
+    const account = await db.account.findFirst({
+      where: { emailHmac, kind: 'STAFF', deletedAt: null },
+      include: { totpFactor: true },
+    });
+
+    if (!account) {
+      await this.logSecurityEvent(
+        null,
+        null,
+        'STAFF_LOGIN',
+        'FAILED_INVALID_CREDENTIALS',
+      );
+      throw new UnauthorizedException('Invalid email address or password');
+    }
+
+    return this.authenticateAccount(
+      account,
+      password,
+      totpToken,
+      ipAddress,
+      userAgent,
+      null,
+      'Invalid email address or password',
+    );
+  }
+
+  private async authenticateAccount(
+    account: any,
+    password: string,
+    totpToken: string | undefined,
+    ipAddress: string | undefined,
+    userAgent: string | undefined,
+    phoneHmac: string | null,
+    invalidCredentialsMessage: string,
+  ) {
     const isPassMatch = await this.securityService.verifyPassword(
       account.passwordHash,
       password,
@@ -291,7 +345,7 @@ export class AuthService {
         'LOGIN',
         'FAILED_INVALID_CREDENTIALS',
       );
-      throw new UnauthorizedException('Invalid phone number or password');
+      throw new UnauthorizedException(invalidCredentialsMessage);
     }
 
     // Staff TOTP verification if active

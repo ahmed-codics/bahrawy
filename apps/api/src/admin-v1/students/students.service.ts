@@ -119,7 +119,9 @@ export class AdminV1StudentsService {
     });
     let phone = 'HIDDEN';
     try {
-      phone = this.securityService.decrypt(student.account.phoneEncrypted);
+      if (student.account.phoneEncrypted) {
+        phone = this.securityService.decrypt(student.account.phoneEncrypted);
+      }
     } catch {
       // Keep the masked fallback when legacy encrypted data cannot be read.
     }

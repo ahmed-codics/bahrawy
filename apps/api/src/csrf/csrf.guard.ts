@@ -9,6 +9,7 @@ import { getSessionTokenFromCookies } from '../auth/session-cookie';
 
 const EXEMPT_PATHS = new Set([
   '/auth/login',
+  '/auth/staff-login',
   '/auth/register',
   '/auth/activate',
   '/auth/check-phone',

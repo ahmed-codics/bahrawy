@@ -24,7 +24,7 @@ type Role = {
 type Staff = {
   id: string;
   displayName: string;
-  phone: string;
+  email: string;
   account: {
     status: string;
     version: number;
@@ -103,7 +103,7 @@ export default function StaffPage() {
           method: 'POST',
           body: JSON.stringify({
             displayName: values.displayName,
-            phone: values.phone,
+            email: values.email,
             roleIds: selectedRoles,
           }),
         });
@@ -147,7 +147,7 @@ export default function StaffPage() {
               <div>
                 <strong>{member.displayName}</strong>
                 <p className="text-xs text-ink-3" dir="ltr">
-                  {member.phone}
+                  {member.email}
                 </p>
               </div>
             ),
@@ -214,7 +214,13 @@ export default function StaffPage() {
             {!editing ? (
               <>
                 <Input name="displayName" label="اسم الموظف" required />
-                <Input name="phone" label="رقم الهاتف" directionMode="ltr" required />
+                <Input
+                  name="email"
+                  type="email"
+                  label="البريد الإلكتروني"
+                  directionMode="ltr"
+                  required
+                />
               </>
             ) : (
               <>

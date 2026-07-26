@@ -35,6 +35,10 @@ function generatePhoneHmac(phone: string): string {
   return crypto.createHmac('sha256', hmacKey).update(normalized).digest('hex');
 }
 
+function generateEmailHmac(email: string): string {
+  return crypto.createHmac('sha256', hmacKey).update(email.trim().toLowerCase()).digest('hex');
+}
+
 function encrypt(text: string): string {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv);
@@ -65,6 +69,7 @@ function seedCredential(name: string, developmentFallback: string): string {
 
 async function main() {
   console.log('Seeding development/test data for Bahrawy Academy...');
+  const staffEmail = (process.env.SEED_STAFF_EMAIL || 'admin@bahrawy.test').trim().toLowerCase();
   const staffPassword = seedCredential('SEED_STAFF_PASSWORD', 'owner_secret');
   const studentPassword = seedCredential('SEED_STUDENT_PASSWORD', 'student_secret');
   const guardianPassword = seedCredential('SEED_GUARDIAN_PASSWORD', 'guardian_secret');
@@ -216,39 +221,49 @@ async function main() {
   }
 
   // 3. Test Identities
-  const staffPhone = '+201000000000';
   const studentPhone = '+201000000001';
   const guardianPhone = '+201000000002';
   const unactivatedPhone = '+201000000003';
 
   // Owner/Staff Account
-  const staffAccount = await db.account.upsert({
+  const staffEmailHmac = generateEmailHmac(staffEmail);
+  const existingStaffAccount = await db.account.findFirst({
     where: {
-      organizationId_phoneHmac: {
-        organizationId: org.id,
-        phoneHmac: generatePhoneHmac(staffPhone),
-      },
-    },
-    update: {},
-    create: {
       organizationId: org.id,
       kind: 'STAFF',
-      phoneEncrypted: encrypt(staffPhone),
-      phoneHmac: generatePhoneHmac(staffPhone),
-      passwordHash: await hashPassword(staffPassword),
-      status: 'ACTIVE',
-      accountRoles: {
-        create: {
-          roleId: ownerRole.id,
-        },
-      },
-      staffProfile: {
-        create: {
-          displayName: '[DEV] Admin Staff',
-        },
-      },
+      OR: [{ emailHmac: staffEmailHmac }, { phoneHmac: generatePhoneHmac('+201000000000') }],
     },
   });
+  const staffAccount = existingStaffAccount
+    ? await db.account.update({
+        where: { id: existingStaffAccount.id },
+        data: {
+          emailEncrypted: encrypt(staffEmail),
+          emailHmac: staffEmailHmac,
+          phoneEncrypted: null,
+          phoneHmac: null,
+        },
+      })
+    : await db.account.create({
+        data: {
+          organizationId: org.id,
+          kind: 'STAFF',
+          emailEncrypted: encrypt(staffEmail),
+          emailHmac: staffEmailHmac,
+          passwordHash: await hashPassword(staffPassword),
+          status: 'ACTIVE',
+          accountRoles: {
+            create: {
+              roleId: ownerRole.id,
+            },
+          },
+          staffProfile: {
+            create: {
+              displayName: '[DEV] Admin Staff',
+            },
+          },
+        },
+      });
 
   const existingOwnerAssignment = await db.accountRole.findFirst({
     where: {

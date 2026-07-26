@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -273,7 +274,9 @@ export default async function Home() {
               <h1>
                 <span className="academy-hero-line">منصة</span>
                 <span className="academy-hero-line academy-hero-line-emphasis">البحراوي</span>
-                <span className="academy-hero-line academy-hero-line-sub" dir="ltr">English</span>
+                <span className="academy-hero-line academy-hero-line-sub" dir="ltr">
+                  English
+                </span>
               </h1>
               <p className="academy-hero-lead">
                 شرح واضح، تدريب بعد كل فكرة، ومراجعة تعرفك مستواك مع مستر السيد البحراوي.
@@ -306,10 +309,14 @@ export default async function Home() {
               </ul>
             </div>
             <div className="academy-hero-image-col">
-              <img
-                src="/images/elbahrawy-hero.png"
+              <Image
+                src="/images/elbahrawy-hero.webp"
                 alt="مستر السيد البحراوي"
                 className="academy-hero-image"
+                width={1024}
+                height={1024}
+                sizes="(max-width: 760px) 92vw, 46vw"
+                preload
               />
               <div className="academy-hero-tags">
                 <span>Grammar</span>
@@ -337,11 +344,11 @@ export default async function Home() {
             <div className="academy-grade-grid">
               {grades.map((grade, index) => (
                 <div key={grade.code} className="academy-grade-wrapper">
-                  <div className="academy-grade-name-box">
-                    {grade.nameAr}
-                  </div>
+                  <div className="academy-grade-name-box">{grade.nameAr}</div>
                   <Link
-                    href={grade.id ? `/courses?gradeId=${encodeURIComponent(grade.id)}` : '/courses'}
+                    href={
+                      grade.id ? `/courses?gradeId=${encodeURIComponent(grade.id)}` : '/courses'
+                    }
                     className={`academy-grade-card${grade.code === 'g3-prep' ? ' academy-grade-card--bg' : ''}${grade.code === 'g1-sec' ? ' academy-grade-card--bg1' : ''}${grade.code === 'g2-sec' ? ' academy-grade-card--bg2' : ''}${grade.code === 'g3-sec' ? ' academy-grade-card--bg3' : ''}`}
                   >
                     <span className="academy-grade-number" aria-hidden="true">
@@ -362,10 +369,13 @@ export default async function Home() {
         <section id="learning-path" className="academy-section academy-learning-section">
           <div className="academy-container academy-teacher-card">
             <div className="academy-teacher-visual" aria-hidden="true">
-              <img
-                src="/images/teacher-bg.png"
+              <Image
+                src="/images/teacher-bg.webp"
                 alt=""
                 className="size-full object-cover"
+                width={1024}
+                height={1024}
+                sizes="(max-width: 760px) 92vw, 42vw"
               />
             </div>
             <div className="academy-teacher-copy">
@@ -480,7 +490,15 @@ export default async function Home() {
             <span className="academy-final-kicker">جاهز تبدأ؟</span>
             <h2>اختار مرحلتك وخلي الإنجليزي نقطة قوة.</h2>
             <p>ابدأ بالمحتوى المناسب لصفك، وشوف تفاصيل الباقات المتاحة بوضوح قبل الاشتراك.</p>
-            <a className="academy-button academy-button-lg" style={{borderColor: 'var(--academy-cyan)', background: 'var(--academy-cyan)', color: '#071620'}} href="#levels">
+            <a
+              className="academy-button academy-button-lg"
+              style={{
+                borderColor: 'var(--academy-cyan)',
+                background: 'var(--academy-cyan)',
+                color: '#071620',
+              }}
+              href="#levels"
+            >
               اختار مرحلتك
               <ArrowLeft aria-hidden="true" />
             </a>

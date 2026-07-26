@@ -44,7 +44,7 @@ model Organization {
   updatedAt  DateTime  @updatedAt
   archivedAt DateTime?
   version    Int       @default(1)
-  
+
   paymentInstapay String?
   paymentWallet   String?
 
@@ -231,8 +231,8 @@ model Account {
   id                     String    @id @default(uuid())
   organizationId         String
   kind                   String // STUDENT, GUARDIAN, STAFF
-  phoneEncrypted         String
-  phoneHmac              String // Keyed HMAC for exact lookup
+  phoneEncrypted         String?
+  phoneHmac              String? // Keyed HMAC for exact lookup
   phoneVerificationState String    @default("UNVERIFIED_V1")
   emailEncrypted         String?
   emailHmac              String?
@@ -267,26 +267,28 @@ model Account {
   supportMessages       SupportMessage[]
 
   @@unique([organizationId, phoneHmac])
+  @@unique([organizationId, emailHmac])
   @@index([phoneHmac])
+  @@index([emailHmac])
 }
 
 model StudentProfile {
-  id                       String   @id @default(uuid())
-  accountId                String   @unique
-  gradeId                  String?
-  displayName              String
-  firstName                String?
-  secondName               String?
-  thirdName                String?
-  lastName                 String?
-  fatherPhoneEncrypted     String?
-  motherPhoneEncrypted     String?
-  schoolName               String?
-  guardianOccupation       String?
-  gender                   String?
-  city                     String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  accountId            String   @unique
+  gradeId              String?
+  displayName          String
+  firstName            String?
+  secondName           String?
+  thirdName            String?
+  lastName             String?
+  fatherPhoneEncrypted String?
+  motherPhoneEncrypted String?
+  schoolName           String?
+  guardianOccupation   String?
+  gender               String?
+  city                 String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   account   Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
   grade     Grade?            @relation(fields: [gradeId], references: [id], onDelete: Restrict)

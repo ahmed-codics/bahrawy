@@ -7,6 +7,7 @@ import {
   Min,
   MinLength,
   IsOptional,
+  IsEmail,
 } from 'class-validator';
 
 export class CreateStaffDto {
@@ -14,9 +15,8 @@ export class CreateStaffDto {
   @MinLength(2)
   displayName!: string;
 
-  @IsString()
-  @MinLength(8)
-  phone!: string;
+  @IsEmail()
+  email!: string;
 
   @IsArray()
   @IsString({ each: true })

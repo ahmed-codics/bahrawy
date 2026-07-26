@@ -109,10 +109,10 @@ export default function LoginPage() {
           <div className="academy-login-art" aria-hidden="true">
             <span className="academy-login-art-ring" />
             <Image
-              src="/images/elbahrawy-hero.png"
+              src="/images/elbahrawy-hero.webp"
               alt=""
-              width={1334}
-              height={1181}
+              width={1024}
+              height={1024}
               sizes="(max-width: 900px) 0px, 46vw"
               preload
             />

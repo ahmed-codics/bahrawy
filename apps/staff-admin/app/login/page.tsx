@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, KeyRound, LockKeyhole, Phone } from 'lucide-react';
+import { AlertCircle, KeyRound, LockKeyhole, Mail } from 'lucide-react';
 import { BrandMark, Button, Card, Input } from '@bahrawy/ui';
 import { fetchApi, fetchCsrfToken } from '../../lib/api';
 
@@ -20,9 +20,13 @@ export default function StaffLoginPage() {
     setLoading(true);
     try {
       await fetchCsrfToken();
-      const response = await fetchApi('/auth/login', {
+      const response = await fetchApi('/auth/staff-login', {
         method: 'POST',
-        body: JSON.stringify({ phone: identifier, password, totpToken }),
+        body: JSON.stringify({
+          email: identifier,
+          password,
+          ...(totpToken ? { totpToken } : {}),
+        }),
       });
       await fetchCsrfToken();
       if (response?.mustChangePassword) return router.push('/change-password');
@@ -36,7 +40,7 @@ export default function StaffLoginPage() {
   };
 
   const fillDev = () => {
-    setIdentifier('+201000000000');
+    setIdentifier('admin@bahrawy.test');
     setPassword('owner_secret');
     setTotpToken('');
   };
@@ -63,15 +67,15 @@ export default function StaffLoginPage() {
               </div>
             )}
             <Input
-              label="Phone"
-              type="tel"
+              label="Email"
+              type="email"
               value={identifier}
               onChange={(event) => setIdentifier(event.target.value)}
               autoComplete="username"
               required
               disabled={loading}
               directionMode="ltr"
-              leadingIcon={<Phone className="size-4" />}
+              leadingIcon={<Mail className="size-4" />}
             />
             <Input
               label="Password"

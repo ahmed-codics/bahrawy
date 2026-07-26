@@ -101,7 +101,9 @@ export class StudentsController {
 
     let phone = 'HIDDEN';
     try {
-      phone = this.securityService.decrypt(student.account.phoneEncrypted);
+      if (student.account.phoneEncrypted) {
+        phone = this.securityService.decrypt(student.account.phoneEncrypted);
+      }
     } catch {
       phone = 'HIDDEN';
     }

@@ -156,5 +156,47 @@ describe('AuthService', () => {
         UnauthorizedException,
       );
     });
+
+    it('should login staff with an email address', async () => {
+      const pass = 'SuperSecretPassphrase123';
+      const hash = await securityService.hashPassword(pass);
+      const mockAccount = {
+        id: 'staff-1',
+        kind: 'STAFF',
+        emailHmac: securityService.generateEmailHmac('admin@bahrawy.test'),
+        passwordHash: hash,
+        status: 'ACTIVE',
+        organizationId: 'org-1',
+        totpFactor: null,
+      };
+      (db.account.findFirst as jest.Mock).mockResolvedValue(mockAccount);
+      (db.authSession.create as jest.Mock).mockResolvedValue({ id: 'sess-2' });
+
+      const result = await service.staffLogin('ADMIN@BAHRAWY.TEST', pass);
+
+      expect(db.account.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            emailHmac: mockAccount.emailHmac,
+            kind: 'STAFF',
+          }),
+        }),
+      );
+      expect(result.account.id).toBe('staff-1');
+    });
+
+    it('should not allow staff through the phone login endpoint', async () => {
+      (db.account.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.login('+201000000000', 'SuperSecretPassphrase123'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(db.account.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ kind: { not: 'STAFF' } }),
+        }),
+      );
+    });
   });
 });

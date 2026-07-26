@@ -17,21 +17,21 @@ describe('Bahrawy Academy E2E', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-    
+
     // Attempt login with seeded staff
     const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ phone: '+201000000000', password: 'password123' });
-    
+      .post('/auth/staff-login')
+      .send({ email: 'admin@bahrawy.test', password: 'password123' });
+
     if (loginRes.status === 201 || loginRes.status === 200) {
       staffCookie = loginRes.headers['set-cookie'][0];
     }
-    
+
     // Attempt login with seeded student
     const studentRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ phone: '+201111111111', password: 'password123' });
-      
+
     if (studentRes.status === 201 || studentRes.status === 200) {
       studentCookie = studentRes.headers['set-cookie'][0];
     }
@@ -55,7 +55,7 @@ describe('Bahrawy Academy E2E', () => {
       .set('Cookie', staffCookie)
       .expect(200);
   });
-  
+
   it('should deny student from accessing admin routes (RBAC check)', async () => {
     if (!studentCookie) return; // Skip if db not seeded
     await request(app.getHttpServer())

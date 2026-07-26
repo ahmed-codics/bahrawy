@@ -26,6 +26,7 @@ import { RbacService } from '../rbac/rbac.service';
 import { CsrfService } from '../csrf/csrf.service';
 import { getSessionTokenFromCookies } from './session-cookie';
 import { RegisterStudentDto } from './register.dto';
+import { StaffLoginDto } from './staff-login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -98,6 +99,32 @@ export class AuthController {
     const userAgent = req.headers['user-agent'];
     const { account, session } = await this.authService.login(
       body.phone,
+      body.password,
+      body.totpToken,
+      ipAddress,
+      userAgent,
+    );
+    this.setSessionCookie(req, res, session.plainToken);
+    return {
+      status: 'SUCCESS',
+      accountId: account.id,
+      kind: account.kind,
+      mustChangePassword: account.mustChangePassword,
+    };
+  }
+
+  @Post('staff-login')
+  @UseGuards(ThrottleGuard)
+  @Throttle(10, 900_000)
+  async staffLogin(
+    @Body() body: StaffLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const ipAddress = req.ip;
+    const userAgent = req.headers['user-agent'];
+    const { account, session } = await this.authService.staffLogin(
+      body.email,
       body.password,
       body.totpToken,
       ipAddress,

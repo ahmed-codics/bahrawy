@@ -49,11 +49,13 @@ export class AdminV1ManagementService {
       },
     });
     return profiles.map((profile: any) => {
-      let phone = 'HIDDEN';
+      let email = 'HIDDEN';
       try {
-        phone = this.security.decrypt(profile.account.phoneEncrypted);
+        if (profile.account.emailEncrypted) {
+          email = this.security.decrypt(profile.account.emailEncrypted);
+        }
       } catch {}
-      return { ...profile, phone };
+      return { ...profile, email };
     });
   }
 
@@ -72,23 +74,24 @@ export class AdminV1ManagementService {
 
   async createStaff(actor: Actor, input: CreateStaffDto) {
     await this.validateRoles(input.roleIds);
-    const phoneHmac = this.security.generatePhoneHmac(input.phone);
+    const email = input.email.trim().toLowerCase();
+    const emailHmac = this.security.generateEmailHmac(email);
     const duplicate = await db.account.findFirst({
       where: {
         organizationId: actor.organizationId,
-        phoneHmac,
+        emailHmac,
         deletedAt: null,
       },
     });
     if (duplicate)
-      throw new ConflictException('Phone number is already registered');
+      throw new ConflictException('Email address is already registered');
     const temporaryPassword = randomBytes(12).toString('base64url');
     const account = await db.account.create({
       data: {
         organizationId: actor.organizationId,
         kind: 'STAFF',
-        phoneEncrypted: this.security.encrypt(input.phone),
-        phoneHmac,
+        emailEncrypted: this.security.encrypt(email),
+        emailHmac,
         passwordHash: await this.security.hashPassword(temporaryPassword),
         mustChangePassword: true,
         staffProfile: { create: { displayName: input.displayName } },
