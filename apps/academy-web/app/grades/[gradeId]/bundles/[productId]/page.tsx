@@ -11,6 +11,7 @@ import {
   Lock,
   PlayCircle,
   ClipboardList,
+  BookOpen,
   Layers3,
   PackageOpen,
   ShieldCheck,
@@ -27,6 +28,13 @@ type Unit = {
   lessons?: Lesson[];
   assessments?: Assessment[];
   access?: { hasAccess: boolean; reason: string };
+};
+type Course = {
+  id: string;
+  titleAr: string;
+  descriptionAr?: string | null;
+  coverImageUrl?: string | null;
+  unitCount?: number;
 };
 type Product = {
   id: string;
@@ -51,6 +59,7 @@ export default function BundleDetailPage({
   const { gradeId, productId } = use(params);
   const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [openUnitId, setOpenUnitId] = useState<string | null>(null);
   const [hasEntitlement, setHasEntitlement] = useState(false);
@@ -60,6 +69,7 @@ export default function BundleDetailPage({
     fetchApi(`/catalog/bundles/${productId}`)
       .then((response) => {
         setProduct(response.data.product);
+        setCourses(response.data.courses || []);
         setUnits(response.data.units || []);
         setHasEntitlement(Boolean(response.data.hasEntitlement));
         setOpenUnitId(response.data.units?.[0]?.id ?? null);
@@ -124,7 +134,7 @@ export default function BundleDetailPage({
               <div className="mt-7 flex flex-wrap gap-3">
                 <span className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-surface-soft px-4 py-3 text-sm font-bold">
                   <Layers3 className="size-5 text-brand-600" aria-hidden="true" />
-                  {units.length} {units.length === 1 ? 'درس' : 'دروس'}
+                  {courses.length} {courses.length === 1 ? 'كورس' : 'كورسات'}
                 </span>
                 {hasEntitlement && (
                   <span className="inline-flex items-center gap-2 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm font-bold text-success">
@@ -182,107 +192,182 @@ export default function BundleDetailPage({
             </p>
           </div>
 
-          {units.length === 0 ? (
-            <EmptyState title="لا توجد دروس داخل هذه الباقة بعد" />
+          {courses.length === 0 && units.length === 0 ? (
+            <EmptyState title="لا توجد كورسات أو دروس داخل هذه الباقة بعد" />
           ) : (
-            <div className="space-y-4">
-              {units.map((unit, index) => {
-                const unlocked = !!unit.access?.hasAccess;
-                const open = openUnitId === unit.id;
-                const itemCount = (unit.lessons?.length || 0) + (unit.assessments?.length || 0);
+            <div className="space-y-8">
+              {courses.length > 0 && (
+                <div>
+                  <h3 className="mb-4 font-heading text-xl font-black text-text">
+                    الكورسات المشمولة
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {courses.map((course) => {
+                      const courseCover = publicCoverUrl(course.coverImageUrl);
+                      return (
+                        <article
+                          key={course.id}
+                          className="group overflow-hidden rounded-2xl border border-border-default bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                          <div className="grid min-h-44 grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[160px_minmax(0,1fr)]">
+                            <div className="relative overflow-hidden bg-brand-50 dark:bg-brand-950/30">
+                              {courseCover ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={courseCover}
+                                  alt={course.titleAr}
+                                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center">
+                                  <BookOpen className="size-10 text-brand-500" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex min-w-0 flex-col justify-between p-4 sm:p-5">
+                              <div>
+                                <span className="text-xs font-black text-brand-600">
+                                  كورس داخل الباقة
+                                </span>
+                                <h4 className="mt-2 font-heading text-lg font-black leading-snug text-text">
+                                  {course.titleAr}
+                                </h4>
+                                {course.descriptionAr && (
+                                  <p className="mt-2 line-clamp-2 text-xs leading-6 text-text-muted">
+                                    {course.descriptionAr}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="mt-4 flex items-center justify-between gap-3">
+                                <span className="text-xs font-bold text-text-muted">
+                                  {course.unitCount || 0} دروس منشورة
+                                </span>
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    router.push(
+                                      hasEntitlement
+                                        ? `/student/courses/${course.id}`
+                                        : `/student/checkout/${product.id}`,
+                                    )
+                                  }
+                                >
+                                  {hasEntitlement ? 'فتح الكورس' : 'اشترك للفتح'}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                return (
-                  <Card
-                    key={unit.id}
-                    className="overflow-hidden rounded-2xl transition-shadow hover:shadow-md"
-                  >
-                    <CardContent className="p-0">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-4 p-5 text-start sm:p-6"
-                        onClick={() => setOpenUnitId(open ? null : unit.id)}
-                        aria-expanded={open}
+              {units.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="font-heading text-xl font-black text-text">الدروس المتاحة</h3>
+                  {units.map((unit, index) => {
+                    const unlocked = !!unit.access?.hasAccess;
+                    const open = openUnitId === unit.id;
+                    const itemCount = (unit.lessons?.length || 0) + (unit.assessments?.length || 0);
+
+                    return (
+                      <Card
+                        key={unit.id}
+                        className="overflow-hidden rounded-2xl transition-shadow hover:shadow-md"
                       >
-                        <span className="flex min-w-0 items-center gap-4">
-                          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-heading text-sm font-black text-brand-700 dark:bg-brand-950/40 dark:text-brand-200">
-                            {index + 1}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate font-heading text-lg font-black sm:text-xl">
-                              {unit.titleAr}
+                        <CardContent className="p-0">
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-4 p-5 text-start sm:p-6"
+                            onClick={() => setOpenUnitId(open ? null : unit.id)}
+                            aria-expanded={open}
+                          >
+                            <span className="flex min-w-0 items-center gap-4">
+                              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-heading text-sm font-black text-brand-700 dark:bg-brand-950/40 dark:text-brand-200">
+                                {index + 1}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate font-heading text-lg font-black sm:text-xl">
+                                  {unit.titleAr}
+                                </span>
+                                <span className="mt-1 block text-xs text-text-muted">
+                                  {itemCount} محتوى تعليمي
+                                </span>
+                              </span>
                             </span>
-                            <span className="mt-1 block text-xs text-text-muted">
-                              {itemCount} محتوى تعليمي
+                            <span className="flex shrink-0 items-center gap-3">
+                              <Badge tone={unlocked ? 'success' : 'danger'}>
+                                {unlocked ? 'مفتوح' : 'مغلق'}
+                              </Badge>
+                              <ChevronDown
+                                className={`size-5 text-text-muted transition-transform ${
+                                  open ? 'rotate-180' : ''
+                                }`}
+                                aria-hidden="true"
+                              />
                             </span>
-                          </span>
-                        </span>
-                        <span className="flex shrink-0 items-center gap-3">
-                          <Badge tone={unlocked ? 'success' : 'danger'}>
-                            {unlocked ? 'مفتوح' : 'مغلق'}
-                          </Badge>
-                          <ChevronDown
-                            className={`size-5 text-text-muted transition-transform ${
-                              open ? 'rotate-180' : ''
-                            }`}
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </button>
+                          </button>
 
-                      {open && (
-                        <div className="space-y-3 border-t border-border-default bg-surface-soft/50 p-4 sm:p-6">
-                          {!unlocked && (
-                            <div className="flex flex-col gap-3 rounded-xl border border-danger/20 bg-danger/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-                              <p className="flex items-center gap-2 text-sm font-bold text-danger">
-                                <Lock className="size-4" />
-                                اشترِ الدرس أو الباقة لفتح المحتوى.
-                              </p>
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  router.push(`/grades/${gradeId}/units/${unit.id}/buy`)
-                                }
-                              >
-                                شراء الدرس
-                              </Button>
+                          {open && (
+                            <div className="space-y-3 border-t border-border-default bg-surface-soft/50 p-4 sm:p-6">
+                              {!unlocked && (
+                                <div className="flex flex-col gap-3 rounded-xl border border-danger/20 bg-danger/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                  <p className="flex items-center gap-2 text-sm font-bold text-danger">
+                                    <Lock className="size-4" />
+                                    اشترِ الدرس أو الباقة لفتح المحتوى.
+                                  </p>
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(`/grades/${gradeId}/units/${unit.id}/buy`)
+                                    }
+                                  >
+                                    شراء الدرس
+                                  </Button>
+                                </div>
+                              )}
+                              {(unit.lessons || []).map((lesson) => (
+                                <ContentRow
+                                  key={lesson.id}
+                                  icon={
+                                    lesson.contentType === 'VIDEO' ? (
+                                      <PlayCircle className="size-5" />
+                                    ) : (
+                                      <FileText className="size-5" />
+                                    )
+                                  }
+                                  title={lesson.titleAr}
+                                  meta={lesson.contentType}
+                                  unlocked={unlocked}
+                                  onClick={() =>
+                                    unlocked &&
+                                    router.push(`/grades/${gradeId}/units/${unit.id}/learn`)
+                                  }
+                                />
+                              ))}
+                              {(unit.assessments || []).map((assessment) => (
+                                <ContentRow
+                                  key={assessment.id}
+                                  icon={<ClipboardList className="size-5" />}
+                                  title={assessment.titleAr}
+                                  meta={`${assessment.questions?.length || 0} أسئلة`}
+                                  unlocked={unlocked}
+                                  onClick={() =>
+                                    unlocked &&
+                                    router.push(`/grades/${gradeId}/units/${unit.id}/learn`)
+                                  }
+                                />
+                              ))}
                             </div>
                           )}
-                          {(unit.lessons || []).map((lesson) => (
-                            <ContentRow
-                              key={lesson.id}
-                              icon={
-                                lesson.contentType === 'VIDEO' ? (
-                                  <PlayCircle className="size-5" />
-                                ) : (
-                                  <FileText className="size-5" />
-                                )
-                              }
-                              title={lesson.titleAr}
-                              meta={lesson.contentType}
-                              unlocked={unlocked}
-                              onClick={() =>
-                                unlocked && router.push(`/grades/${gradeId}/units/${unit.id}/learn`)
-                              }
-                            />
-                          ))}
-                          {(unit.assessments || []).map((assessment) => (
-                            <ContentRow
-                              key={assessment.id}
-                              icon={<ClipboardList className="size-5" />}
-                              title={assessment.titleAr}
-                              meta={`${assessment.questions?.length || 0} أسئلة`}
-                              unlocked={unlocked}
-                              onClick={() =>
-                                unlocked && router.push(`/grades/${gradeId}/units/${unit.id}/learn`)
-                              }
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </section>

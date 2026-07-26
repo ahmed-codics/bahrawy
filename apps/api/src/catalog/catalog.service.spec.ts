@@ -23,6 +23,9 @@ jest.mock('@bahrawy/db', () => {
     lessonProgress: {
       findMany: jest.fn(),
     },
+    product: {
+      findUnique: jest.fn(),
+    },
   };
   return {
     db: mockDbClient,
@@ -117,6 +120,43 @@ describe('CatalogService', () => {
       expect(result.contentItems.every((item: any) => item.available)).toBe(
         true,
       );
+    });
+  });
+
+  describe('getBundleDetail', () => {
+    it('returns an assigned published course even when it has no published units', async () => {
+      (db.product.findUnique as jest.Mock).mockResolvedValue({
+        id: 'bundle-1',
+        type: 'BUNDLE',
+        prices: [],
+        courses: [
+          {
+            course: {
+              id: 'course-1',
+              titleAr: 'English | Units 1 - 6',
+              status: 'PUBLISHED',
+              chapters: [],
+            },
+          },
+        ],
+        unitEntries: [],
+      });
+      jest.spyOn(service, 'hasEntitlementToProduct').mockResolvedValue(false);
+
+      const result = await service.getBundleDetail(
+        'bundle-1',
+        'account-1',
+        false,
+      );
+
+      expect(result.courses).toEqual([
+        expect.objectContaining({
+          id: 'course-1',
+          titleAr: 'English | Units 1 - 6',
+          unitCount: 0,
+        }),
+      ]);
+      expect(result.units).toEqual([]);
     });
   });
 });

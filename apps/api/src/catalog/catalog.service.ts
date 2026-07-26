@@ -570,9 +570,20 @@ export class CatalogService {
       throw new NotFoundException('Bundle not found');
     }
 
+    const courses = (product.courses as any[])
+      .map((entry) => entry.course)
+      .filter((course) => isStaff || course.status === 'PUBLISHED')
+      .map((course) => ({
+        ...course,
+        unitCount: course.chapters.reduce(
+          (total: number, chapter: any) => total + chapter.units.length,
+          0,
+        ),
+      }));
+
     const unitMap = new Map<string, any>();
-    for (const entry of product.courses as any[]) {
-      for (const chapter of entry.course.chapters) {
+    for (const course of courses) {
+      for (const chapter of course.chapters) {
         for (const unit of chapter.units) {
           unitMap.set(unit.id, unit);
         }
@@ -597,7 +608,7 @@ export class CatalogService {
         ? await this.hasEntitlementToProduct(accountId, product.id)
         : false);
 
-    return { product, units, hasEntitlement };
+    return { product, courses, units, hasEntitlement };
   }
 
   async getUnitDetail(unitId: string, accountId: string, isStaff = false) {
