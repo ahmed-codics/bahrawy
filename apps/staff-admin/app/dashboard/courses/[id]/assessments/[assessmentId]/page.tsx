@@ -480,6 +480,8 @@ export default function AssessmentEditorPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [questionCountInput, setQuestionCountInput] = useState('1');
+  const [questionsRemaining, setQuestionsRemaining] = useState(0);
   const [showQuestionBank, setShowQuestionBank] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -521,6 +523,12 @@ export default function AssessmentEditorPage({
   }, [reloadAssessment]);
 
   const questions = useMemo(() => assessment?.questions ?? [], [assessment?.questions]);
+
+  const startAddingQuestions = () => {
+    const count = Math.max(1, Math.floor(Number(questionCountInput) || 0));
+    setQuestionsRemaining(count);
+    setShowAddQuestion(true);
+  };
 
   const handleSaveSettings = async () => {
     if (!assessment) return;
@@ -736,10 +744,38 @@ export default function AssessmentEditorPage({
               اختيار من البنك
             </Button>
             <Button
-              onClick={() => setShowAddQuestion(true)}
+              onClick={() => {
+                setQuestionCountInput('1');
+                setQuestionsRemaining(1);
+                setShowAddQuestion(true);
+              }}
               leadingIcon={<Plus className="size-4" />}
             >
               سؤال جديد
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-xl border border-interactive/20 bg-interactive/5 p-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-primary">إضافة عدة أسئلة دفعة واحدة</p>
+            <p className="mt-1 text-xs text-text-muted">حدد العدد ثم املأ الأسئلة واحداً تلو الآخر.</p>
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <label className="flex-1 sm:w-36">
+              <span className="sr-only">عدد الأسئلة</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={questionCountInput}
+                onChange={(event) => setQuestionCountInput(event.target.value)}
+                className="h-11 w-full rounded-lg border border-border-default bg-surface px-3 text-sm font-semibold outline-none focus:border-interactive"
+                aria-label="عدد الأسئلة التي تريد إضافتها"
+              />
+            </label>
+            <Button variant="outline" onClick={startAddingQuestions}>
+              تطبيق
             </Button>
           </div>
         </div>
@@ -748,7 +784,7 @@ export default function AssessmentEditorPage({
           <div className="rounded-xl border-2 border-dashed border-border-default p-12 text-center">
             <ClipboardList className="mx-auto mb-3 size-10 text-text-muted" />
             <p className="text-text-muted">لم يتم إضافة أسئلة بعد</p>
-            <Button variant="outline" className="mt-4" onClick={() => setShowAddQuestion(true)}>
+            <Button variant="outline" className="mt-4" onClick={() => { setQuestionsRemaining(1); setShowAddQuestion(true); }}>
               أضف أول سؤال
             </Button>
           </div>
@@ -767,14 +803,30 @@ export default function AssessmentEditorPage({
         </div>
 
         {showAddQuestion && (
-          <QuestionForm
-            assessmentId={assessmentId}
-            onSaved={() => {
-              setShowAddQuestion(false);
-              void reloadAssessment();
-            }}
-            onCancel={() => setShowAddQuestion(false)}
-          />
+          <div className="space-y-3">
+            {questionsRemaining > 0 && (
+              <div className="rounded-lg border border-success/20 bg-success/5 px-4 py-3 text-sm font-bold text-success">
+                متبقي لإضافته: {questionsRemaining} سؤال
+              </div>
+            )}
+            <QuestionForm
+              key={`new-question-${questionsRemaining}`}
+              assessmentId={assessmentId}
+              onSaved={() => {
+                if (questionsRemaining > 1) {
+                  setQuestionsRemaining((count) => count - 1);
+                } else {
+                  setQuestionsRemaining(0);
+                  setShowAddQuestion(false);
+                }
+                void reloadAssessment();
+              }}
+              onCancel={() => {
+                setQuestionsRemaining(0);
+                setShowAddQuestion(false);
+              }}
+            />
+          </div>
         )}
       </section>
       <QuestionBankDrawer
