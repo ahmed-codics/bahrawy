@@ -10,6 +10,17 @@ import { SecurityService } from '../security/security.service';
 export class DashboardService {
   constructor(private readonly securityService: SecurityService) {}
 
+  async getStudentProfile(accountId: string): Promise<any> {
+    const student = await db.studentProfile.findUnique({
+      where: { accountId },
+      select: { displayName: true, gradeId: true },
+    });
+    if (!student) {
+      throw new NotFoundException('Student profile not found');
+    }
+    return { profile: student };
+  }
+
   async getStudentDashboard(accountId: string): Promise<any> {
     const student = await db.studentProfile.findUnique({
       where: { accountId },

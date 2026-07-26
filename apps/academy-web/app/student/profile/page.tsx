@@ -28,10 +28,11 @@ export default function StudentProfilePage() {
   const router = useRouter();
 
   useEffect(() => {
-    Promise.all([fetchApi('/dashboard/student'), fetchApi('/catalog/grades')])
+    Promise.all([fetchApi('/dashboard/student/profile'), fetchApi('/catalog/grades')])
       .then(([student, gradeList]) => {
-        setProfile(student.data.profile);
-        setSelectedGradeId(student.data.profile.gradeId || '');
+        const nextProfile = student.data?.profile || {};
+        setProfile(nextProfile);
+        setSelectedGradeId(nextProfile.gradeId || '');
         setGrades(gradeList.data || []);
       })
       .catch(() => setError('تعذر تحميل بيانات الحساب. حاول مرة أخرى.'))

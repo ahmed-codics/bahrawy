@@ -32,6 +32,15 @@ export class DashboardController {
     return { status: 'SUCCESS', data };
   }
 
+  @Get('student/profile')
+  async getStudentProfile(@Req() req: any) {
+    if (req.account.kind !== 'STUDENT') {
+      throw new UnauthorizedException('Not a student account');
+    }
+    const data = await this.dashboardService.getStudentProfile(req.account.id);
+    return { status: 'SUCCESS', data };
+  }
+
   @Put('student/profile')
   async updateStudentProfile(
     @Req() req: any,
