@@ -13,6 +13,8 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
+import { MobileSheet } from './MobileSheet';
+import { useDataSaver } from './DataSaverProvider';
 
 export interface VideoPlayerProps {
   src: string;
@@ -30,7 +32,7 @@ type QualityOption = {
 };
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
-const DEFAULT_QUALITY_LABEL = '480p';
+const DEFAULT_QUALITY_LABEL = 'تلقائي';
 const QUALITY_LADDER = ['1080p', '720p', '480p', '360p', '240p', '144p'];
 const DEFAULT_QUALITY_OPTIONS = QUALITY_LADDER.map((label) => ({
   label,
@@ -75,6 +77,7 @@ export function VideoPlayer({
   onTimeUpdate,
   onProgress,
 }: VideoPlayerProps) {
+  const { enabled: dataSaver } = useDataSaver();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -138,10 +141,13 @@ export function VideoPlayer({
       hlsInstance.attachMedia(video);
 
       hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-        const defaultLevel = chooseDefaultQualityLevel(hlsInstance.levels);
-        if (defaultLevel >= 0) {
+        const defaultLevel = dataSaver ? chooseDefaultQualityLevel(hlsInstance.levels) : -1;
+        if (dataSaver && defaultLevel >= 0) {
           hlsInstance.currentLevel = defaultLevel;
           setSelectedQuality(`${hlsInstance.levels[defaultLevel]?.height || 480}p`);
+        } else {
+          hlsInstance.currentLevel = -1;
+          setSelectedQuality(DEFAULT_QUALITY_LABEL);
         }
 
         const availableOptions = hlsInstance.levels.map((level, index) => ({
@@ -196,7 +202,7 @@ export function VideoPlayer({
       }
       hlsRef.current = null;
     };
-  }, [src]);
+  }, [dataSaver, src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -381,7 +387,7 @@ export function VideoPlayer({
         ref={videoRef}
         className="h-full w-full object-contain"
         playsInline
-        preload="auto"
+        preload="metadata"
         poster={poster}
         controls={false}
         controlsList="nodownload"
@@ -461,7 +467,7 @@ export function VideoPlayer({
             <button
               type="button"
               onClick={togglePlay}
-              className="flex size-10 items-center justify-center rounded-full text-white transition hover:bg-white/12"
+              className="flex size-11 items-center justify-center rounded-full text-white transition hover:bg-white/12"
               aria-label={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
             >
               {isPlaying ? <Pause className="size-5 fill-current" /> : <Play className="size-5 fill-current" />}
@@ -469,7 +475,7 @@ export function VideoPlayer({
             <button
               type="button"
               onClick={() => skipBy(-10)}
-              className="hidden size-10 items-center justify-center rounded-full text-white transition hover:bg-white/12 sm:flex"
+              className="hidden size-11 items-center justify-center rounded-full text-white transition hover:bg-white/12 sm:flex"
               aria-label="الرجوع 10 ثواني"
             >
               <RotateCcw className="size-5" />
@@ -477,7 +483,7 @@ export function VideoPlayer({
             <button
               type="button"
               onClick={toggleMute}
-              className="flex size-10 items-center justify-center rounded-full text-white transition hover:bg-white/12"
+              className="flex size-11 items-center justify-center rounded-full text-white transition hover:bg-white/12"
               aria-label={isMuted ? 'تشغيل الصوت' : 'كتم الصوت'}
             >
               {isMuted || volume === 0 ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
@@ -498,7 +504,7 @@ export function VideoPlayer({
             <button
               type="button"
               onClick={() => setSettingsOpen((open) => !open)}
-              className="flex h-10 items-center gap-2 rounded-full px-3 text-xs font-bold text-white transition hover:bg-white/12"
+              className="flex min-h-11 items-center gap-2 rounded-full px-3 text-xs font-bold text-white transition hover:bg-white/12"
               aria-expanded={settingsOpen}
               aria-label="إعدادات الفيديو"
             >
@@ -508,21 +514,40 @@ export function VideoPlayer({
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="flex size-10 items-center justify-center rounded-full text-white transition hover:bg-white/12"
+              className="flex size-11 items-center justify-center rounded-full text-white transition hover:bg-white/12"
               aria-label={isFullscreen ? 'الخروج من ملء الشاشة' : 'ملء الشاشة'}
             >
               {isFullscreen ? <Minimize className="size-5" /> : <Maximize className="size-5" />}
             </button>
 
-            {settingsOpen && (
-              <div className="absolute bottom-12 right-0 w-64 overflow-hidden rounded-2xl border border-white/15 bg-zinc-950/95 p-3 text-white shadow-2xl backdrop-blur-xl">
-                <div className="space-y-3">
+            <MobileSheet
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              title="إعدادات الفيديو"
+              description={dataSaver ? 'توفير البيانات مفعل' : 'اختار الجودة وسرعة التشغيل'}
+            >
+                <div className="space-y-5" dir="rtl">
                   <div>
-                    <div className="mb-2 flex items-center gap-2 text-xs font-bold text-white/65">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-3">
                       <Settings className="size-4" />
                       الجودة
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (hlsRef.current) hlsRef.current.currentLevel = -1;
+                        setSelectedQuality(DEFAULT_QUALITY_LABEL);
+                        setSettingsOpen(false);
+                      }}
+                      className={`mb-2 min-h-11 w-full rounded-xl px-3 text-sm font-bold ${
+                        selectedQuality === DEFAULT_QUALITY_LABEL
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-surface-2 text-ink'
+                      }`}
+                    >
+                      تلقائي
+                    </button>
+                    <div className="grid grid-cols-3 gap-2">
                       {qualityOptions.map((option) => (
                         <button
                           key={option.label}
@@ -534,12 +559,12 @@ export function VideoPlayer({
                               ? option.label
                               : 'هذه الجودة تحتاج توليد نسخة HLS بعد رفع الفيديو'
                           }
-                          className={`rounded-full px-2 py-1.5 text-xs font-bold transition ${
+                          className={`min-h-11 rounded-xl px-2 py-2 text-sm font-bold transition ${
                             selectedQuality === option.label
                               ? 'bg-brand-500 text-white'
                               : option.available
-                                ? 'bg-white/8 text-white/75 hover:bg-white/14'
-                                : 'bg-white/5 text-white/35'
+                                ? 'bg-surface-2 text-ink hover:bg-surface-3'
+                                : 'bg-surface-2 text-ink-4'
                           }`}
                         >
                           {option.label}
@@ -548,24 +573,24 @@ export function VideoPlayer({
                     </div>
                   </div>
 
-                  <div className="h-px bg-white/10" />
+                  <div className="h-px bg-border" />
 
                   <div>
-                    <div className="mb-2 flex items-center gap-2 text-xs font-bold text-white/65">
+                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-3">
                       <Gauge className="size-4" />
                       السرعة
                     </div>
-                    <div className="grid grid-cols-5 gap-1.5">
+                    <div className="grid grid-cols-5 gap-2">
                       {PLAYBACK_RATES.map((rate) => (
                         <button
                           key={rate}
                           type="button"
                           onClick={() => void changePlaybackRate(rate)}
                           disabled={isChangingRate}
-                          className={`rounded-full px-2 py-1.5 text-xs font-bold transition ${
+                          className={`min-h-11 rounded-xl px-1 py-2 text-xs font-bold transition ${
                             playbackRate === rate
                               ? 'bg-brand-500 text-white'
-                              : 'bg-white/8 text-white/75 hover:bg-white/14'
+                              : 'bg-surface-2 text-ink hover:bg-surface-3'
                           }`}
                         >
                           {rate}x
@@ -574,8 +599,7 @@ export function VideoPlayer({
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+            </MobileSheet>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -219,10 +220,12 @@ function LessonCard({
         className="student-cover relative aspect-[16/9] overflow-hidden text-right"
       >
         {lesson.purchaseProduct?.coverImageUrl ? (
-          <img
+          <Image
             src={`${API_BASE}${lesson.purchaseProduct.coverImageUrl}`}
             alt={lesson.titleAr}
-            className="size-full object-cover transition duration-300 hover:scale-[1.025]"
+            fill
+            sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"
+            className="object-cover transition duration-300 hover:scale-[1.025]"
           />
         ) : (
           <div className="flex h-full items-center justify-center">

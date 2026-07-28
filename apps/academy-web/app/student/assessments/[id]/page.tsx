@@ -2,13 +2,23 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Clock3, Save, Trophy, XCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Clock3,
+  ListChecks,
+  Save,
+  Trophy,
+  XCircle,
+} from 'lucide-react';
 import {
   Badge,
   Button,
   Card,
   CardContent,
   ErrorState,
+  MobileSheet,
   PageHeader,
   PageIntro,
   PageSkeleton,
@@ -100,6 +110,8 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState('');
   const [now, setNow] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [navigatorOpen, setNavigatorOpen] = useState(false);
 
   const loadAttempt = useCallback(
     async (newAttempt = false) => {
@@ -134,7 +146,10 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
   );
 
   useEffect(() => {
-    void loadAttempt();
+    const frame = window.requestAnimationFrame(() => {
+      void loadAttempt();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [loadAttempt]);
 
   useEffect(() => {
@@ -151,6 +166,16 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
     ? Math.max(0, Math.floor((new Date(attempt.expiresAt).getTime() - now) / 1000))
     : 0;
   const answeredCount = questions.filter((question) => answers[question.questionId]).length;
+  const activeQuestionIndex = Math.min(currentQuestion, Math.max(questions.length - 1, 0));
+  const activeQuestion = questions[activeQuestionIndex];
+
+  useEffect(() => {
+    if (!attempt || result) return;
+    window.dispatchEvent(new Event('bahrawy:critical-start'));
+    return () => {
+      window.dispatchEvent(new Event('bahrawy:critical-end'));
+    };
+  }, [attempt, result]);
 
   const chooseAnswer = async (questionId: string, optionId: string) => {
     if (!attempt) return;
@@ -196,6 +221,53 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
       setSubmitting(false);
     }
   };
+
+  const renderQuestion = (entry: AssessmentQuestion, index: number) => (
+    <Card key={entry.questionId} id={`question-${index}`}>
+      <CardContent className="pt-5 sm:pt-6">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+          <span className="ba-number flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-black text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
+            {index + 1}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2
+              dir="auto"
+              className="break-words text-start font-heading text-lg font-black leading-8 [unicode-bidi:plaintext]"
+            >
+              {entry.question.titleAr}
+            </h2>
+            <div className="mt-5 grid gap-3">
+              {normalizeOptions(entry.question.options).map((option) => {
+                const selected = answers[entry.questionId] === option.id;
+                return (
+                  <label
+                    key={option.id}
+                    className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${selected ? 'border-violet-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200' : 'border-border-default hover:border-violet-300 hover:bg-surface-soft'}`}
+                  >
+                    <input
+                      type="radio"
+                      className="size-5 shrink-0 accent-violet-600"
+                      name={entry.questionId}
+                      value={option.id}
+                      checked={selected}
+                      onChange={() => void chooseAnswer(entry.questionId, option.id)}
+                    />
+                    <span
+                      dir="auto"
+                      className="min-w-0 flex-1 break-words text-start font-bold [unicode-bidi:plaintext]"
+                    >
+                      {option.text}
+                    </span>
+                    {selected && <CheckCircle2 className="ms-auto size-5 shrink-0" />}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   if (loading) return <PageSkeleton cards={4} />;
   if (error && !attempt)
@@ -410,58 +482,57 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
               {error}
             </div>
           )}
-          <div className="space-y-5">
-            {questions.map((entry, index) => (
-              <Card key={entry.questionId} id={`question-${index}`}>
-                <CardContent className="pt-5 sm:pt-6">
-                  <div className="flex items-start gap-4">
-                    <span className="ba-number flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-black text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1">
-                      <h2
-                        dir="auto"
-                        className="text-start font-heading text-lg font-black leading-8 [unicode-bidi:plaintext]"
-                      >
-                        {entry.question.titleAr}
-                      </h2>
-                      <div className="mt-5 grid gap-3">
-                        {normalizeOptions(entry.question.options).map((option) => {
-                          const selected = answers[entry.questionId] === option.id;
-                          return (
-                            <label
-                              key={option.id}
-                              className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${selected ? 'border-violet-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200' : 'border-border-default hover:border-violet-300 hover:bg-surface-soft'}`}
-                            >
-                              <input
-                                type="radio"
-                                className="size-5 accent-violet-600"
-                                name={entry.questionId}
-                                value={option.id}
-                                checked={selected}
-                                onChange={() => chooseAnswer(entry.questionId, option.id)}
-                              />
-                              <span
-                                dir="auto"
-                                className="flex-1 text-start font-bold [unicode-bidi:plaintext]"
-                              >
-                                {option.text}
-                              </span>
-                              {selected && <CheckCircle2 className="ms-auto size-5" />}
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="lg:hidden">
+            {activeQuestion && renderQuestion(activeQuestion, activeQuestionIndex)}
           </div>
-          <div className="flex justify-end border-t border-border-default pt-6">
+          <div className="hidden space-y-5 lg:block">
+            {questions.map((entry, index) => renderQuestion(entry, index))}
+          </div>
+          <div className="hidden justify-end border-t border-border-default pt-6 lg:flex">
             <Button size="lg" loading={submitting} loadingText="جاري التسليم..." onClick={submit}>
               إنهاء وتسليم الاختبار
             </Button>
+          </div>
+          <div className="exam-mobile-actions lg:hidden">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="السؤال السابق"
+              disabled={activeQuestionIndex === 0}
+              onClick={() => setCurrentQuestion((value) => Math.max(0, value - 1))}
+            >
+              <ArrowRight className="size-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              className="min-w-0 flex-1"
+              onClick={() => setNavigatorOpen(true)}
+            >
+              <ListChecks className="size-5" />
+              <span className="ba-number">
+                {activeQuestionIndex + 1} / {questions.length}
+              </span>
+            </Button>
+            {activeQuestionIndex < questions.length - 1 ? (
+              <Button
+                size="icon"
+                aria-label="السؤال التالي"
+                onClick={() =>
+                  setCurrentQuestion((value) => Math.min(questions.length - 1, value + 1))
+                }
+              >
+                <ArrowLeft className="size-5" />
+              </Button>
+            ) : (
+              <Button
+                className="shrink-0 px-4"
+                loading={submitting}
+                loadingText="جارٍ..."
+                onClick={() => void submit()}
+              >
+                تسليم
+              </Button>
+            )}
           </div>
         </div>
 
@@ -496,6 +567,49 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
           </Card>
         </div>
       </div>
+      <MobileSheet
+        open={navigatorOpen}
+        onClose={() => setNavigatorOpen(false)}
+        title="التنقل بين الأسئلة"
+        description={`${answeredCount} من ${questions.length} سؤال تمت الإجابة عنه`}
+      >
+        <div className="grid grid-cols-5 gap-3 py-2">
+          {questions.map((entry, index) => {
+            const isAnswered = Boolean(answers[entry.questionId]);
+            const isCurrent = index === activeQuestionIndex;
+            return (
+              <button
+                key={entry.questionId}
+                type="button"
+                aria-current={isCurrent ? 'step' : undefined}
+                aria-label={`السؤال ${index + 1}${isAnswered ? '، تمت الإجابة' : '، بدون إجابة'}`}
+                onClick={() => {
+                  setCurrentQuestion(index);
+                  setNavigatorOpen(false);
+                }}
+                className={`ba-number flex aspect-square min-h-11 items-center justify-center rounded-xl border-2 font-black ${
+                  isCurrent
+                    ? 'border-violet-500 bg-violet-600 text-white'
+                    : isAnswered
+                      ? 'border-success/30 bg-success/10 text-success'
+                      : 'border-border-default bg-surface-soft text-text-muted'
+                }`}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+        </div>
+        <Button
+          variant="outline"
+          className="mt-5 w-full"
+          loading={submitting}
+          loadingText="جارٍ التسليم..."
+          onClick={() => void submit()}
+        >
+          إنهاء وتسليم الاختبار
+        </Button>
+      </MobileSheet>
     </PageIntro>
   );
 }

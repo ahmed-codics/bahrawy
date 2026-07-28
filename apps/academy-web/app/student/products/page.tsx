@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Crown, PackageOpen, ShieldCheck, Sparkles } from 'lucide-react';
@@ -119,10 +120,12 @@ function BundleCard({
     >
       <div className="student-cover relative aspect-[16/9] overflow-hidden">
         {product.coverImageUrl ? (
-          <img
+          <Image
             src={`${API_BASE}${product.coverImageUrl}`}
             alt={product.titleAr}
-            className="size-full object-cover"
+            fill
+            sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"
+            className="object-cover"
           />
         ) : (
           <div className="flex h-full items-center justify-center">

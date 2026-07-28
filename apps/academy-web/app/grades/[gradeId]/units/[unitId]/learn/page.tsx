@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, use, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, FileText, Lock, PlayCircle } from 'lucide-react';
 import {
@@ -105,7 +105,7 @@ export default function LearnPage({
   const [loading, setLoading] = useState(true);
   const lastProgressReport = useRef<Record<string, number>>({});
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const response = await fetchApi(`/catalog/units/${unitId}`);
     const data = response.data as UnitPayload;
     if (!data.hasAccess && data.access?.reason !== 'PREREQUISITE') {
@@ -131,13 +131,16 @@ export default function LearnPage({
       }),
     );
     setVideoPlaybacks(Object.fromEntries(signedEntries));
-  };
+  }, [gradeId, router, unitId]);
 
   useEffect(() => {
-    load()
-      .catch(() => router.replace('/login'))
-      .finally(() => setLoading(false));
-  }, [gradeId, unitId, router]);
+    const frame = window.requestAnimationFrame(() => {
+      load()
+        .catch(() => router.replace('/login'))
+        .finally(() => setLoading(false));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [load, router]);
 
   const homework = useMemo(
     () => payload?.contentItems.find((item) => item.type === 'ASSESSMENT'),
@@ -229,7 +232,7 @@ export default function LearnPage({
                     <div className="space-y-3">
                       <iframe
                         src={pdfUrl}
-                        className="h-[520px] w-full rounded-xl border border-border-default bg-white"
+                        className="h-[min(68dvh,42rem)] min-h-[22rem] w-full rounded-xl border border-border-default bg-white"
                         title={item.titleAr}
                       />
                       <Button variant="outline" onClick={() => window.open(pdfUrl, '_blank')}>

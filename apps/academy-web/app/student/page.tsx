@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -39,12 +40,18 @@ type PaymentOrder = {
   createdAt: string;
   product: { titleAr: string };
 };
+type ActiveAssessment = {
+  id: string;
+  assessmentId: string;
+  startedAt: string;
+  assessment: { titleAr: string };
+};
 type DashboardData = {
   profile?: { displayName?: string };
   enrolledCourses?: Course[];
   recentNotifications?: Notification[];
   recentOrders?: PaymentOrder[];
-  activeAssessments?: any[];
+  activeAssessments?: ActiveAssessment[];
 };
 
 const number = new Intl.NumberFormat('ar-EG');
@@ -319,10 +326,12 @@ function ContinueCard({ course, onOpen }: { course: Course; onOpen: () => void }
     <article className="student-course-card grid min-h-72 md:grid-cols-[minmax(16rem,40%)_1fr]">
       <div className="student-cover relative min-h-52 overflow-hidden">
         {course.coverImageUrl ? (
-          <img
+          <Image
             src={`${API_BASE}${course.coverImageUrl}`}
             alt={course.titleAr}
-            className="absolute inset-0 size-full object-cover"
+            fill
+            sizes="(max-width: 767px) 100vw, 40vw"
+            className="object-cover"
           />
         ) : (
           <div className="flex h-full items-center justify-center">

@@ -8,12 +8,17 @@ import { LearnerShell, PageTransition } from '@bahrawy/ui';
 import { fetchApi, fetchCsrfToken, clearCsrfToken } from '../../lib/api';
 import { useStudentNavigation } from '../../hooks/use-student-navigation';
 
+type ActiveAssessment = {
+  assessmentId: string;
+  assessment: { titleAr: string };
+};
+
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const navigation = useStudentNavigation();
   const [profile, setProfile] = useState<{ displayName?: string } | null>(null);
-  const [activeAssessments, setActiveAssessments] = useState<any[]>([]);
+  const [activeAssessments, setActiveAssessments] = useState<ActiveAssessment[]>([]);
 
   useEffect(() => {
     fetchApi('/dashboard/student')
@@ -31,6 +36,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     try {
       await fetchApi('/auth/logout', { method: 'POST' });
       clearCsrfToken();
+      navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_PRIVATE_CACHES' });
       router.push('/login');
     } catch {
       clearCsrfToken();
@@ -47,19 +53,24 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       navigation={navigation}
       onNavigate={(href) => router.push(href)}
       onLogout={handleLogout}
+      focusedMode={pathname.startsWith('/student/assessments/')}
     >
       {!pathname.startsWith('/student/assessments/') && activeAssessments.length > 0 && (
-        <div className="mb-6 flex flex-col items-start gap-4 rounded-xl border border-warning/30 bg-warning/10 p-4 text-warning-800 dark:border-warning/20 dark:text-warning-300 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Clock className="size-6 shrink-0 text-warning" />
+        <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-3.5 text-warning-800 dark:border-warning/20 dark:text-warning-300 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/15">
+              <Clock className="size-5 text-warning" />
+            </span>
             <div>
-              <p className="font-bold">لديك اختبار قيد الإجراء: {activeAssessments[0].assessment.titleAr}</p>
-              <p className="text-sm opacity-90">يرجى العودة لإنهاء الاختبار.</p>
+              <p className="line-clamp-2 text-sm font-black">
+                اختبار قيد الإجراء: {activeAssessments[0].assessment.titleAr}
+              </p>
+              <p className="mt-0.5 text-xs opacity-90">إجاباتك محفوظة—ارجع كمّل الاختبار.</p>
             </div>
           </div>
           <Link
             href={`/student/assessments/${activeAssessments[0].assessmentId}`}
-            className="shrink-0 rounded-lg bg-warning px-4 py-2 text-sm font-bold text-warning-950 transition-colors hover:bg-warning-600 dark:hover:bg-warning-500"
+            className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl bg-warning px-4 text-sm font-black text-warning-950 transition-colors hover:bg-warning-600 dark:hover:bg-warning-500 sm:w-auto"
           >
             متابعة الاختبار
           </Link>

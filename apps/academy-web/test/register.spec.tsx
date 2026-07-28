@@ -51,7 +51,7 @@ describe('Student self-registration', () => {
     }
     fireEvent.click(screen.getByRole('button', { name: /التالي/ }));
 
-    expect(screen.getByLabelText('اسم المدرسة')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('اسم المدرسة')).toBeInTheDocument());
     expect(screen.getByLabelText('مهنة ولي الأمر')).toBeInTheDocument();
     expect(screen.getByLabelText('المرحلة الدراسية')).toBeInTheDocument();
     const password = screen.getByLabelText('كلمة المرور');

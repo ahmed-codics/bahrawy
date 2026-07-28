@@ -74,6 +74,14 @@ export default function StudentSupportPage() {
         title="الدعم الفني"
         description="اشرح المشكلة بوضوح، وسيتابع فريق الأكاديمية طلبك من نفس الصفحة."
       />
+      <div className="flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/5 p-4 text-sm leading-7 text-warning-800 dark:text-warning-300">
+        <Clock3 className="mt-1 size-5 shrink-0" />
+        <p>
+          اكتب اسم الكورس والدرس لو المشكلة أثناء المذاكرة. لو المشكلة أثناء اختبار، اكتب
+          <strong className="mx-1">اختبار عاجل</strong>
+          في عنوان التذكرة واذكر الوقت المتبقي.
+        </p>
+      </div>
       <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Card tone="cyan">
           <CardContent className="pt-5 sm:pt-6">
@@ -170,6 +178,8 @@ export default function StudentSupportPage() {
                       </Badge>
                     </div>
                     <p className="ba-number mt-4 text-xs text-text-muted">
+                      <span dir="ltr">#{ticket.id}</span>
+                      <span aria-hidden="true"> · </span>
                       {new Date(ticket.createdAt).toLocaleDateString('ar-EG')}
                     </p>
                   </CardContent>

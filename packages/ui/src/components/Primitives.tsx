@@ -33,7 +33,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium leading-normal',
+        'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium leading-normal whitespace-normal',
         badgeTones[tone],
         className,
       )}
@@ -102,7 +102,7 @@ export function PageSkeleton({ cards = 3 }: { cards?: number }) {
         <Skeleton className="h-9 w-56" />
         <Skeleton className="h-5 w-80 max-w-full" />
       </div>
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: cards }, (_, index) => (
           <Skeleton key={index} className="h-52" />
         ))}
@@ -129,7 +129,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'rounded-[var(--radius-lg)] border border-dashed border-border bg-surface px-6 py-12 text-center shadow-[var(--shadow-xs)]',
+        'rounded-[var(--radius-lg)] border border-dashed border-border bg-surface px-4 py-8 text-center shadow-[var(--shadow-xs)] sm:px-6 sm:py-12',
         className,
       )}
     >
@@ -141,7 +141,7 @@ export function EmptyState({
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-3">{description}</p>
       )}
       {actionLabel && onAction && (
-        <Button className="mt-6" variant="outline" onClick={onAction}>
+        <Button className="mt-6 w-full sm:w-auto" variant="outline" onClick={onAction}>
           {actionLabel}
         </Button>
       )}
@@ -185,18 +185,18 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'mb-6 flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between',
+        'mb-5 flex min-w-0 flex-col gap-4 border-b border-border pb-5 sm:mb-6 sm:flex-row sm:items-end sm:justify-between',
         className,
       )}
     >
       <div className="min-w-0">
         {eyebrow && <span className="ba-kicker mb-3">{eyebrow}</span>}
-        <h1 className="font-heading text-2xl font-bold leading-tight text-ink">{title}</h1>
+        <h1 className="break-words font-heading text-[clamp(1.5rem,7vw,2rem)] font-bold leading-[1.3] text-ink">{title}</h1>
         {description && (
           <p className="mt-1 max-w-2xl text-sm text-ink-3">{description}</p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div>}
     </header>
   );
 }
@@ -271,7 +271,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           required={required}
           aria-invalid={Boolean(error)}
           className={cn(
-            'min-h-32 w-full resize-y rounded-[var(--radius-md)] border border-border bg-surface px-3 py-3 text-sm text-ink outline-none transition duration-200 placeholder:text-ink-4 focus:border-border-2 focus:shadow-[0_0_0_3px_rgb(99_102_241/0.12)] disabled:opacity-50',
+            'min-h-32 w-full resize-y rounded-[var(--radius-md)] border border-border bg-surface px-3 py-3 text-base text-ink outline-none transition duration-200 placeholder:text-ink-4 focus:border-brand-500 focus:shadow-[0_0_0_3px_rgb(37_99_235/0.14)] disabled:opacity-50 sm:text-sm',
             error && 'border-danger',
             className,
           )}
@@ -308,7 +308,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'h-10 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2 text-sm text-ink outline-none transition duration-200 focus:border-border-2 focus:shadow-[0_0_0_3px_rgb(99_102_241/0.12)] disabled:opacity-50',
+            'h-12 min-w-0 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-2 text-base text-ink outline-none transition duration-200 focus:border-brand-500 focus:shadow-[0_0_0_3px_rgb(37_99_235/0.14)] disabled:opacity-50 sm:text-sm',
             className,
           )}
           {...props}

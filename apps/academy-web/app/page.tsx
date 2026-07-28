@@ -11,7 +11,6 @@ import {
   FileText,
   GraduationCap,
   LayoutDashboard,
-  Menu,
   MessagesSquare,
   NotebookPen,
   Play,
@@ -20,8 +19,8 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
-import { ThemeSelector } from '@bahrawy/ui';
-import { AcademyBrand } from '../components/AcademyBrand';
+import { PublicShell } from '../components/PublicShell';
+import { WhatsAppWidget } from '../components/WhatsAppWidget';
 
 export const metadata: Metadata = {
   title: 'أكاديمية السيد البحراوي | English للإعدادي والثانوي',
@@ -217,56 +216,8 @@ export default async function Home() {
   const { grades, usingFallback } = await getGrades();
 
   return (
-    <div className="academy-landing">
-      <a href="#main-content" className="academy-skip-link">
-        تخطّي للمحتوى الرئيسي
-      </a>
-
-      <header className="academy-header">
-        <nav className="academy-container academy-nav" aria-label="التنقل الرئيسي">
-          <Link href="/" aria-label="الصفحة الرئيسية لأكاديمية السيد البحراوي">
-            <AcademyBrand />
-          </Link>
-
-          <div className="academy-desktop-links">
-            <a href="#levels">المراحل</a>
-            <a href="#teacher">هتتعلم إزاي؟</a>
-            <a href="#learning-path">عن مستر البحراوي</a>
-          </div>
-
-          <div className="academy-nav-actions">
-            <ThemeSelector />
-            <Link className="academy-login-link" href="/login">
-              تسجيل الدخول
-            </Link>
-            <a className="academy-button academy-button-sm" href="#levels">
-              اختار مرحلتك
-              <ArrowLeft aria-hidden="true" />
-            </a>
-          </div>
-
-          <details className="academy-mobile-menu">
-            <summary aria-label="فتح قائمة التنقل">
-              <Menu aria-hidden="true" />
-            </summary>
-            <div className="academy-mobile-menu-panel">
-              <span className="academy-mobile-menu-theme">
-                <ThemeSelector />
-              </span>
-              <a href="#levels">المراحل</a>
-              <a href="#teacher">هتتعلم إزاي؟</a>
-              <a href="#learning-path">عن مستر البحراوي</a>
-              <Link href="/login">تسجيل الدخول</Link>
-              <a className="academy-button" href="#levels">
-                اختار مرحلتك
-                <ArrowLeft aria-hidden="true" />
-              </a>
-            </div>
-          </details>
-        </nav>
-      </header>
-
-      <main id="main-content">
+    <PublicShell active="home">
+      <div className="academy-landing">
         <section className="academy-hero">
           <div className="academy-container academy-hero-grid">
             <div className="academy-hero-copy">
@@ -352,6 +303,7 @@ export default async function Home() {
                     href={
                       grade.id ? `/courses?gradeId=${encodeURIComponent(grade.id)}` : '/courses'
                     }
+                    aria-label={`شوف محتوى ${grade.nameAr}`}
                     className={`academy-grade-card${grade.code === 'g3-prep' ? ' academy-grade-card--bg' : ''}${grade.code === 'g1-sec' ? ' academy-grade-card--bg1' : ''}${grade.code === 'g2-sec' ? ' academy-grade-card--bg2' : ''}${grade.code === 'g3-sec' ? ' academy-grade-card--bg3' : ''}`}
                   >
                     <span className="academy-grade-number" aria-hidden="true">
@@ -507,41 +459,8 @@ export default async function Home() {
             </a>
           </div>
         </section>
-      </main>
-
-      <footer className="academy-footer">
-        <div className="academy-container academy-footer-grid">
-          <div>
-            <AcademyBrand />
-            <p>
-              شرح English لطلاب الصف الثالث الإعدادي والصفوف الأول والثاني والثالث الثانوي في النظام
-              المصري.
-            </p>
-          </div>
-          <div>
-            <h2>روابط سريعة</h2>
-            <a href="#levels">اختار مرحلتك</a>
-            <a href="#learning-path">نظام المذاكرة</a>
-            <Link href="/courses">الكورسات</Link>
-          </div>
-          <div>
-            <h2>حسابك</h2>
-            <Link href="/login">تسجيل الدخول</Link>
-            <Link href="/register">إنشاء حساب</Link>
-          </div>
-          <div>
-            <h2>الأكاديمية</h2>
-            <a href="#teacher">عن مستر البحراوي</a>
-            <a href="#parents">لولي الأمر</a>
-          </div>
-        </div>
-        <div className="academy-footer-bottom">
-          <span>© {new Date().getFullYear()} أكاديمية السيد البحراوي. جميع الحقوق محفوظة.</span>
-          <span dir="ltr" lang="en">
-            English made clear.
-          </span>
-        </div>
-      </footer>
-    </div>
+      </div>
+      <WhatsAppWidget />
+    </PublicShell>
   );
 }

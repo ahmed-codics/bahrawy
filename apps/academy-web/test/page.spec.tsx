@@ -50,7 +50,7 @@ describe('Academy Web Home', () => {
 
   it('renders the student-first Arabic hero and both entry actions', async () => {
     render(await Home());
-    expect(screen.getByRole('heading', { name: /افهم الإنجليزي/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /منصة البحراوي English/ })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /اختار مرحلتك/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'أنا طالب بالفعل' })).toHaveAttribute('href', '/login');
   });
@@ -86,9 +86,7 @@ describe('Academy Web Home', () => {
     render(await Home());
 
     expect(screen.getByRole('heading', { name: /نفس شرح مستر البحراوي/ })).toBeInTheDocument();
-    expect(
-      screen.getByAltText('مستر السيد البحراوي يحمل شاشة لشرح اللغة الإنجليزية'),
-    ).toBeInTheDocument();
+    expect(screen.getByAltText('مستر السيد البحراوي')).toBeInTheDocument();
     expect(screen.getByText('أختار المرحلة بتاعتي إزاي؟')).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
   });

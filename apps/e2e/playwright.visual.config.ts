@@ -14,20 +14,11 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: [
-    {
-      command: 'pnpm --filter academy-web exec next start -p 3001',
-      cwd: workspaceRoot,
-      url: 'http://127.0.0.1:3001',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-    {
-      command: 'pnpm --filter staff-admin exec next start -p 3002',
-      cwd: workspaceRoot,
-      url: 'http://127.0.0.1:3002/login',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-  ],
+  webServer: {
+    command: 'npm run start -w academy-web',
+    cwd: workspaceRoot,
+    url: 'http://127.0.0.1:3001',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
 });

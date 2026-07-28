@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -171,10 +172,12 @@ function CourseCard({
     <article className="student-course-card flex h-full flex-col">
       <div className="student-cover relative aspect-[16/9] overflow-hidden">
         {course.coverImageUrl ? (
-          <img
+          <Image
             src={`${API_BASE}${course.coverImageUrl}`}
             alt={course.titleAr}
-            className="size-full object-cover transition duration-300 hover:scale-[1.02]"
+            fill
+            sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"
+            className="object-cover transition duration-300 hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full items-center justify-center">

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -125,10 +126,12 @@ export default function LessonPage({
           </div>
           <div className="student-cover relative aspect-video min-h-0 border-t border-white/10 lg:aspect-auto lg:min-h-60 lg:border-r lg:border-t-0">
             {lessonProduct?.coverImageUrl ? (
-              <img
+              <Image
                 src={`${API_BASE}${lessonProduct.coverImageUrl}`}
                 alt={unit.titleAr}
-                className="absolute inset-0 size-full object-cover"
+                fill
+                sizes="(max-width: 1023px) 100vw, 22rem"
+                className="object-cover"
               />
             ) : (
               <div className="flex h-full items-center justify-center">
@@ -159,7 +162,7 @@ export default function LessonPage({
             )}
           </div>
           {!detail.access?.hasEntitlement && (
-            <div className="min-w-56 rounded-2xl border border-brand-200 bg-brand-50 p-5 text-center dark:border-brand-900 dark:bg-brand-950/25">
+            <div className="w-full rounded-2xl border border-brand-200 bg-brand-50 p-5 text-center dark:border-brand-900 dark:bg-brand-950/25 lg:w-auto lg:min-w-56">
               <p className="text-xs font-bold text-text-muted">سعر الدرس</p>
               <p className="ba-number mt-2 text-3xl font-black">{priceText || 'غير محدد بعد'}</p>
               {lessonProduct && priceText && (

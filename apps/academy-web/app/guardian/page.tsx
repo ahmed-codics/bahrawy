@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, CheckCircle2, Home, TrendingUp, UserRound } from 'lucide-react';
+import { BookOpen, CheckCircle2, TrendingUp, UserRound } from 'lucide-react';
 import {
   Badge,
   Card,
   CardContent,
   EmptyState,
-  LearnerShell,
+  GuardianShell,
   PageHeader,
   PageIntro,
   PageSkeleton,
@@ -67,16 +67,8 @@ export default function GuardianDashboard() {
     : 0;
 
   return (
-    <LearnerShell
+    <GuardianShell
       user={{ name: data?.profile?.displayName || 'ولي الأمر', role: 'ولي أمر' }}
-      navigation={[
-        {
-          label: 'متابعة الأبناء',
-          href: '/guardian',
-          isActive: true,
-          icon: <Home className="size-5" />,
-        },
-      ]}
       onNavigate={router.push}
       onLogout={logout}
     >
@@ -174,6 +166,6 @@ export default function GuardianDashboard() {
           </section>
         </PageIntro>
       )}
-    </LearnerShell>
+    </GuardianShell>
   );
 }

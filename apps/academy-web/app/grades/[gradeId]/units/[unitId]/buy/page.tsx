@@ -13,6 +13,7 @@ import {
   PageIntro,
   PageSkeleton,
 } from '@bahrawy/ui';
+import { PublicShell } from '../../../../../../components/PublicShell';
 import { fetchApi } from '../../../../../../lib/api';
 
 type Product = {
@@ -57,38 +58,64 @@ export default function UnitBuyPage({
   );
   const firstBundle = bundles[0];
 
-  if (loading) return <PageSkeleton cards={2} />;
-  if (!unit) return <EmptyState title="تعذر فتح الدرس" />;
+  if (loading)
+    return (
+      <PublicShell active="courses">
+        <PageSkeleton cards={2} />
+      </PublicShell>
+    );
+  if (!unit)
+    return (
+      <PublicShell active="courses">
+        <EmptyState title="تعذر فتح الدرس" />
+      </PublicShell>
+    );
 
   return (
-    <PageIntro className="mx-auto max-w-4xl space-y-7">
-      <PageHeader
-        eyebrow="شراء المحتوى"
-        title={unit.titleAr}
-        description="اختر بين شراء الباقة الكاملة أو هذا الدرس فقط، ثم ارفع إيصال الدفع من صفحة الدفع."
-      />
+    <PublicShell active="courses">
+      <PageIntro className="mx-auto max-w-4xl space-y-7">
+        <PageHeader
+          eyebrow="شراء المحتوى"
+          title={unit.titleAr}
+          description="اختر بين شراء الباقة الكاملة أو هذا الدرس فقط، ثم ارفع إيصال الدفع من صفحة الدفع."
+        />
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <BuyCard
-          icon={<PackageOpen className="size-6" />}
-          badge="الأوفر"
-          title={firstBundle?.titleAr || 'الباقة الكاملة'}
-          price={firstBundle?.prices?.[0]}
-          disabled={!firstBundle}
-          buttonLabel="اشتري الباقة"
-          onBuy={() => firstBundle && router.push(Number(firstBundle.prices?.[0]?.amount) === 0 ? `/login?next=/student/products` : `/student/checkout/${firstBundle.id}`)}
-        />
-        <BuyCard
-          icon={<BookOpen className="size-6" />}
-          badge="درس منفرد"
-          title="هذا الدرس فقط"
-          price={lessonProduct?.prices?.[0]}
-          disabled={!lessonProduct}
-          buttonLabel="اشتري الدرس"
-          onBuy={() => lessonProduct && router.push(Number(lessonProduct.prices?.[0]?.amount) === 0 ? `/login?next=/student/courses` : `/student/checkout/${lessonProduct.id}`)}
-        />
-      </div>
-    </PageIntro>
+        <div className="grid gap-5 md:grid-cols-2">
+          <BuyCard
+            icon={<PackageOpen className="size-6" />}
+            badge="الأوفر"
+            title={firstBundle?.titleAr || 'الباقة الكاملة'}
+            price={firstBundle?.prices?.[0]}
+            disabled={!firstBundle}
+            buttonLabel="اشتري الباقة"
+            onBuy={() =>
+              firstBundle &&
+              router.push(
+                Number(firstBundle.prices?.[0]?.amount) === 0
+                  ? `/login?next=/student/products`
+                  : `/student/checkout/${firstBundle.id}`,
+              )
+            }
+          />
+          <BuyCard
+            icon={<BookOpen className="size-6" />}
+            badge="درس منفرد"
+            title="هذا الدرس فقط"
+            price={lessonProduct?.prices?.[0]}
+            disabled={!lessonProduct}
+            buttonLabel="اشتري الدرس"
+            onBuy={() =>
+              lessonProduct &&
+              router.push(
+                Number(lessonProduct.prices?.[0]?.amount) === 0
+                  ? `/login?next=/student/courses`
+                  : `/student/checkout/${lessonProduct.id}`,
+              )
+            }
+          />
+        </div>
+      </PageIntro>
+    </PublicShell>
   );
 }
 

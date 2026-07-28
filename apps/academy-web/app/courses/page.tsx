@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, CheckCircle2, Filter, GraduationCap, ImageIcon } from 'lucide-react';
 import type { ProductDTO } from '@bahrawy/types';
@@ -198,8 +199,13 @@ export default async function CoursesPage({
                       <article className="academy-course-card" key={course.id}>
                         <div className="academy-course-cover">
                           {cover ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={cover} alt={`صورة كورس ${course.titleAr}`} loading="lazy" />
+                            <Image
+                              src={cover}
+                              alt={`صورة كورس ${course.titleAr}`}
+                              fill
+                              sizes="(max-width: 799px) 100vw, (max-width: 1100px) 44vw, 28vw"
+                              className="object-cover"
+                            />
                           ) : (
                             <span
                               className="academy-course-cover-placeholder"
@@ -279,8 +285,13 @@ export default async function CoursesPage({
                       <article className="academy-course-card" key={product.id}>
                         <div className="academy-course-cover">
                           {cover ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={cover} alt={`صورة باقة ${product.titleAr}`} loading="lazy" />
+                            <Image
+                              src={cover}
+                              alt={`صورة باقة ${product.titleAr}`}
+                              fill
+                              sizes="(max-width: 799px) 100vw, (max-width: 1100px) 44vw, 28vw"
+                              className="object-cover"
+                            />
                           ) : (
                             <span
                               className="academy-course-cover-placeholder"

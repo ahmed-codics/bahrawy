@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, GraduationCap, KeyRound, UserRound } from 'lucide-react';
+import { CheckCircle2, GraduationCap, KeyRound, Settings2, UserRound } from 'lucide-react';
 import {
   Button,
   Card,
   CardContent,
+  DataSaverToggle,
   PageHeader,
   PageIntro,
   PageSkeleton,
   Select,
+  ThemeSelector,
 } from '@bahrawy/ui';
 import { fetchApi } from '../../../lib/api';
 
@@ -145,9 +147,38 @@ export default function StudentProfilePage() {
                   </p>
                 </div>
               </div>
-              <Button variant="outline" onClick={() => router.push('/change-password')}>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => router.push('/change-password')}
+              >
                 تغيير كلمة المرور
               </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-5 sm:pt-6">
+              <div className="flex items-start gap-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
+                  <Settings2 className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-heading text-xl font-black">تفضيلات التطبيق</h2>
+                  <p className="mt-1 text-sm leading-7 text-text-muted">
+                    اختار المظهر وقلل استهلاك الصور والفيديو على باقة الموبايل.
+                  </p>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex min-h-14 items-center justify-between rounded-xl border border-border-default bg-surface-soft px-3">
+                      <span className="text-sm font-bold">المظهر</span>
+                      <ThemeSelector />
+                    </div>
+                    <div className="flex min-h-14 items-center justify-between rounded-xl border border-border-default bg-surface-soft px-3">
+                      <span className="text-sm font-bold">توفير البيانات</span>
+                      <DataSaverToggle />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

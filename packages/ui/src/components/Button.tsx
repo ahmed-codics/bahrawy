@@ -56,10 +56,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               variant === 'ghost',
             'border-danger/10 bg-[var(--color-danger-bg)] text-danger hover:bg-danger/15 dark:bg-danger/10':
               variant === 'danger',
-            'h-8 gap-1.5 rounded-[var(--radius-md)] px-3 text-sm': size === 'sm',
-            'h-10 gap-2 rounded-[var(--radius-md)] px-4 text-sm': size === 'md',
+            'min-h-11 gap-1.5 rounded-[var(--radius-md)] px-3 text-sm': size === 'sm',
+            'min-h-11 gap-2 rounded-[var(--radius-md)] px-4 text-sm': size === 'md',
             'h-12 gap-2.5 rounded-[var(--radius-md)] px-5 text-base': size === 'lg',
-            'aspect-square h-10 rounded-[var(--radius-md)] px-0': size === 'icon',
+            'aspect-square size-11 rounded-[var(--radius-md)] px-0': size === 'icon',
           },
           className,
         )}

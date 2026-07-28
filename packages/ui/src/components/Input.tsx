@@ -70,8 +70,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={Boolean(error)}
             aria-describedby={cn(hint && hintId, error && errorId) || undefined}
             className={cn(
-              'w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 text-sm text-ink outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] placeholder:text-ink-4 focus:border-border-2 focus:shadow-[0_0_0_3px_rgb(99_102_241/0.12)] disabled:cursor-not-allowed disabled:bg-surface-3 disabled:opacity-60 read-only:bg-surface-2',
-              sizeMode === 'lg' ? 'h-12' : 'h-10',
+              'w-full rounded-[var(--radius-md)] border border-border bg-surface px-3 text-base text-ink outline-none transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] placeholder:text-ink-4 focus:border-brand-500 focus:shadow-[0_0_0_3px_rgb(37_99_235/0.14)] disabled:cursor-not-allowed disabled:bg-surface-3 disabled:opacity-60 read-only:bg-surface-2 sm:text-sm',
+              sizeMode === 'lg' ? 'h-12' : 'h-12',
               leadingIcon && 'ps-10',
               isLtr && 'text-left font-latin',
               error &&

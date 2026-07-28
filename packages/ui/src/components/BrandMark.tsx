@@ -11,20 +11,20 @@ export function BrandMark({
   admin?: boolean;
 }) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div className={cn('ba-brand flex min-w-0 items-center gap-2.5 sm:gap-3', className)}>
       <span className="relative flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-brand-500 text-white dark:bg-brand-400 dark:text-brand-950">
         <BookOpenCheck className="size-6" strokeWidth={2.25} />
         <span className="absolute -bottom-1 -start-1 size-3 rounded-full border-2 border-surface bg-success" />
       </span>
       {!compact && (
-        <span className="min-w-0">
-          <span className="block font-heading text-base font-bold leading-tight text-ink">
+        <span className="ba-brand-copy min-w-0">
+          <span className="block truncate font-heading text-sm font-bold leading-tight text-ink sm:text-base">
             أكاديمية البحراوي
           </span>
           <span
             dir="ltr"
             lang="en"
-            className="block text-[0.65rem] font-semibold tracking-[0.13em] text-ink-3"
+            className="ba-brand-tagline block truncate text-[0.58rem] font-semibold tracking-[0.11em] text-ink-3 sm:text-[0.65rem] sm:tracking-[0.13em]"
           >
             {admin ? 'STAFF COMMAND CENTER' : 'LEARN • PRACTICE • MASTER'}
           </span>

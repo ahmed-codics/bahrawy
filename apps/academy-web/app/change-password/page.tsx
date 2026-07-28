@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
 import { BrandMark, Button, Card, CardContent, Input } from '@bahrawy/ui';
-import { fetchApi } from '../../lib/api';
+import { fetchApi, fetchCsrfToken } from '../../lib/api';
 
 export default function ChangePasswordPage() {
   const [oldPassword, setOldPassword] = useState('');
@@ -21,6 +21,7 @@ export default function ChangePasswordPage() {
     if (newPassword !== confirmPassword) return setError('تأكيد كلمة المرور غير مطابق.');
     setLoading(true);
     try {
+      await fetchCsrfToken();
       await fetchApi('/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ oldPasswordAr: oldPassword, newPasswordAr: newPassword }),

@@ -28,7 +28,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
   const [referenceNumber, setReferenceNumber] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [orgSettings, setOrgSettings] = useState<{
     paymentInstapay?: string | null;
     paymentWallet?: string | null;
@@ -48,7 +47,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
       })
       .catch(() => setError('تعذر تحميل بيانات عملية الشراء.'))
       .finally(() => setLoading(false));
-  }, [productId]);
+  }, [productId, router]);
+
+  useEffect(() => {
+    if (!proofFile && !submitting) return;
+    window.dispatchEvent(new Event('bahrawy:critical-start'));
+    return () => {
+      window.dispatchEvent(new Event('bahrawy:critical-end'));
+    };
+  }, [proofFile, submitting]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -226,7 +233,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
               </span>
             </label>
             <label
-              className={`relative flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition ${proofFile ? 'border-success bg-success/5' : 'border-border-default bg-surface-soft hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-950/20'}`}
+              className={`relative flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition sm:min-h-56 sm:p-6 ${proofFile ? 'border-success bg-success/5' : 'border-border-default bg-surface-soft hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-950/20'}`}
             >
               <input
                 type="file"
@@ -245,16 +252,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
               </p>
               <p className="mt-2 text-sm text-text-muted">JPG، PNG أو PDF — بحد أقصى 5MB</p>
             </label>
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              loading={submitting}
-              loadingText="جاري إرسال الطلب..."
-              disabled={!proofFile || referenceNumber.trim().length < 4}
-            >
-              إرسال للمراجعة
-            </Button>
+            <div className="mobile-sticky-action">
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                loading={submitting}
+                loadingText="جاري إرسال الطلب..."
+                disabled={!proofFile || referenceNumber.trim().length < 4}
+              >
+                إرسال للمراجعة
+              </Button>
+            </div>
           </form>
         </section>
       </div>

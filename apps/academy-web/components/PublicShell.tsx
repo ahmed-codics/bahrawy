@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Menu, X } from 'lucide-react';
 import { ThemeSelector } from '@bahrawy/ui';
 import { AcademyBrand } from './AcademyBrand';
@@ -14,6 +14,40 @@ export function PublicShell({
   active?: 'home' | 'courses';
 }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    const controls = panelRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    controls?.[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !controls?.length) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+      previousFocus?.focus();
+    };
+  }, [open]);
 
   return (
     <div className="academy-public-flow">
@@ -98,7 +132,7 @@ export function PublicShell({
             aria-label="إغلاق القائمة"
             onClick={() => setOpen(false)}
           />
-          <div className="academy-public-drawer-panel">
+          <div ref={panelRef} className="academy-public-drawer-panel">
             <div className="academy-public-drawer-head">
               <AcademyBrand />
               <button type="button" onClick={() => setOpen(false)} aria-label="إغلاق القائمة">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { type ReactNode, useState } from 'react';
-import { Bell, LogOut, Menu, Plus, X } from 'lucide-react';
+import { KeyRound, LogOut, Menu, Palette, Plus, Settings2, X } from 'lucide-react';
 import { AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion } from 'motion/react';
 import { cn } from '../utils';
 import { BrandMark } from './BrandMark';
@@ -9,6 +9,7 @@ import { Button } from './Button';
 import { DataSaverToggle } from './DataSaverToggle';
 import { ThemeSelector } from './ThemeSelector';
 import { Badge } from './Primitives';
+import { MobileSheet } from './MobileSheet';
 
 export interface NavigationItem {
   icon?: ReactNode;
@@ -31,6 +32,7 @@ interface BaseShellProps {
   onNavigate?: (href: string) => void;
   onLogout?: () => void;
   brandName?: string;
+  focusedMode?: boolean;
 }
 
 function Avatar({ user, size = 'md' }: { user?: ShellUser; size?: 'sm' | 'md' }) {
@@ -95,7 +97,14 @@ function NavButton({
   );
 }
 
-export function LearnerShell({ children, user, navigation, onNavigate, onLogout }: BaseShellProps) {
+export function LearnerShell({
+  children,
+  user,
+  navigation,
+  onNavigate,
+  onLogout,
+  focusedMode = false,
+}: BaseShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const primaryBottomHrefs = [
     '/student',
@@ -118,7 +127,7 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
 
       <header className="student-topbar sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-xl">
         <div className="ba-page flex h-16 items-center justify-between gap-4 px-5 lg:h-20 lg:px-8">
-          <BrandMark />
+          <BrandMark className="max-w-[13rem] sm:max-w-none" />
           <nav aria-label="التنقل الرئيسي" className="hidden items-center gap-1 lg:flex">
             {navigation.map((item) => (
               <button
@@ -156,9 +165,6 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
                 <LogOut className="size-4 text-danger" />
               </Button>
             </div>
-            <Button variant="ghost" size="icon" className="lg:hidden" aria-label="الإشعارات">
-              <Bell className="size-5" />
-            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -174,15 +180,21 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
 
       <main
         id="main-content"
-        className="student-main ba-page min-h-[calc(100dvh-4rem)] w-full min-w-0 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-9"
+        className={cn(
+          'student-main min-h-[calc(100dvh-4rem)] w-full min-w-0 px-[var(--mobile-gutter)] pt-4 sm:px-5 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-9',
+          focusedMode
+            ? 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
+            : 'pb-[calc(var(--bottom-nav-height)+1.5rem+env(safe-area-inset-bottom))]',
+        )}
       >
         {children}
       </main>
 
-      <nav
-        aria-label="التنقل الرئيسي للهاتف"
-        className="fixed inset-x-0 bottom-0 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-start justify-around border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
-      >
+      {!focusedMode && (
+        <nav
+          aria-label="التنقل الرئيسي للهاتف"
+          className="student-bottom-nav fixed inset-x-0 bottom-0 z-30 flex h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] items-start justify-around border-t border-border bg-surface/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgb(2_22_34/0.08)] backdrop-blur-xl lg:hidden"
+        >
         {bottomItems.map((item) => (
           <button
             key={item.href}
@@ -190,10 +202,11 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
             onClick={() => onNavigate?.(item.href)}
             aria-current={item.isActive ? 'page' : undefined}
             className={cn(
-              'ba-focus flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors',
-              item.isActive ? 'text-brand-500' : 'text-ink-3',
+              'ba-focus relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[0.68rem] font-bold transition-colors',
+              item.isActive ? 'text-brand-600 dark:text-brand-300' : 'text-ink-3',
             )}
           >
+            {item.isActive && <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-brand-500" />}
             <span className="flex size-5 items-center justify-center">{item.icon}</span>
             <span className="max-w-full truncate">{item.label}</span>
           </button>
@@ -201,7 +214,7 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className="ba-focus flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-ink-3"
+          className="ba-focus flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[0.68rem] font-bold text-ink-3"
           aria-label="فتح المزيد"
         >
           <span className="flex size-5 items-center justify-center">
@@ -209,74 +222,145 @@ export function LearnerShell({ children, user, navigation, onNavigate, onLogout 
           </span>
           <span>المزيد</span>
         </button>
-      </nav>
+        </nav>
+      )}
 
-      <AnimatePresence>
-        {menuOpen && (
-          <LazyMotion features={domAnimation}>
-            <m.div
-              key="learner-mobile-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="fixed inset-0 z-50 lg:hidden"
-            >
-              <button
-                aria-label="إغلاق القائمة"
-                className="absolute inset-0 bg-ink/50"
-                onClick={() => setMenuOpen(false)}
-              />
-              <m.aside
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-y-0 right-0 flex w-[min(88vw,20rem)] flex-col bg-surface p-5 shadow-[var(--shadow-lg)]"
-              >
-                <div className="mb-6 flex items-center justify-between">
-                  <BrandMark />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMenuOpen(false)}
-                    aria-label="إغلاق"
-                  >
-                    <X className="size-5" />
-                  </Button>
-                </div>
-                <nav className="flex-1 space-y-1">
-                  {navigation.map((item) => (
-                    <NavButton
-                      key={item.href}
-                      item={item}
-                      onNavigate={(href) => {
-                        setMenuOpen(false);
-                        onNavigate?.(href);
-                      }}
-                    />
-                  ))}
-                </nav>
-                <div className="mb-4 flex items-center gap-3 border-t border-border pt-4">
-                  <Avatar user={user} />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold">{user?.name || 'طالب البحراوي'}</p>
-                    <p className="text-xs text-ink-3">{user?.role || 'طالب'}</p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  className="text-danger"
-                  leadingIcon={<LogOut className="size-4" />}
-                  onClick={onLogout}
-                >
-                  تسجيل الخروج
-                </Button>
-              </m.aside>
-            </m.div>
-          </LazyMotion>
-        )}
-      </AnimatePresence>
+      <MobileSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title="المزيد"
+        description="حسابك وإعدادات الأكاديمية"
+      >
+        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-surface-2 p-4">
+          <Avatar user={user} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black">{user?.name || 'طالب البحراوي'}</p>
+            <p className="text-xs text-ink-3">{user?.role || 'طالب'}</p>
+          </div>
+        </div>
+        <nav className="space-y-1" aria-label="روابط الحساب">
+          {navigation.map((item) => (
+            <NavButton
+              key={item.href}
+              item={item}
+              onNavigate={(href) => {
+                setMenuOpen(false);
+                onNavigate?.(href);
+              }}
+            />
+          ))}
+        </nav>
+        <div className="my-4 h-px bg-border" />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
+            <span className="flex items-center gap-2 text-sm font-bold">
+              <Palette className="size-4 text-brand-600" /> المظهر
+            </span>
+            <ThemeSelector />
+          </div>
+          <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
+            <span className="flex items-center gap-2 text-sm font-bold">
+              <Settings2 className="size-4 text-brand-600" /> التوفير
+            </span>
+            <DataSaverToggle />
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          className="mt-3 w-full justify-start"
+          leadingIcon={<KeyRound className="size-4" />}
+          onClick={() => {
+            setMenuOpen(false);
+            onNavigate?.('/change-password');
+          }}
+        >
+          تغيير كلمة المرور
+        </Button>
+        <Button
+          variant="ghost"
+          className="mt-1 w-full justify-start text-danger"
+          leadingIcon={<LogOut className="size-4" />}
+          onClick={onLogout}
+        >
+          تسجيل الخروج
+        </Button>
+      </MobileSheet>
+    </div>
+  );
+}
+
+export function GuardianShell({
+  children,
+  user,
+  onNavigate,
+  onLogout,
+}: Omit<BaseShellProps, 'navigation'>) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div className="student-app min-h-dvh bg-canvas text-ink" dir="rtl">
+      <a
+        href="#main-content"
+        className="sr-only z-50 rounded-xl bg-brand-600 px-4 py-2 text-white focus:not-sr-only focus:fixed focus:right-4 focus:top-4"
+      >
+        تخطي إلى المحتوى
+      </a>
+      <header className="student-topbar sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-xl">
+        <div className="flex h-16 items-center justify-between gap-3 px-[var(--mobile-gutter)] sm:px-5 lg:h-20 lg:px-8">
+          <BrandMark className="max-w-[13rem] sm:max-w-none" />
+          <Button variant="ghost" size="icon" onClick={() => setMenuOpen(true)} aria-label="فتح القائمة">
+            <Menu className="size-5" />
+          </Button>
+        </div>
+      </header>
+      <main
+        id="main-content"
+        className="student-main mx-auto min-h-[calc(100dvh-4rem)] w-full min-w-0 px-[var(--mobile-gutter)] py-5 sm:px-5 sm:py-7 lg:px-8 lg:py-10"
+      >
+        {children}
+      </main>
+      <MobileSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title="حساب ولي الأمر"
+        description="الإعدادات ومتابعة الأبناء"
+      >
+        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-surface-2 p-4">
+          <Avatar user={user} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black">{user?.name || 'ولي الأمر'}</p>
+            <p className="text-xs text-ink-3">{user?.role || 'ولي أمر'}</p>
+          </div>
+        </div>
+        <Button
+          className="w-full justify-start"
+          variant="ghost"
+          onClick={() => {
+            setMenuOpen(false);
+            onNavigate?.('/guardian');
+          }}
+        >
+          متابعة الأبناء
+        </Button>
+        <div className="my-4 grid grid-cols-2 gap-3">
+          <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
+            <span className="text-sm font-bold">المظهر</span>
+            <ThemeSelector />
+          </div>
+          <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
+            <span className="text-sm font-bold">التوفير</span>
+            <DataSaverToggle />
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-danger"
+          leadingIcon={<LogOut className="size-4" />}
+          onClick={onLogout}
+        >
+          تسجيل الخروج
+        </Button>
+      </MobileSheet>
     </div>
   );
 }

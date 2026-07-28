@@ -21,10 +21,10 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     <Component
       ref={ref as unknown as React.LegacyRef<HTMLDivElement>}
       className={cn(
-        'rounded-[var(--radius-card)] border p-6 text-ink shadow-[var(--shadow-xs)]',
+        'min-w-0 rounded-[var(--radius-card)] border p-4 text-ink shadow-[var(--shadow-xs)] sm:p-6',
         tones[tone],
         interactive &&
-          'cursor-pointer transition-[transform,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:-translate-y-[2px] hover:shadow-[var(--shadow-md)]',
+          'cursor-pointer transition-[border-color,box-shadow] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:border-border-2 hover:shadow-[var(--shadow-md)]',
         className,
       )}
       {...props}

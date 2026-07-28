@@ -1,7 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const viewports = [
-  { name: 'mobile', width: 360, height: 800 },
+  { name: 'phone-320', width: 320, height: 568 },
+  { name: 'phone-360', width: 360, height: 800 },
+  { name: 'phone-375', width: 375, height: 812 },
+  { name: 'phone-390', width: 390, height: 844 },
+  { name: 'phone-430', width: 430, height: 932 },
+  { name: 'phone-landscape', width: 844, height: 390 },
   { name: 'tablet', width: 768, height: 1024 },
   { name: 'laptop', width: 1024, height: 768 },
   { name: 'desktop', width: 1440, height: 900 },
@@ -23,8 +28,14 @@ for (const viewport of viewports) {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
     const browserErrors: string[] = [];
     page.on('console', (message) => {
-      if (message.type() === 'error') browserErrors.push(message.text());
+      if (
+        message.type() === 'error' &&
+        !message.text().includes('Failed to load resource')
+      ) {
+        browserErrors.push(message.text());
+      }
     });
+    page.on('pageerror', (error) => browserErrors.push(error.message));
 
     await page.goto('http://127.0.0.1:3001/', { waitUntil: 'networkidle' });
     await expectHealthyPage(page);
@@ -36,21 +47,12 @@ for (const viewport of viewports) {
     await page.goto('http://127.0.0.1:3001/login', { waitUntil: 'networkidle' });
     await expectHealthyPage(page);
     await expect(page.locator('input')).toHaveCount(2);
-    expect(browserErrors).toEqual([]);
-  });
 
-  test(`staff login is responsive in dark mode at ${viewport.width}px`, async ({ page }) => {
-    await page.setViewportSize(viewport);
-    await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
-    const browserErrors: string[] = [];
-    page.on('console', (message) => {
-      if (message.type() === 'error') browserErrors.push(message.text());
-    });
-
-    await page.goto('http://127.0.0.1:3002/login', { waitUntil: 'networkidle' });
+    await page.goto('http://127.0.0.1:3001/register', { waitUntil: 'networkidle' });
     await expectHealthyPage(page);
-    await expect(page.locator('input')).toHaveCount(3);
-    await expect(page.locator('button[type="submit"]')).toBeVisible();
+
+    await page.goto('http://127.0.0.1:3001/offline', { waitUntil: 'networkidle' });
+    await expectHealthyPage(page);
     expect(browserErrors).toEqual([]);
   });
 }

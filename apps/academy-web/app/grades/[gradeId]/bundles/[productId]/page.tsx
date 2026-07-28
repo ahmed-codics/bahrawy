@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -165,11 +166,12 @@ export default function BundleDetailPage({
 
             <div className="relative order-first aspect-video overflow-hidden bg-brand-50 sm:aspect-[4/3] lg:order-none lg:m-5 lg:aspect-auto lg:min-h-72 lg:rounded-[1.5rem] dark:bg-brand-950/30">
               {coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={coverUrl}
                   alt={product.titleAr}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  fill
+                  sizes="(max-width: 1023px) 100vw, 45vw"
+                  className="object-cover"
                 />
               ) : (
                 <div className="flex h-full min-h-72 items-center justify-center">
@@ -214,11 +216,12 @@ export default function BundleDetailPage({
                           <div className="grid sm:min-h-44 sm:grid-cols-[160px_minmax(0,1fr)]">
                             <div className="relative aspect-[16/8] overflow-hidden bg-brand-50 sm:aspect-auto dark:bg-brand-950/30">
                               {courseCover ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
+                                <Image
                                   src={courseCover}
                                   alt={course.titleAr}
-                                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  fill
+                                  sizes="(max-width: 639px) 100vw, 160px"
+                                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                                 />
                               ) : (
                                 <div className="flex h-full items-center justify-center">

@@ -19,10 +19,17 @@ describe('Public academy flow', () => {
               titleEn: 'Semester one',
               descriptionAr: 'شرح وتدريب ومراجعة للترم الأول.',
               coverImageUrl: '/storage/cover-1',
+              type: 'BUNDLE',
+              status: 'ACTIVE',
+              gradeId: 'sec-3',
               prices: [{ amount: '100', currency: 'EGP' }],
             },
           ],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -46,9 +53,8 @@ describe('Public academy flow', () => {
 
     expect(screen.getByRole('heading', { name: 'الصف الثالث الثانوي' })).toBeInTheDocument();
     expect(screen.queryByText(/\[DEV ONLY\]/)).not.toBeInTheDocument();
-    expect(screen.getByAltText('صورة باقة الفصل الدراسي الأول')).toHaveAttribute(
-      'src',
-      '/api/storage/public/cover-1',
+    expect(screen.getByAltText('صورة باقة الفصل الدراسي الأول').getAttribute('src')).toContain(
+      'cover-1',
     );
     expect(screen.getByRole('link', { name: /سجّل واشترك/ })).toHaveAttribute(
       'href',
@@ -57,10 +63,7 @@ describe('Public academy flow', () => {
   });
 
   it('keeps the page useful when no products are published', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: false }) as jest.Mock;
+    global.fetch = jest.fn().mockResolvedValue({ ok: false }) as jest.Mock;
 
     render(await CoursesPage({ searchParams: Promise.resolve({}) }));
 
