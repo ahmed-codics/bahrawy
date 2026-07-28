@@ -161,8 +161,9 @@ textarea {
 }
 
 .academy-public-nav > a:first-child {
+  flex: 1;
   min-width: 0;
-  max-width: calc(100% - 3.5rem);
+  max-width: none;
 }
 
 .academy-public-nav .academy-brand {
@@ -184,6 +185,34 @@ textarea {
 .academy-public-links,
 .academy-public-actions {
   display: none;
+}
+
+.academy-public-mobile-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.academy-mobile-login-link {
+  display: inline-flex;
+  min-width: 3.25rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--academy-cyan) 42%, var(--academy-border));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--academy-cyan) 10%, var(--academy-surface));
+  color: var(--academy-text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.academy-mobile-login-link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--academy-cyan) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .academy-public-menu-button {
@@ -725,6 +754,16 @@ textarea {
   min-height: 0;
 }
 
+.student-continue-cover {
+  min-height: auto;
+}
+
+@media (min-width: 768px) {
+  .student-continue-cover {
+    min-height: 18rem;
+  }
+}
+
 .student-main button,
 .student-main a[role='button'] {
   min-height: 2.75rem;
@@ -911,6 +950,10 @@ textarea {
 
   .academy-public-actions {
     display: flex;
+  }
+
+  .academy-public-mobile-actions {
+    display: none;
   }
 
   .academy-public-menu-button {

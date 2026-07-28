@@ -323,8 +323,8 @@ function Metric({
 function ContinueCard({ course, onOpen }: { course: Course; onOpen: () => void }) {
   const progress = Math.round(course.progressPercentage || 0);
   return (
-    <article className="student-course-card grid min-h-72 md:grid-cols-[minmax(16rem,40%)_1fr]">
-      <div className="student-cover relative min-h-52 overflow-hidden">
+    <article className="student-course-card grid overflow-hidden md:min-h-72 md:grid-cols-[minmax(16rem,40%)_1fr]">
+      <div className="student-cover student-continue-cover relative aspect-video w-full overflow-hidden md:aspect-auto md:min-h-72">
         {course.coverImageUrl ? (
           <Image
             src={`${API_BASE}${course.coverImageUrl}`}

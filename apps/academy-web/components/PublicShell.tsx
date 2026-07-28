@@ -84,15 +84,20 @@ export function PublicShell({
             </Link>
           </div>
 
-          <button
-            type="button"
-            className="academy-public-menu-button"
-            onClick={() => setOpen(true)}
-            aria-label="فتح القائمة"
-            aria-expanded={open}
-          >
-            <Menu aria-hidden="true" />
-          </button>
+          <div className="academy-public-mobile-actions">
+            <Link className="academy-mobile-login-link" href="/login">
+              دخول
+            </Link>
+            <button
+              type="button"
+              className="academy-public-menu-button"
+              onClick={() => setOpen(true)}
+              aria-label="فتح القائمة"
+              aria-expanded={open}
+            >
+              <Menu aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </header>
 
