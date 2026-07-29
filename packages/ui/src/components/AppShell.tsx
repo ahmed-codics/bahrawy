@@ -469,10 +469,7 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
   );
 
   return (
-    <div
-      className="min-h-dvh bg-canvas text-ink lg:grid lg:grid-cols-[minmax(0,1fr)_16rem]"
-      dir="rtl"
-    >
+    <div className="min-h-dvh bg-canvas text-ink" dir="rtl">
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 flex-col border-l border-border bg-surface p-4 lg:flex">
         <div className="mb-2 border-b border-border pb-4">
           <BrandMark admin />
@@ -492,7 +489,7 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
         </div>
       </aside>
 
-      <div className="min-w-0 lg:col-start-1">
+      <div className="min-w-0 lg:mr-64">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <Button
