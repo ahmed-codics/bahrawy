@@ -329,18 +329,13 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
             )}
             {resultsReleased && passed === false && result.attemptsRemaining === 0 && (
               <p className="mt-5 font-bold text-danger">
-                تم استهلاك جميع المحاولات. تواصل مع خدمة العملاء للمساعدة.
+                تم استهلاك جميع المحاولات. راجع إدارة الأكاديمية لمعرفة الخطوة التالية.
               </p>
             )}
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               {canRetry && (
                 <Button onClick={() => void loadAttempt(true)}>
                   {passed === true ? 'إعادة الاختبار' : 'بدء محاولة جديدة'}
-                </Button>
-              )}
-              {resultsReleased && passed === false && result.attemptsRemaining === 0 && (
-                <Button onClick={() => router.push('/student/support')}>
-                  التواصل مع خدمة العملاء
                 </Button>
               )}
               <Button variant="outline" onClick={() => router.push('/student/courses')}>

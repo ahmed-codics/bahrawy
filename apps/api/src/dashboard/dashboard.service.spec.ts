@@ -7,6 +7,10 @@ jest.mock('@bahrawy/db', () => {
   const mockDbClient: any = {
     studentProfile: {
       findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    grade: {
+      findFirst: jest.fn(),
     },
     guardianProfile: {
       findUnique: jest.fn(),
@@ -28,6 +32,13 @@ jest.mock('@bahrawy/db', () => {
     },
     paymentOrder: {
       count: jest.fn(),
+      findMany: jest.fn(),
+    },
+    product: {
+      findUnique: jest.fn(),
+    },
+    assessmentAttempt: {
+      findMany: jest.fn(),
     },
     supportTicket: {
       count: jest.fn(),
@@ -75,9 +86,62 @@ describe('DashboardService', () => {
       });
       (db.entitlement.findMany as jest.Mock).mockResolvedValue([]);
       (db.inAppNotification.findMany as jest.Mock).mockResolvedValue([]);
+      (db.paymentOrder.findMany as jest.Mock).mockResolvedValue([]);
+      (db.assessmentAttempt.findMany as jest.Mock).mockResolvedValue([]);
       const result = await service.getStudentDashboard('acc-1');
       expect(result.profile.displayName).toBe('Ali');
       expect(result.enrolledCourses).toHaveLength(0);
+    });
+  });
+
+  describe('student profile', () => {
+    it('updates editable academic details within the student organization', async () => {
+      (db.studentProfile.findUnique as jest.Mock)
+        .mockResolvedValueOnce({
+          account: { organizationId: 'org-1' },
+        })
+        .mockResolvedValueOnce({
+          displayName: 'Ali',
+          gradeId: 'grade-1',
+          schoolName: 'مدرسة النيل',
+          city: 'الإسكندرية',
+          gender: 'MALE',
+          updatedAt: new Date(),
+          account: {
+            phoneEncrypted: null,
+            status: 'ACTIVE',
+            createdAt: new Date(),
+          },
+        });
+      (db.grade.findFirst as jest.Mock).mockResolvedValue({ id: 'grade-1' });
+      (db.studentProfile.update as jest.Mock).mockResolvedValue({});
+
+      const result = await service.updateStudentProfile('acc-1', {
+        gradeId: 'grade-1',
+        schoolName: ' مدرسة النيل ',
+        city: ' الإسكندرية ',
+        gender: 'MALE',
+      });
+
+      expect(db.grade.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'grade-1',
+          organizationId: 'org-1',
+          status: 'ACTIVE',
+          archivedAt: null,
+        },
+        select: { id: true },
+      });
+      expect(db.studentProfile.update).toHaveBeenCalledWith({
+        where: { accountId: 'acc-1' },
+        data: {
+          gradeId: 'grade-1',
+          schoolName: 'مدرسة النيل',
+          city: 'الإسكندرية',
+          gender: 'MALE',
+        },
+      });
+      expect(result.profile.schoolName).toBe('مدرسة النيل');
     });
   });
 

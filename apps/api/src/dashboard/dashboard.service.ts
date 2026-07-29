@@ -13,12 +13,52 @@ export class DashboardService {
   async getStudentProfile(accountId: string): Promise<any> {
     const student = await db.studentProfile.findUnique({
       where: { accountId },
-      select: { displayName: true, gradeId: true },
+      select: {
+        displayName: true,
+        gradeId: true,
+        schoolName: true,
+        city: true,
+        gender: true,
+        updatedAt: true,
+        account: {
+          select: {
+            phoneEncrypted: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+      },
     });
     if (!student) {
       throw new NotFoundException('Student profile not found');
     }
-    return { profile: student };
+
+    let phoneMasked = '';
+    if (student.account.phoneEncrypted) {
+      try {
+        const phone = this.securityService.decrypt(
+          student.account.phoneEncrypted,
+        );
+        const digits = phone.replace(/\D/g, '');
+        phoneMasked = digits.length >= 4 ? `•••• ${digits.slice(-4)}` : '••••';
+      } catch {
+        phoneMasked = 'غير متاح';
+      }
+    }
+
+    return {
+      profile: {
+        displayName: student.displayName,
+        gradeId: student.gradeId,
+        schoolName: student.schoolName,
+        city: student.city,
+        gender: student.gender,
+        phoneMasked,
+        status: student.account.status,
+        createdAt: student.account.createdAt,
+        updatedAt: student.updatedAt,
+      },
+    };
   }
 
   async getStudentDashboard(accountId: string): Promise<any> {
@@ -134,9 +174,9 @@ export class DashboardService {
     });
 
     const rawOrders = await db.paymentOrder.findMany({
-      where: { 
-        accountId, 
-        status: { in: ['PENDING_REVIEW', 'REJECTED'] } 
+      where: {
+        accountId,
+        status: { in: ['PENDING_REVIEW', 'REJECTED'] },
       },
       orderBy: { createdAt: 'desc' },
       take: 5,
@@ -152,7 +192,7 @@ export class DashboardService {
           ...order,
           product,
         };
-      })
+      }),
     );
     const rawActiveAssessments = await db.assessmentAttempt.findMany({
       where: {
@@ -164,7 +204,7 @@ export class DashboardService {
           select: {
             titleAr: true,
             passingScore: true,
-          }
+          },
         },
       },
       orderBy: { startedAt: 'desc' },
@@ -325,17 +365,17 @@ export class DashboardService {
     if (!student) {
       throw new NotFoundException('Student not found');
     }
-    
+
     // We can decrypt the phone number if needed here
     let rawPhone = '';
     if (student.account.phoneEncrypted) {
       try {
         rawPhone = this.securityService.decrypt(student.account.phoneEncrypted);
-      } catch (e) {
+      } catch {
         rawPhone = 'DECRYPT_ERROR';
       }
     }
-    
+
     return {
       id: student.id,
       accountId: student.accountId,
@@ -345,11 +385,61 @@ export class DashboardService {
       createdAt: student.createdAt,
     };
   }
-  async updateStudentProfile(accountId: string, gradeId: string): Promise<any> {
-    const student = await db.studentProfile.update({
+  async updateStudentProfile(
+    accountId: string,
+    input: {
+      gradeId: string;
+      schoolName?: string | null;
+      city?: string | null;
+      gender?: 'MALE' | 'FEMALE' | null;
+    },
+  ): Promise<any> {
+    const current = await db.studentProfile.findUnique({
       where: { accountId },
-      data: { gradeId },
+      select: { account: { select: { organizationId: true } } },
     });
-    return { profile: { displayName: student.displayName, gradeId: student.gradeId } };
+    if (!current) {
+      throw new NotFoundException('Student profile not found');
+    }
+
+    const gradeId = input.gradeId?.trim();
+    if (!gradeId) {
+      throw new BadRequestException('Grade is required');
+    }
+    const grade = await db.grade.findFirst({
+      where: {
+        id: gradeId,
+        organizationId: current.account.organizationId,
+        status: 'ACTIVE',
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!grade) {
+      throw new BadRequestException('Invalid grade');
+    }
+
+    const schoolName = input.schoolName?.trim() || null;
+    const city = input.city?.trim() || null;
+    if (schoolName && schoolName.length > 120) {
+      throw new BadRequestException('School name is too long');
+    }
+    if (city && city.length > 80) {
+      throw new BadRequestException('City is too long');
+    }
+    if (input.gender && !['MALE', 'FEMALE'].includes(input.gender)) {
+      throw new BadRequestException('Invalid gender');
+    }
+
+    await db.studentProfile.update({
+      where: { accountId },
+      data: {
+        gradeId,
+        schoolName,
+        city,
+        gender: input.gender || null,
+      },
+    });
+    return this.getStudentProfile(accountId);
   }
 }

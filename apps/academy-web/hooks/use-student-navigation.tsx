@@ -1,5 +1,5 @@
 import { usePathname } from 'next/navigation';
-import { BookOpen, Headphones, Home, ShoppingBag, UserRound } from 'lucide-react';
+import { BookOpen, Home, ShoppingBag, UserRound } from 'lucide-react';
 
 export function useStudentNavigation() {
   const pathname = usePathname() || '';
@@ -22,12 +22,6 @@ export function useStudentNavigation() {
       isActive:
         pathname.startsWith('/student/products') || pathname.startsWith('/student/checkout'),
       icon: <ShoppingBag className="size-5" />,
-    },
-    {
-      label: 'الدعم',
-      href: '/student/support',
-      isActive: pathname.startsWith('/student/support'),
-      icon: <Headphones className="size-5" />,
     },
     {
       label: 'حسابي',

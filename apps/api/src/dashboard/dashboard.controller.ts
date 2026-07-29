@@ -44,14 +44,20 @@ export class DashboardController {
   @Put('student/profile')
   async updateStudentProfile(
     @Req() req: any,
-    @Body() body: { gradeId: string },
+    @Body()
+    body: {
+      gradeId: string;
+      schoolName?: string | null;
+      city?: string | null;
+      gender?: 'MALE' | 'FEMALE' | null;
+    },
   ) {
     if (req.account.kind !== 'STUDENT') {
       throw new UnauthorizedException('Not a student account');
     }
     const data = await this.dashboardService.updateStudentProfile(
       req.account.id,
-      body.gradeId,
+      body,
     );
     return { status: 'SUCCESS', data };
   }

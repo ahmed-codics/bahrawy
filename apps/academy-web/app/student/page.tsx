@@ -282,7 +282,7 @@ export default function StudentDashboard() {
               <>
                 <QuickNote text="اختار الدرس اللي هتبدأ به قبل ما تذاكر." />
                 <QuickNote text="تقدمك بيتحفظ تلقائياً بعد كل مشاهدة." />
-                <QuickNote text="محتاج مساعدة؟ فريق الدعم موجود من القائمة." />
+                <QuickNote text="راجع مرحلتك الدراسية من حسابك عشان يظهر لك المحتوى المناسب." />
               </>
             )}
           </div>
