@@ -391,6 +391,10 @@ textarea {
   overflow: visible;
 }
 
+.academy-benefits-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .academy-grade-wrapper {
   min-width: 0;
 }
@@ -965,10 +969,16 @@ textarea {
   }
 
   .academy-hero-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.8fr);
+    grid-template-columns: minmax(0, 1.05fr) minmax(24rem, 0.95fr);
     align-items: center;
     gap: 2.5rem;
     text-align: start;
+  }
+
+  .academy-hero-image,
+  .academy-landing .academy-hero-image {
+    width: min(100%, 32rem);
+    max-width: 32rem;
   }
 
   .academy-hero-copy {
@@ -989,6 +999,16 @@ textarea {
   .academy-faq-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2.5rem;
+  }
+
+  .academy-teacher-card {
+    grid-template-columns: minmax(24rem, 0.95fr) minmax(0, 1.05fr);
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  .academy-teacher-visual {
+    min-height: 24rem;
+    aspect-ratio: 4 / 3;
   }
 
   .academy-public-footer-grid {
@@ -1078,9 +1098,12 @@ textarea {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .academy-learning-grid,
-  .academy-benefits-grid {
+  .academy-learning-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .academy-benefits-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
