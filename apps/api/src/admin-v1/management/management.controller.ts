@@ -24,6 +24,7 @@ import {
   UpdateStaffDto,
 } from './management.dto';
 import { AdminV1ManagementService } from './management.service';
+import { LifecycleMutationDto } from '../common/dto/lifecycle.dto';
 
 type AdminRequest = Request & {
   account: { id: string; organizationId: string };
@@ -38,8 +39,20 @@ export class AdminV1ManagementController {
   constructor(private readonly management: AdminV1ManagementService) {}
 
   @Get('staff')
-  staff(@Req() request: AdminRequest) {
-    return this.management.staff(request.account.organizationId);
+  staff(
+    @Req() request: AdminRequest,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.management.staff(
+      request.account.organizationId,
+      search,
+      status,
+      Number(page) || 1,
+      Number(pageSize) || 25,
+    );
   }
 
   @Get('roles')
@@ -61,18 +74,48 @@ export class AdminV1ManagementController {
     return this.management.updateStaff(request.account, id, input);
   }
 
+  @Get('staff/:id/deletion-impact')
+  staffDeletionImpact(@Req() request: AdminRequest, @Param('id') id: string) {
+    return this.management.staffDeletionImpact(
+      request.account.organizationId,
+      id,
+    );
+  }
+
+  @Post('staff/:id/archive')
+  archiveStaff(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.management.setStaffArchived(request.account, id, true, input);
+  }
+
+  @Post('staff/:id/restore')
+  restoreStaff(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.management.setStaffArchived(request.account, id, false, input);
+  }
+
   @Get('audit')
   audit(
     @Req() request: AdminRequest,
     @Query('action') action?: string,
     @Query('actorId') actorId?: string,
     @Query('targetType') targetType?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     return this.management.auditEvents(
       request.account.organizationId,
       action,
       actorId,
       targetType,
+      Number(page) || 1,
+      Number(pageSize) || 50,
     );
   }
 

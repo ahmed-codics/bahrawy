@@ -10,6 +10,7 @@ import {
   Monitor,
   Phone,
   Plus,
+  Pencil,
   RotateCcw,
   School,
   Trash2,
@@ -29,6 +30,8 @@ import {
   Select,
 } from '@bahrawy/ui';
 import { fetchApi } from '../../../../lib/api';
+import { LifecycleDialog } from '../../_components/LifecycleDialog';
+import { ReasonActionDialog } from '../../_components/ReasonActionDialog';
 
 type Product = { id: string; titleAr: string; code: string; status?: string };
 type Entitlement = {
@@ -86,7 +89,7 @@ type Student = {
   guardianOccupation?: string | null;
   gender?: string | null;
   city?: string | null;
-  grade?: { nameAr: string } | null;
+  grade?: { id: string; nameAr: string } | null;
   account: {
     id: string;
     status: string;
@@ -100,38 +103,48 @@ type Student = {
 };
 
 type Tab = 'entitlements' | 'payments' | 'security';
-
-function requireReason(message: string) {
-  const reason = window.prompt(message)?.trim();
-  if (!reason || reason.length < 3) {
-    toast.error('اكتب سبباً واضحاً لا يقل عن 3 أحرف');
-    return null;
-  }
-  return reason;
-}
+type Grade = { id: string; nameAr: string; status: string };
+type SensitiveAction = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  run: (reason: string) => Promise<void>;
+};
 
 export default function StudentDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [student, setStudent] = useState<Student | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('entitlements');
   const [grantOpen, setGrantOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [lifecycleOpen, setLifecycleOpen] = useState(false);
+  const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [studentResponse, productResponse] = await Promise.all([
+      const [studentResponse, productResponse, academicResponse] = await Promise.all([
         fetchApi(`/admin/v1/students/${id}`),
-        fetchApi('/admin/v1/products'),
+        fetchApi('/admin/v1/products?pageSize=100'),
+        fetchApi('/admin/v1/academic'),
       ]);
       setStudent(studentResponse.data as Student);
       setProducts(
-        (productResponse.data as Product[]).filter((product) => product.status !== 'ARCHIVED'),
+        ((productResponse.data.items ?? productResponse.data) as Product[]).filter(
+          (product) => product.status !== 'ARCHIVED',
+        ),
+      );
+      setGrades(
+        (academicResponse.data.grades as Grade[]).filter(
+          (grade) => grade.status !== 'ARCHIVED',
+        ),
       );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل ملف الطالب');
@@ -148,53 +161,95 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
   const setAccountStatus = async () => {
     if (!student) return;
     const nextStatus = student.account.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-    const reason = requireReason(
-      nextStatus === 'SUSPENDED' ? 'سبب إيقاف حساب الطالب:' : 'سبب إعادة تفعيل الحساب:',
-    );
-    if (!reason) return;
-    await fetchApi(`/admin/v1/students/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        status: nextStatus,
-        reason,
-        version: student.account.version,
-      }),
+    setSensitiveAction({
+      title: nextStatus === 'SUSPENDED' ? 'إيقاف حساب الطالب' : 'إعادة تفعيل الحساب',
+      description:
+        nextStatus === 'SUSPENDED'
+          ? 'سيُمنع الطالب من تسجيل الدخول وستُلغى جلساته النشطة. تظل بيانات التعلم والمدفوعات محفوظة.'
+          : 'سيتمكن الطالب من تسجيل الدخول من جديد. لن تُعاد الجلسات القديمة.',
+      confirmLabel: nextStatus === 'SUSPENDED' ? 'إيقاف الحساب' : 'إعادة التفعيل',
+      run: async (reason) => {
+        await fetchApi(`/admin/v1/students/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: nextStatus,
+            reason,
+            version: student.account.version,
+          }),
+        });
+        toast.success(nextStatus === 'ACTIVE' ? 'تم تفعيل الطالب' : 'تم إيقاف الطالب');
+        await load();
+      },
     });
-    toast.success(nextStatus === 'ACTIVE' ? 'تم تفعيل الطالب' : 'تم إيقاف الطالب');
-    await load();
   };
 
   const revokeSessions = async () => {
-    const reason = requireReason('سبب تسجيل الخروج من كل الجلسات:');
-    if (!reason) return;
-    await fetchApi(`/admin/v1/students/${id}/sessions/revoke`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
+    setSensitiveAction({
+      title: 'تسجيل الخروج من كل الأجهزة',
+      description: 'ستنتهي جميع جلسات الطالب الحالية وسيحتاج إلى تسجيل الدخول مرة أخرى.',
+      confirmLabel: 'إلغاء كل الجلسات',
+      run: async (reason) => {
+        await fetchApi(`/admin/v1/students/${id}/sessions/revoke`, {
+          method: 'POST',
+          body: JSON.stringify({ reason }),
+        });
+        toast.success('تم إلغاء كل الجلسات النشطة');
+        await load();
+      },
     });
-    toast.success('تم إلغاء كل الجلسات النشطة');
-    await load();
   };
 
   const revokeDevice = async (device: Device) => {
-    const reason = requireReason(`سبب حذف الجهاز "${device.label || 'بدون اسم'}":`);
-    if (!reason) return;
-    await fetchApi(`/admin/v1/students/${id}/devices/${device.id}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ reason }),
+    setSensitiveAction({
+      title: 'إلغاء جهاز الطالب',
+      description: `سيُلغى الجهاز "${device.label || 'بدون اسم'}" وكل الجلسات النشطة لحماية الحساب.`,
+      confirmLabel: 'إلغاء الجهاز',
+      run: async (reason) => {
+        await fetchApi(`/admin/v1/students/${id}/devices/${device.id}`, {
+          method: 'DELETE',
+          body: JSON.stringify({ reason }),
+        });
+        toast.success('تم إلغاء الجهاز');
+        await load();
+      },
     });
-    toast.success('تم حذف الجهاز');
-    await load();
   };
 
   const changeEntitlement = async (entitlement: Entitlement, status: string) => {
-    const reason = requireReason('سبب تغيير حالة الاشتراك:');
-    if (!reason) return;
-    await fetchApi(`/admin/v1/students/entitlements/${entitlement.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, reason }),
+    setSensitiveAction({
+      title: 'تغيير حالة الاشتراك',
+      description: `ستتغير حالة اشتراك "${entitlement.product.titleAr}" من ${entitlement.status} إلى ${status}.`,
+      confirmLabel: 'تأكيد التغيير',
+      run: async (reason) => {
+        await fetchApi(`/admin/v1/students/entitlements/${entitlement.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status, reason }),
+        });
+        toast.success('تم تحديث الاشتراك');
+        await load();
+      },
     });
-    toast.success('تم تحديث الاشتراك');
-    await load();
+  };
+
+  const updateProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!student) return;
+    setSaving(true);
+    try {
+      const values = Object.fromEntries(new FormData(event.currentTarget));
+      await fetchApi(`/admin/v1/students/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          ...values,
+          version: student.account.version,
+        }),
+      });
+      toast.success('تم تحديث بيانات الطالب');
+      setProfileOpen(false);
+      await load();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const grant = async (event: FormEvent<HTMLFormElement>) => {
@@ -254,12 +309,22 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
                 </>
               )}
             </Button>
+            <Button variant="outline" onClick={() => setLifecycleOpen(true)}>
+              {student.account.status === 'ARCHIVED' ? (
+                <RotateCcw className="size-4" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              {student.account.status === 'ARCHIVED' ? 'استعادة الطالب' : 'أرشفة الطالب'}
+            </Button>
           </div>
         }
       />
       <div className="flex items-center gap-3 border-b border-border pb-3">
         {student.account.status === 'ACTIVE' ? (
           <Badge tone="success">الحساب نشط</Badge>
+        ) : student.account.status === 'ARCHIVED' ? (
+          <Badge tone="neutral">الحساب مؤرشف</Badge>
         ) : (
           <Badge tone="amber">الحساب موقوف</Badge>
         )}
@@ -277,6 +342,10 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
           <Badge tone="neutral">
             {student.gender === 'FEMALE' ? 'أنثى' : student.gender === 'MALE' ? 'ذكر' : 'غير محدد'}
           </Badge>
+          <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)}>
+            <Pencil className="size-4" />
+            تعديل البيانات
+          </Button>
         </div>
         <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <ProfileItem icon={<UserRound />} label="الاسم الرباعي" value={student.displayName} />
@@ -553,6 +622,76 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
           <Input name="reason" label="سبب المنح" required minLength={3} />
         </form>
       </Drawer>
+      <Drawer
+        isOpen={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        title="تعديل بيانات الطالب"
+        footer={
+          <Button type="submit" form="student-profile-form" loading={saving}>
+            حفظ التعديلات
+          </Button>
+        }
+      >
+        <form id="student-profile-form" className="space-y-4" onSubmit={updateProfile}>
+          <Input name="displayName" label="اسم الطالب" defaultValue={student.displayName} required />
+          <Input
+            name="phone"
+            label="رقم هاتف الطالب"
+            defaultValue={student.phone}
+            directionMode="ltr"
+            required
+          />
+          <Select name="gradeId" label="المرحلة الدراسية" defaultValue={student.grade?.id ?? ''}>
+            <option value="">بدون مرحلة</option>
+            {grades.map((grade) => (
+              <option key={grade.id} value={grade.id}>
+                {grade.nameAr}
+              </option>
+            ))}
+          </Select>
+          <Input name="schoolName" label="المدرسة" defaultValue={student.schoolName ?? ''} />
+          <Input name="city" label="المدينة / المحافظة" defaultValue={student.city ?? ''} />
+          <Input
+            name="fatherPhone"
+            label="هاتف الأب"
+            defaultValue={student.fatherPhone ?? ''}
+            directionMode="ltr"
+          />
+          <Input
+            name="motherPhone"
+            label="هاتف الأم"
+            defaultValue={student.motherPhone ?? ''}
+            directionMode="ltr"
+          />
+          <Input
+            name="reason"
+            label="سبب التعديل"
+            placeholder="مثال: تحديث بيانات الطالب بطلب ولي الأمر"
+            minLength={3}
+            required
+          />
+        </form>
+      </Drawer>
+      {sensitiveAction && (
+        <ReasonActionDialog
+          open
+          title={sensitiveAction.title}
+          description={sensitiveAction.description}
+          confirmLabel={sensitiveAction.confirmLabel}
+          onClose={() => setSensitiveAction(null)}
+          onConfirm={sensitiveAction.run}
+        />
+      )}
+      <LifecycleDialog
+        open={lifecycleOpen}
+        endpoint={`/admin/v1/students/${id}`}
+        version={student.account.version}
+        onClose={() => setLifecycleOpen(false)}
+        onComplete={async () => {
+          setLifecycleOpen(false);
+          await load();
+        }}
+      />
     </div>
   );
 }

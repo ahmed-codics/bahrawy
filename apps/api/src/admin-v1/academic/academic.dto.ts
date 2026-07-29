@@ -43,11 +43,10 @@ export class UpdateAcademicEntityDto {
   @IsString()
   status?: string;
 
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  version?: number;
+  version!: number;
 
   @IsOptional()
   @Type(() => Number)

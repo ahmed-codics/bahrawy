@@ -11,9 +11,15 @@ jest.mock('@bahrawy/db', () => {
 });
 
 describe('AdminV1CoursesService lesson lifecycle', () => {
-  const service = new AdminV1CoursesService();
+  const audit = {
+    logEvent: jest.fn(),
+  };
+  const service = new AdminV1CoursesService(audit as never);
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    audit.logEvent.mockResolvedValue(undefined);
+  });
 
   it('publishes the lesson container, its content, and its parent chapter', async () => {
     (db.unit.findFirst as jest.Mock).mockResolvedValue({
@@ -32,7 +38,12 @@ describe('AdminV1CoursesService lesson lifecycle', () => {
       callback(tx),
     );
 
-    await service.updateLessonLifecycle('org-1', 'unit-1', 'PUBLISHED', 3);
+    await service.updateLessonLifecycle(
+      { id: 'staff-1', organizationId: 'org-1' },
+      'unit-1',
+      'PUBLISHED',
+      3,
+    );
 
     expect(tx.chapter.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -49,6 +60,13 @@ describe('AdminV1CoursesService lesson lifecycle', () => {
     expect(tx.unit.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'PUBLISHED' }),
+      }),
+    );
+    expect(audit.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: 'org-1',
+        actorId: 'staff-1',
+        targetId: 'unit-1',
       }),
     );
   });

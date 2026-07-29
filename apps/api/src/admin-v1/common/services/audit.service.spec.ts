@@ -84,8 +84,16 @@ describe('AdminAuditService', () => {
   it('redacts sensitive fields inside arrays of objects', () => {
     const original = {
       accounts: [
-        { temporaryPassword: 'abc', plainCredential: 'xyz', displayName: 'User1' },
-        { temporaryPassword: 'def', plainCredential: 'uvw', displayName: 'User2' },
+        {
+          temporaryPassword: 'abc',
+          plainCredential: 'xyz',
+          displayName: 'User1',
+        },
+        {
+          temporaryPassword: 'def',
+          plainCredential: 'uvw',
+          displayName: 'User2',
+        },
       ],
     };
 

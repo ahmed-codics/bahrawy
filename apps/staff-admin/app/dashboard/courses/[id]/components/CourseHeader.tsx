@@ -2,11 +2,12 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Edit3 } from 'lucide-react';
+import { Archive, ChevronRight, Edit3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Drawer, Input, Select } from '@bahrawy/ui';
 import { API_BASE, fetchApi } from '../../../../../lib/api';
 import type { CourseWithContent } from './types';
+import { LifecycleDialog } from '../../../_components/LifecycleDialog';
 
 type CourseHeaderProps = {
   course: CourseWithContent;
@@ -23,6 +24,7 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isFree, setIsFree] = useState(
     Number(course.courseProduct?.prices?.[0]?.amount ?? -1) === 0,
@@ -60,15 +62,15 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
         }),
       });
       if (isFree || String(values.priceAmount || '').trim()) {
-        await fetchApi(`/admin/courses/${course.id}/product`, {
-          method: course.courseProduct ? 'PATCH' : 'POST',
+        await fetchApi(`/admin/v1/products/course/${course.id}/commerce`, {
+          method: 'POST',
           body: JSON.stringify({
             titleAr: values.titleAr,
             titleEn: values.titleEn || undefined,
             descriptionAr: values.descriptionAr || undefined,
             coverImageUrl,
             priceAmount: isFree ? 0 : Number(values.priceAmount),
-            status: 'ACTIVE',
+            version: course.courseProduct?.version,
           }),
         });
       }
@@ -121,10 +123,16 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
                 : 'مسودة'}
           </span>
         </div>
-        <Button variant="outline" onClick={() => setOpen(true)}>
-          <Edit3 className="size-4" />
-          إعدادات النشر
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setOpen(true)}>
+            <Edit3 className="size-4" />
+            إعدادات الكورس
+          </Button>
+          <Button variant="ghost" onClick={() => setLifecycleOpen(true)}>
+            <Archive className="size-4" />
+            {course.status === 'ARCHIVED' ? 'استعادة أو حذف' : 'إدارة الأرشفة'}
+          </Button>
+        </div>
       </header>
       <Drawer
         isOpen={open}
@@ -167,7 +175,6 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
           <Select name="status" label="الحالة" defaultValue={course.status}>
             <option value="DRAFT">مسودة</option>
             <option value="PUBLISHED">منشور</option>
-            <option value="ARCHIVED">مؤرشف</option>
           </Select>
           <label className="block space-y-2 text-sm font-bold text-ink">
             صورة الكورس
@@ -205,6 +212,26 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
           </p>
         </form>
       </Drawer>
+      <LifecycleDialog
+        open={lifecycleOpen}
+        endpoint={`/admin/v1/courses/${course.id}`}
+        version={course.version}
+        onClose={() => setLifecycleOpen(false)}
+        onComplete={async (action) => {
+          toast.success(
+            action === 'RESTORE'
+              ? 'تمت استعادة الكورس كمسودة'
+              : action === 'PERMANENT_DELETE'
+                ? 'تم حذف مسودة الكورس نهائياً'
+                : 'تمت أرشفة الكورس',
+          );
+          if (action !== 'RESTORE') {
+            router.push('/dashboard/courses');
+            return;
+          }
+          await onReload();
+        }}
+      />
     </>
   );
 }

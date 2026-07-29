@@ -13,7 +13,15 @@ type Actor = { id: string; organizationId: string };
 export class AdminV1PaymentsService {
   constructor(private readonly audit: AdminAuditService) {}
 
-  async list(organizationId: string, status?: string, search?: string) {
+  async list(
+    organizationId: string,
+    status?: string,
+    search?: string,
+    page = 1,
+    pageSize = 25,
+  ) {
+    const take = Math.min(Math.max(pageSize, 1), 100);
+    const skip = Math.max(page - 1, 0) * take;
     const studentIds = search
       ? (
           await db.studentProfile.findMany({
@@ -25,15 +33,21 @@ export class AdminV1PaymentsService {
           })
         ).map((student: any) => student.accountId)
       : undefined;
-    const orders = await db.paymentOrder.findMany({
-      where: {
-        organizationId,
-        ...(status ? { status } : {}),
-        ...(studentIds ? { accountId: { in: studentIds } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { ledgerEntries: { orderBy: { createdAt: 'desc' } } },
-    });
+    const where = {
+      organizationId,
+      ...(status ? { status } : {}),
+      ...(studentIds ? { accountId: { in: studentIds } } : {}),
+    };
+    const [orders, total] = await Promise.all([
+      db.paymentOrder.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: { ledgerEntries: { orderBy: { createdAt: 'desc' } } },
+      }),
+      db.paymentOrder.count({ where }),
+    ]);
     const accountIds = [
       ...new Set(orders.map((order: any) => order.accountId)),
     ];
@@ -88,7 +102,7 @@ export class AdminV1PaymentsService {
       reviewers.map((reviewer: any) => [reviewer.accountId, reviewer]),
     );
     const proofMap = new Map(proofs.map((proof: any) => [proof.id, proof]));
-    return orders.map((order: any) => ({
+    const items = orders.map((order: any) => ({
       ...order,
       student: studentMap.get(order.accountId) ?? null,
       product: productMap.get(order.productId) ?? null,
@@ -99,6 +113,15 @@ export class AdminV1PaymentsService {
         ? (proofMap.get(order.proofObjectId) ?? null)
         : null,
     }));
+    return {
+      items,
+      meta: {
+        page,
+        pageSize: take,
+        total,
+        pageCount: Math.ceil(total / take),
+      },
+    };
   }
 
   async review(actor: Actor, orderId: string, input: ReviewPaymentDto) {
@@ -110,6 +133,7 @@ export class AdminV1PaymentsService {
       throw new ConflictException({
         code: 'PAYMENT_ALREADY_REVIEWED',
         message: 'This payment was already changed by another reviewer',
+        currentVersion: order.version,
       });
     }
     const now = new Date();

@@ -25,7 +25,9 @@ import {
   ReasonDto,
   StudentStatusDto,
   UpdateEntitlementDto,
+  UpdateStudentProfileDto,
 } from './students.dto';
+import { LifecycleMutationDto } from '../common/dto/lifecycle.dto';
 import { AdminV1StudentsService } from './students.service';
 
 type AdminRequest = Request & {
@@ -67,6 +69,38 @@ export class AdminV1StudentsController {
   @Post()
   create(@Req() request: AdminRequest, @Body() input: CreateStudentDto) {
     return this.students.create(request.account, input);
+  }
+
+  @Patch(':id')
+  updateProfile(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: UpdateStudentProfileDto,
+  ) {
+    return this.students.updateProfile(request.account, id, input);
+  }
+
+  @Get(':id/deletion-impact')
+  deletionImpact(@Req() request: AdminRequest, @Param('id') id: string) {
+    return this.students.deletionImpact(request.account.organizationId, id);
+  }
+
+  @Post(':id/archive')
+  archive(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.students.setArchived(request.account, id, true, input);
+  }
+
+  @Post(':id/restore')
+  restore(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.students.setArchived(request.account, id, false, input);
   }
 
   @Patch(':id/status')

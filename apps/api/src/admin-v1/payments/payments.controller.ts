@@ -37,8 +37,16 @@ export class AdminV1PaymentsController {
     @Req() request: AdminRequest,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.payments.list(request.account.organizationId, status, search);
+    return this.payments.list(
+      request.account.organizationId,
+      status,
+      search,
+      Number(page) || 1,
+      Number(pageSize) || 25,
+    );
   }
 
   @Patch(':id/review')

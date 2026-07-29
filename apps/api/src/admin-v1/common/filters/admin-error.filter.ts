@@ -26,6 +26,7 @@ export class AdminApiErrorFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let code = 'INTERNAL_ERROR';
     let fieldErrors: Record<string, string[]> | undefined;
+    let conflict: { currentVersion: number } | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -35,6 +36,8 @@ export class AdminApiErrorFilter implements ExceptionFilter {
           message?: string | string[];
           code?: string;
           fieldErrors?: Record<string, string[]>;
+          currentVersion?: number;
+          conflict?: { currentVersion?: number };
         };
         if (Array.isArray(payload.message)) {
           message = 'Validation failed';
@@ -45,6 +48,11 @@ export class AdminApiErrorFilter implements ExceptionFilter {
         code =
           payload.code || exception.name.replace('Exception', '').toUpperCase();
         fieldErrors = payload.fieldErrors || fieldErrors;
+        const currentVersion =
+          payload.conflict?.currentVersion ?? payload.currentVersion;
+        if (typeof currentVersion === 'number') {
+          conflict = { currentVersion };
+        }
       } else {
         message = exception.message;
         code = exception.name.replace('Exception', '').toUpperCase();
@@ -56,6 +64,7 @@ export class AdminApiErrorFilter implements ExceptionFilter {
       message,
       fieldErrors,
       traceId,
+      conflict,
     };
 
     response.setHeader('x-request-id', traceId);

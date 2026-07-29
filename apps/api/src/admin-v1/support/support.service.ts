@@ -13,48 +13,80 @@ type Actor = { id: string; organizationId: string };
 export class AdminV1SupportService {
   constructor(private readonly audit: AdminAuditService) {}
 
-  list(
+  async list(
     organizationId: string,
     status?: string,
     priority?: string,
     search?: string,
+    page = 1,
+    pageSize = 25,
   ) {
-    return db.supportTicket.findMany({
-      where: {
-        organizationId,
-        ...(status ? { status: status as any } : {}),
-        ...(priority ? { priority: priority as any } : {}),
-        ...(search
-          ? {
-              OR: [
-                { subject: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
-                {
-                  account: {
-                    studentProfile: {
-                      displayName: { contains: search, mode: 'insensitive' },
+    const take = Math.min(Math.max(pageSize, 1), 100);
+    const skip = Math.max(page - 1, 0) * take;
+    const where = {
+      organizationId,
+      ...(status ? { status: status as any } : {}),
+      ...(priority ? { priority: priority as any } : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                subject: {
+                  contains: search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                description: {
+                  contains: search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                account: {
+                  studentProfile: {
+                    displayName: {
+                      contains: search,
+                      mode: 'insensitive' as const,
                     },
                   },
                 },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [
-        { priority: 'desc' },
-        { lastMessageAt: 'asc' },
-        { createdAt: 'asc' },
-      ],
-      include: {
-        account: {
-          select: {
-            studentProfile: { select: { id: true, displayName: true } },
+              },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      db.supportTicket.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [
+          { priority: 'desc' },
+          { lastMessageAt: 'asc' },
+          { createdAt: 'asc' },
+        ],
+        include: {
+          account: {
+            select: {
+              studentProfile: { select: { id: true, displayName: true } },
+            },
           },
+          assignedStaff: { select: { id: true, displayName: true } },
+          _count: { select: { messages: true } },
         },
-        assignedStaff: { select: { id: true, displayName: true } },
-        _count: { select: { messages: true } },
+      }),
+      db.supportTicket.count({ where }),
+    ]);
+    return {
+      items,
+      meta: {
+        page,
+        pageSize: take,
+        total,
+        pageCount: Math.ceil(total / take),
       },
-    });
+    };
   }
 
   async detail(organizationId: string, id: string) {
@@ -101,6 +133,7 @@ export class AdminV1SupportService {
       throw new ConflictException({
         code: 'VERSION_CONFLICT',
         message: 'This ticket was changed by another staff member',
+        currentVersion: ticket.version,
       });
     }
     if (input.assignedStaffId) {

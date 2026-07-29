@@ -13,7 +13,6 @@ import type { AssessmentPrerequisiteOption, AssessmentRecord, UnitRecord } from 
 type LessonCardProps = {
   unit: UnitRecord;
   index: number;
-  chapterId: string;
   courseId: string;
   assessmentByLessonId?: Record<string, AssessmentRecord>;
   prerequisiteOptions: AssessmentPrerequisiteOption[];
@@ -24,7 +23,6 @@ type LessonCardProps = {
 export function LessonCard({
   unit,
   index,
-  chapterId,
   courseId,
   assessmentByLessonId,
   prerequisiteOptions,
@@ -75,13 +73,13 @@ export function LessonCard({
         });
         coverImageUrl = `/storage/${uploaded.data.storedObjectId}`;
       }
-      await fetchApi(`/admin/units/${unit.id}/product`, {
-        method: unit.lessonProduct ? 'PATCH' : 'POST',
+      await fetchApi(`/admin/v1/products/unit/${unit.id}/commerce`, {
+        method: 'POST',
         body: JSON.stringify({
           titleAr: unit.titleAr,
           priceAmount: parsedPrice,
           coverImageUrl,
-          status: 'ACTIVE',
+          version: unit.lessonProduct?.version,
         }),
       });
       toast.success('تم حفظ سعر وصورة الدرس');
@@ -151,9 +149,6 @@ export function LessonCard({
   };
 
   const changeLifecycle = async (status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') => {
-    if (status === 'ARCHIVED' && !confirm(`هل أنت متأكد من أرشفة الدرس "${unit.titleAr}"؟`)) {
-      return;
-    }
     setChangingStatus(true);
     try {
       await fetchApi(`/admin/v1/courses/units/${unit.id}/lifecycle`, {

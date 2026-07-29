@@ -20,7 +20,9 @@ import { AdminApiResponseInterceptor } from '../common/interceptors/admin-respon
 import { CreateAssessmentDto, UpdateAssessmentDto } from './assessments.dto';
 import { AdminV1AssessmentsService } from './assessments.service';
 
-type AdminRequest = Request & { account: { organizationId: string } };
+type AdminRequest = Request & {
+  account: { id: string; organizationId: string };
+};
 
 @Controller('admin/v1/assessments')
 @UseGuards(SessionAuthGuard, PermissionsGuard)
@@ -42,7 +44,7 @@ export class AdminV1AssessmentsController {
     @Body() input: CreateAssessmentDto,
   ) {
     return this.assessmentsService.createForLesson(
-      request.account.organizationId,
+      request.account,
       lessonId,
       input,
     );
@@ -54,10 +56,6 @@ export class AdminV1AssessmentsController {
     @Param('id') id: string,
     @Body() input: UpdateAssessmentDto,
   ) {
-    return this.assessmentsService.update(
-      request.account.organizationId,
-      id,
-      input,
-    );
+    return this.assessmentsService.update(request.account, id, input);
   }
 }

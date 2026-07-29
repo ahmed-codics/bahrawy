@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from '@bahrawy/db';
+import type { AdminDeletionImpact } from '@bahrawy/types';
 import { randomBytes } from 'node:crypto';
 import { SecurityService } from '../../security/security.service';
 import { AdminAuditService } from '../common/services/audit.service';
@@ -13,7 +14,9 @@ import {
   GrantEntitlementDto,
   StudentStatusDto,
   UpdateEntitlementDto,
+  UpdateStudentProfileDto,
 } from './students.dto';
+import { LifecycleMutationDto } from '../common/dto/lifecycle.dto';
 
 type Actor = { id: string; organizationId: string };
 
@@ -43,7 +46,10 @@ export class AdminV1StudentsService {
         organizationId,
         kind: 'STUDENT',
         deletedAt: null,
-        ...(status ? { status } : {}),
+        ...(status === 'ARCHIVED'
+          ? { archivedAt: { not: null } }
+          : { archivedAt: null }),
+        ...(status && status !== 'ARCHIVED' ? { status } : {}),
       },
       ...(gradeId ? { gradeId } : {}),
       ...(normalizedSearch
@@ -86,7 +92,12 @@ export class AdminV1StudentsService {
     ]);
     return {
       students,
-      meta: { page, pageSize: take, total },
+      meta: {
+        page,
+        pageSize: take,
+        total,
+        pageCount: Math.ceil(total / take),
+      },
     };
   }
 
@@ -204,6 +215,7 @@ export class AdminV1StudentsService {
       throw new ConflictException({
         code: 'VERSION_CONFLICT',
         message: 'This student was changed by another staff member',
+        currentVersion: student.account.version,
       });
     }
     const updated = await db.$transaction(async (tx: any) => {
@@ -228,6 +240,196 @@ export class AdminV1StudentsService {
       targetId: student.accountId,
       before: { status: student.account.status },
       after: { status: updated.status },
+      reason: input.reason,
+    });
+    return updated;
+  }
+
+  async updateProfile(
+    actor: Actor,
+    studentId: string,
+    input: UpdateStudentProfileDto,
+  ) {
+    const student = await this.findStudent(actor.organizationId, studentId);
+    if (student.account.version !== input.version) {
+      throw new ConflictException({
+        code: 'VERSION_CONFLICT',
+        message: 'This student was changed by another staff member',
+        currentVersion: student.account.version,
+      });
+    }
+    if (input.gradeId) {
+      const grade = await db.grade.findFirst({
+        where: {
+          id: input.gradeId,
+          organizationId: actor.organizationId,
+          archivedAt: null,
+        },
+      });
+      if (!grade) throw new BadRequestException('Grade not found');
+    }
+    let phoneData: { phoneEncrypted: string; phoneHmac: string } | undefined;
+    if (input.phone) {
+      const phoneHmac = this.securityService.generatePhoneHmac(input.phone);
+      const duplicate = await db.account.findFirst({
+        where: {
+          organizationId: actor.organizationId,
+          phoneHmac,
+          id: { not: student.accountId },
+          deletedAt: null,
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException({
+          code: 'PHONE_ALREADY_EXISTS',
+          message: 'Phone number is already registered',
+        });
+      }
+      phoneData = {
+        phoneEncrypted: this.securityService.encrypt(input.phone),
+        phoneHmac,
+      };
+    }
+    const updated = await db.$transaction(async (tx: any) => {
+      await tx.account.update({
+        where: { id: student.accountId },
+        data: { ...phoneData, version: { increment: 1 } },
+      });
+      return tx.studentProfile.update({
+        where: { id: student.id },
+        data: {
+          displayName: input.displayName,
+          gradeId: input.gradeId,
+          schoolName: input.schoolName,
+          city: input.city,
+          fatherPhoneEncrypted:
+            input.fatherPhone === undefined
+              ? undefined
+              : input.fatherPhone
+                ? this.securityService.encrypt(input.fatherPhone)
+                : null,
+          motherPhoneEncrypted:
+            input.motherPhone === undefined
+              ? undefined
+              : input.motherPhone
+                ? this.securityService.encrypt(input.motherPhone)
+                : null,
+        },
+      });
+    });
+    await this.audit.logEvent({
+      organizationId: actor.organizationId,
+      actorType: 'STAFF',
+      actorId: actor.id,
+      action: 'STUDENT_PROFILE_UPDATED',
+      targetType: 'ACCOUNT',
+      targetId: student.accountId,
+      before: student,
+      after: updated,
+      reason: input.reason,
+    });
+    return updated;
+  }
+
+  async deletionImpact(
+    organizationId: string,
+    studentId: string,
+  ): Promise<AdminDeletionImpact> {
+    const student = await db.studentProfile.findFirst({
+      where: {
+        id: studentId,
+        account: { organizationId, deletedAt: null },
+      },
+      include: {
+        account: {
+          include: {
+            _count: {
+              select: {
+                entitlements: true,
+                assessmentAttempts: true,
+                authSessions: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+    const paymentCount = await db.paymentOrder.count({
+      where: { organizationId, accountId: student.accountId },
+    });
+    const blockers = [
+      {
+        code: 'ENTITLEMENTS',
+        label: 'اشتراكات محفوظة',
+        count: student.account._count.entitlements,
+      },
+      {
+        code: 'ATTEMPTS',
+        label: 'محاولات اختبارات محفوظة',
+        count: student.account._count.assessmentAttempts,
+      },
+      { code: 'PAYMENTS', label: 'سجلات دفع محفوظة', count: paymentCount },
+    ].filter((item) => item.count > 0);
+    return {
+      id: student.id,
+      resource: 'STUDENT',
+      label: student.displayName,
+      currentStatus: student.account.archivedAt
+        ? 'ARCHIVED'
+        : student.account.status,
+      actions: [student.account.archivedAt ? 'RESTORE' : 'ARCHIVE'],
+      blockers,
+      affectedChildren: blockers.map(({ code, label, count }) => ({
+        type: code,
+        label,
+        count,
+      })),
+      requiresReason: true,
+      requiresTypedConfirmation: false,
+    };
+  }
+
+  async setArchived(
+    actor: Actor,
+    studentId: string,
+    archived: boolean,
+    input: LifecycleMutationDto,
+  ) {
+    const student = await this.findStudent(actor.organizationId, studentId);
+    if (student.account.version !== input.version) {
+      throw new ConflictException({
+        code: 'VERSION_CONFLICT',
+        message: 'This student was changed by another staff member',
+        currentVersion: student.account.version,
+      });
+    }
+    const updated = await db.$transaction(async (tx: any) => {
+      const account = await tx.account.update({
+        where: { id: student.accountId },
+        data: {
+          status: archived ? 'ARCHIVED' : 'ACTIVE',
+          archivedAt: archived ? new Date() : null,
+          version: { increment: 1 },
+        },
+      });
+      if (archived) {
+        await tx.authSession.updateMany({
+          where: { accountId: student.accountId, revokedAt: null },
+          data: { revokedAt: new Date(), revokedReason: input.reason },
+        });
+      }
+      return account;
+    });
+    await this.audit.logEvent({
+      organizationId: actor.organizationId,
+      actorType: 'STAFF',
+      actorId: actor.id,
+      action: archived ? 'STUDENT_ARCHIVED' : 'STUDENT_RESTORED',
+      targetType: 'ACCOUNT',
+      targetId: student.accountId,
+      before: student.account,
+      after: updated,
       reason: input.reason,
     });
     return updated;

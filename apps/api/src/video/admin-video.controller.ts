@@ -10,10 +10,12 @@ import {
   Res,
   Headers,
   Body,
+  Req,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
@@ -28,10 +30,15 @@ import {
   YouTubeVideoDto,
 } from './video.dto';
 import { StaffPermission } from '@bahrawy/types';
+import { db } from '@bahrawy/db';
 
 const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
-@Controller('admin/video')
+type AdminRequest = Request & {
+  account: { id: string; organizationId: string };
+};
+
+@Controller('admin/v1/video')
 @UseGuards(SessionAuthGuard, PermissionsGuard)
 @RequirePermission(StaffPermission.CATALOG_MANAGE)
 export class AdminVideoController {
@@ -69,21 +76,25 @@ export class AdminVideoController {
     }),
   )
   async uploadVideo(
+    @Req() request: AdminRequest,
     @Param('lessonId') lessonId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
     const result = await this.videoService.processUpload(lessonId, file);
     return { status: 'SUCCESS', data: result };
   }
 
   @Post(':lessonId/r2/upload-url')
   async createR2UploadUrl(
+    @Req() request: AdminRequest,
     @Param('lessonId') lessonId: string,
     @Body() body: CreateR2UploadDto,
   ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
     const data = await this.videoService.createR2UploadUrl(
       lessonId,
       body.originalFileName,
@@ -95,9 +106,11 @@ export class AdminVideoController {
 
   @Post(':lessonId/r2/complete')
   async completeR2Upload(
+    @Req() request: AdminRequest,
     @Param('lessonId') lessonId: string,
     @Body() body: ConfirmR2UploadDto,
   ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
     const data = await this.videoService.confirmR2Upload(
       lessonId,
       body.objectKey,
@@ -109,9 +122,11 @@ export class AdminVideoController {
 
   @Post(':lessonId/youtube')
   async setYouTubeVideo(
+    @Req() request: AdminRequest,
     @Param('lessonId') lessonId: string,
     @Body() body: YouTubeVideoDto,
   ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
     const data = await this.videoService.setYouTubeVideo(
       lessonId,
       body.youtubeUrl,
@@ -121,10 +136,12 @@ export class AdminVideoController {
 
   @Get(':lessonId/preview')
   async previewVideoForAdmin(
+    @Req() request: AdminRequest,
     @Param('lessonId') lessonId: string,
     @Headers('range') range: string | undefined,
     @Res() res: Response,
   ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
     const playback = await this.videoService.getAdminPlayback(lessonId);
     if (playback.provider === 'YOUTUBE' && playback.videoId) {
       return res.redirect(
@@ -136,5 +153,16 @@ export class AdminVideoController {
     }
     const filePath = await this.videoService.getVideoFilePath(lessonId);
     return streamVideoFile(filePath, range, res);
+  }
+
+  private async assertLessonAccess(organizationId: string, lessonId: string) {
+    const lesson = await db.lesson.findFirst({
+      where: {
+        id: lessonId,
+        unit: { chapter: { course: { organizationId } } },
+      },
+      select: { id: true },
+    });
+    if (!lesson) throw new NotFoundException('Lesson not found');
   }
 }

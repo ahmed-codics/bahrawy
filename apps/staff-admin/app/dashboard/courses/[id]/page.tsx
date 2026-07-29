@@ -1,137 +1,144 @@
 'use client';
 
 import { use, useCallback, useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
-import { Plus } from 'lucide-react';
-import { ErrorState, PageSkeleton } from '@bahrawy/ui';
+import { useRouter } from 'next/navigation';
+import { BookOpen, FileText, ListChecks, Video } from 'lucide-react';
+import { Button, Card, CardContent, ErrorState, PageSkeleton, StatCard } from '@bahrawy/ui';
 import { fetchApi } from '../../../../lib/api';
-import { ChapterSection } from './components/ChapterSection';
 import { CourseHeader } from './components/CourseHeader';
-import { InlineForm } from './components/InlineForm';
-import type { AssessmentPrerequisiteOption, CourseWithContent } from './components/types';
+import type { CourseWithContent } from './components/types';
 
-export default function CourseEditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default function CourseOverviewPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
+  const router = useRouter();
   const [course, setCourse] = useState<CourseWithContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [addingChapter, setAddingChapter] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const loadCourse = useCallback(async () => {
+  const load = useCallback(async () => {
     setError('');
     try {
       const response = await fetchApi(`/admin/v1/courses/${id}`);
-      const loadedCourse = response.data as CourseWithContent;
-      setCourse(loadedCourse);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'فشل تحميل الكورس');
-      toast.error('فشل تحميل الكورس');
+      setCourse(response.data as CourseWithContent);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : 'تعذر تحميل الكورس',
+      );
     } finally {
       setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
-    void loadCourse();
-  }, [loadCourse]);
-
-  const reload = async () => {
-    const courseId = course?.id ?? id;
-    const response = await fetchApi(`/admin/v1/courses/${courseId}`);
-    setCourse(response.data as CourseWithContent);
-  };
-
-  const addChapter = async (title: string) => {
-    const courseId = course?.id ?? id;
-    await fetchApi(`/admin/v1/courses/${courseId}/chapters`, {
-      method: 'POST',
-      body: JSON.stringify({ titleAr: title }),
-    });
-    toast.success('تمت إضافة الفصل');
-    setAddingChapter(false);
-    await reload();
-  };
+    void load();
+  }, [load]);
 
   if (loading) return <PageSkeleton cards={5} />;
-
   if (!course) {
     return (
-      <div className="mx-auto max-w-3xl">
-        <ErrorState
-          title="تعذر فتح محرر الكورس"
-          description={error || 'تحقق من الاتصال بالخادم ثم حاول مرة أخرى.'}
-          onRetry={() => {
-            setLoading(true);
-            void loadCourse();
-          }}
-        />
-      </div>
+      <ErrorState
+        title="تعذر فتح الكورس"
+        description={error}
+        onRetry={() => {
+          setLoading(true);
+          void load();
+        }}
+      />
     );
   }
 
-  const prerequisiteOptions: AssessmentPrerequisiteOption[] = [];
-  const unitPositions: Record<string, number> = {};
-  let unitPosition = 0;
-  for (const chapter of course.chapters) {
-    for (const unit of chapter.units) {
-      unitPositions[unit.id] = unitPosition;
-      const videoItem = unit.lessons.find((lesson) => lesson.contentType === 'VIDEO');
-      const assessment =
-        unit.assessments[0] ??
-        (videoItem ? (course.assessmentByLessonId?.[videoItem.id] ?? null) : null);
-      if (assessment) {
-        prerequisiteOptions.push({
-          id: assessment.id,
-          titleAr: assessment.titleAr,
-          type: assessment.type,
-          unitId: unit.id,
-          unitTitleAr: unit.titleAr,
-          position: unitPosition,
-        });
-      }
-      unitPosition += 1;
-    }
-  }
+  const units = course.chapters.flatMap((chapter) => chapter.units);
+  const lessons = units.flatMap((unit) => unit.lessons);
+  const videos = lessons.filter((lesson) => lesson.videoLesson).length;
+  const pdfs = lessons.filter(
+    (lesson) => lesson.contentType === 'PDF' || lesson.attachedPdfUrl,
+  ).length;
+  const assessments = units.reduce(
+    (total, unit) => total + unit.assessments.length,
+    0,
+  );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-20">
-      <CourseHeader course={course} onReload={reload} />
+    <div className="mx-auto max-w-6xl space-y-6 pb-16">
+      <CourseHeader course={course} onReload={load} />
 
-      {course.chapters.map((chapter) => (
-        <ChapterSection
-          key={chapter.id}
-          chapter={chapter}
-          courseId={course.id}
-          assessmentByLessonId={course.assessmentByLessonId}
-          prerequisiteOptions={prerequisiteOptions}
-          unitPositions={unitPositions}
-          onReload={reload}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="الفصول"
+          value={course.chapters.length}
+          icon={<BookOpen className="size-5" />}
+          tone="blue"
         />
-      ))}
-
-      {course.chapters.length === 0 && !addingChapter && (
-        <div className="rounded-xl border border-dashed border-border-default bg-surface p-8 text-center text-sm text-text-muted">
-          لا توجد فصول بعد — أضف أول فصل ثم أضف الدروس داخله.
-        </div>
-      )}
-
-      {addingChapter ? (
-        <InlineForm
-          label="اسم الفصل الجديد"
-          placeholder="مثال: الفصل الأول — المقدمة"
-          onSave={addChapter}
-          onCancel={() => setAddingChapter(false)}
+        <StatCard
+          label="الدروس"
+          value={lessons.length}
+          icon={<FileText className="size-5" />}
+          tone="cyan"
         />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAddingChapter(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-default p-4 text-text-muted transition-colors hover:border-brand-400 hover:text-brand-700"
-        >
-          <Plus className="size-4" />
-          إضافة فصل جديد
-        </button>
-      )}
+        <StatCard
+          label="الفيديو"
+          value={videos}
+          icon={<Video className="size-5" />}
+          tone="amber"
+        />
+        <StatCard
+          label="الاختبارات"
+          value={assessments}
+          icon={<ListChecks className="size-5" />}
+          tone="violet"
+        />
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            <div>
+              <p className="text-xs font-bold text-brand-600">جاهزية المحتوى</p>
+              <h2 className="mt-1 text-xl font-black">راجع الكورس قبل النشر</h2>
+            </div>
+            <div className="space-y-3 text-sm">
+              <ReadinessRow label="بيانات الكورس الأساسية" ready={Boolean(course.titleAr)} />
+              <ReadinessRow label="صورة الغلاف" ready={Boolean(course.coverImageUrl)} />
+              <ReadinessRow label="وجود فصل ووحدة واحدة على الأقل" ready={units.length > 0} />
+              <ReadinessRow label="فيديو واحد على الأقل" ready={videos > 0} />
+              <ReadinessRow label="ملف PDF واحد على الأقل" ready={pdfs > 0} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card tone="blue">
+          <CardContent className="space-y-3 pt-6">
+            <h2 className="text-xl font-black">الخطوة التالية</h2>
+            <p className="text-sm text-ink-3">
+              المنهج أصبح مساحة منفصلة لتنظيم الفصول والوحدات. افتح الوحدة لإضافة
+              دروسها ومحتواها.
+            </p>
+            <Button
+              className="w-full"
+              onClick={() =>
+                router.push(`/dashboard/courses/${course.id}/curriculum`)
+              }
+            >
+              فتح بناء المنهج
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function ReadinessRow({ label, ready }: { label: string; ready: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+      <span>{label}</span>
+      <span className={ready ? 'font-bold text-success' : 'font-bold text-amber-700'}>
+        {ready ? 'جاهز' : 'يحتاج استكمال'}
+      </span>
     </div>
   );
 }

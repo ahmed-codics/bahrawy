@@ -6,6 +6,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   let staffCookies = '';
   let studentCookies = '';
   let courseId = '';
+  let courseVersion = 1;
   let chapterId = '';
   let unitId = '';
   let productId = '';
@@ -23,7 +24,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
 
   test('Step 1: Staff Admin Authentication', async () => {
     await staffPage.goto('http://localhost:3002/login');
-    await staffPage.fill('input[type="tel"]', '01000000000');
+    await staffPage.fill('input[type="email"]', 'admin@bahrawy.test');
     await staffPage.fill('input[type="password"]', 'owner_secret');
     await staffPage.click('button[type="submit"]');
     await staffPage.waitForURL('**/dashboard');
@@ -40,8 +41,8 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 3: Staff logs in via API and gets session', async ({ request }) => {
-    const res = await request.post('http://localhost:3000/auth/login', {
-      data: { phone: '01000000000', password: 'owner_secret' },
+    const res = await request.post('http://localhost:3000/auth/staff-login', {
+      data: { email: 'admin@bahrawy.test', password: 'owner_secret' },
     });
     expect(res.ok()).toBeTruthy();
     staffCookies = res.headers()['set-cookie'];
@@ -56,7 +57,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 5: Staff creates a new course (API)', async ({ request }) => {
-    const res = await request.post('http://localhost:3000/admin/catalog/courses', {
+    const res = await request.post('http://localhost:3000/admin/v1/courses', {
       data: {
         code: `e2e-${Date.now()}`,
         titleAr: 'E2E Test Course',
@@ -67,11 +68,12 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
     expect(res.ok()).toBeTruthy();
     const course = await res.json();
     courseId = course.data.id;
+    courseVersion = course.data.version;
   });
 
   test('Step 6: Staff adds a chapter to course (API)', async ({ request }) => {
     const res = await request.post(
-      `http://localhost:3000/admin/catalog/courses/${courseId}/chapters`,
+      `http://localhost:3000/admin/v1/courses/${courseId}/chapters`,
       {
         data: { titleAr: 'E2E Chapter' },
         headers: { cookie: staffCookies },
@@ -84,7 +86,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
 
   test('Step 7: Staff adds a unit to chapter (API)', async ({ request }) => {
     const res = await request.post(
-      `http://localhost:3000/admin/catalog/chapters/${chapterId}/units`,
+      `http://localhost:3000/admin/v1/courses/chapters/${chapterId}/units`,
       {
         data: { titleAr: 'E2E Unit' },
         headers: { cookie: staffCookies },
@@ -96,7 +98,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 8: Staff adds a lesson to unit (API)', async ({ request }) => {
-    const res = await request.post(`http://localhost:3000/admin/catalog/units/${unitId}/lessons`, {
+    const res = await request.post(`http://localhost:3000/admin/v1/courses/units/${unitId}/lessons`, {
       data: { titleAr: 'E2E Lesson', contentType: 'VIDEO' },
       headers: { cookie: staffCookies },
     });
@@ -104,7 +106,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 9: Staff creates a product for the course (API)', async ({ request }) => {
-    const res = await request.post('http://localhost:3000/admin/catalog/products', {
+    const res = await request.post('http://localhost:3000/admin/v1/products', {
       data: {
         code: `prod-${Date.now()}`,
         titleAr: 'E2E Test Product',
@@ -119,9 +121,10 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 10: Staff publishes the course (API)', async ({ request }) => {
-    const res = await request.post(
-      `http://localhost:3000/admin/catalog/courses/${courseId}/publish`,
+    const res = await request.patch(
+      `http://localhost:3000/admin/v1/courses/${courseId}`,
       {
+        data: { status: 'PUBLISHED', version: courseVersion },
         headers: { cookie: staffCookies },
       },
     );
@@ -159,7 +162,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 14: Staff views support tickets (API)', async ({ request }) => {
-    const res = await request.get('http://localhost:3000/support', {
+    const res = await request.get('http://localhost:3000/admin/v1/support', {
       headers: { cookie: staffCookies },
     });
     expect(res.ok()).toBeTruthy();
@@ -167,8 +170,8 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
 
   test('Step 15: Staff replies to support ticket (API)', async ({ request }) => {
     if (ticketId) {
-      const res = await request.post(`http://localhost:3000/support/${ticketId}/reply`, {
-        data: { message: 'We are looking into this E2E issue.' },
+      const res = await request.post(`http://localhost:3000/admin/v1/support/${ticketId}/messages`, {
+        data: { body: 'We are looking into this E2E issue.' },
         headers: { cookie: staffCookies },
       });
       expect(res.ok()).toBeTruthy();
@@ -233,7 +236,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
 
   test('Step 26: API check - Get Course By ID (Admin)', async ({ request }) => {
     if (courseId) {
-      const res = await request.get(`http://localhost:3000/admin/catalog/courses/${courseId}`, {
+      const res = await request.get(`http://localhost:3000/admin/v1/courses/${courseId}`, {
         headers: { cookie: staffCookies },
       });
       expect(res.ok()).toBeTruthy();
@@ -241,7 +244,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
 
   test('Step 27: API check - List Products (Admin)', async ({ request }) => {
-    const res = await request.get('http://localhost:3000/admin/catalog/products', {
+    const res = await request.get('http://localhost:3000/admin/v1/products', {
       headers: { cookie: staffCookies },
     });
     expect(res.ok()).toBeTruthy();

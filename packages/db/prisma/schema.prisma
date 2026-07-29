@@ -206,6 +206,8 @@ model AuditEvent {
   @@index([actorId])
   @@index([targetType, targetId])
   @@index([createdAt])
+  @@index([organizationId, targetType, targetId, createdAt])
+  @@index([organizationId, actorId, action, createdAt])
 }
 
 model OutboxEvent {
@@ -271,6 +273,7 @@ model Account {
   @@unique([organizationId, emailHmac])
   @@index([phoneHmac])
   @@index([emailHmac])
+  @@index([organizationId, kind, status, archivedAt, deletedAt])
 }
 
 model StudentProfile {
@@ -559,6 +562,7 @@ model Course {
   @@index([subjectId])
   @@index([termId])
   @@index([status, publishAt, unpublishAt])
+  @@index([organizationId, gradeId, status, updatedAt])
 }
 
 model Chapter {
@@ -674,6 +678,7 @@ model Product {
   @@index([organizationId])
   @@index([gradeId])
   @@index([status, publishAt, unpublishAt])
+  @@index([organizationId, gradeId, status, updatedAt])
 }
 
 model Price {
@@ -781,6 +786,7 @@ model PaymentOrder {
   @@index([organizationId])
   @@index([accountId])
   @@index([status])
+  @@index([organizationId, status, createdAt])
 }
 
 model LedgerEntry {
@@ -878,6 +884,7 @@ model Question {
 
   @@index([organizationId])
   @@index([gradeId])
+  @@index([organizationId, gradeId, archivedAt, updatedAt])
 }
 
 model Assessment {
@@ -973,6 +980,7 @@ model SupportTicket {
   @@index([accountId])
   @@index([assignedStaffId])
   @@index([status])
+  @@index([organizationId, status, createdAt])
 }
 
 model InAppNotification {

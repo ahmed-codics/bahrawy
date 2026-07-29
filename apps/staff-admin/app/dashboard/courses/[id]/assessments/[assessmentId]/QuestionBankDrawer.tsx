@@ -36,8 +36,10 @@ export function QuestionBankDrawer({
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
-    fetchApi('/admin/v1/questions')
-      .then((response) => setQuestions(response.data as BankQuestion[]))
+    fetchApi('/admin/v1/questions?pageSize=100')
+      .then((response) =>
+        setQuestions((response.data.items ?? response.data) as BankQuestion[]),
+      )
       .finally(() => setLoading(false));
   }, [isOpen]);
 

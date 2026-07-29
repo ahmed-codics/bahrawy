@@ -61,3 +61,44 @@ export class UpdateEntitlementDto extends ReasonDto {
   @IsDateString()
   expiresAt?: string;
 }
+
+export class UpdateStudentProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolName?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  fatherPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  motherPhone?: string;
+
+  @IsString()
+  @MinLength(3)
+  reason!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  version!: number;
+}

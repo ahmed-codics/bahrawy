@@ -1,38 +1,31 @@
 'use client';
 
 import { KeyboardEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button } from '@bahrawy/ui';
+import { Archive, ArrowLeft, Pencil, Plus } from 'lucide-react';
+import { Badge, Button } from '@bahrawy/ui';
 import { fetchApi } from '../../../../../lib/api';
 import { InlineForm } from './InlineForm';
-import { LessonCard } from './LessonCard';
-import type {
-  AssessmentPrerequisiteOption,
-  AssessmentRecord,
-  ChapterRecord,
-} from './types';
+import type { ChapterRecord } from './types';
+import { ReasonActionDialog } from '../../../_components/ReasonActionDialog';
 
 type ChapterSectionProps = {
   chapter: ChapterRecord;
   courseId: string;
-  assessmentByLessonId?: Record<string, AssessmentRecord>;
-  prerequisiteOptions: AssessmentPrerequisiteOption[];
-  unitPositions: Record<string, number>;
   onReload: () => Promise<void>;
 };
 
 export function ChapterSection({
   chapter,
   courseId,
-  assessmentByLessonId,
-  prerequisiteOptions,
-  unitPositions,
   onReload,
 }: ChapterSectionProps) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [addingLesson, setAddingLesson] = useState(false);
+  const [addingUnit, setAddingUnit] = useState(false);
   const [editTitle, setEditTitle] = useState(chapter.titleAr);
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   const rename = async () => {
     const trimmed = editTitle.trim();
@@ -54,27 +47,20 @@ export function ChapterSection({
     }
   };
 
-  const deleteChapter = async () => {
-    if (
-      !confirm(
-        `هل أنت متأكد من حذف الفصل "${chapter.titleAr}"؟ سيتم حذف كل الدروس داخله.`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await fetchApi(`/admin/v1/courses/chapter/${chapter.id}/content`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'ARCHIVED', version: chapter.version }),
-      });
-      toast.success('تم حذف الفصل');
-      await onReload();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'فشل حذف الفصل');
-    }
+  const archiveChapter = async (reason: string) => {
+    await fetchApi(`/admin/v1/courses/chapter/${chapter.id}/content`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'ARCHIVED',
+        version: chapter.version,
+        reason,
+      }),
+    });
+    toast.success('تمت أرشفة الفصل مع الاحتفاظ بمحتواه');
+    await onReload();
   };
 
-  const addLesson = async (title: string) => {
+  const addUnit = async (title: string) => {
     const unitResponse = await fetchApi(
       `/admin/v1/courses/chapters/${chapter.id}/units`,
       {
@@ -83,13 +69,9 @@ export function ChapterSection({
       },
     );
     const unitId = unitResponse.data.id as string;
-    await fetchApi(`/admin/v1/courses/units/${unitId}/lessons`, {
-      method: 'POST',
-      body: JSON.stringify({ titleAr: title, contentType: 'VIDEO' }),
-    });
-    toast.success('تمت إضافة الدرس');
-    setAddingLesson(false);
-    await onReload();
+    toast.success('تمت إضافة الوحدة كمسودة');
+    setAddingUnit(false);
+    router.push(`/dashboard/courses/${courseId}/units/${unitId}`);
   };
 
   const handleTitleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -129,51 +111,82 @@ export function ChapterSection({
           </button>
           <button
             type="button"
-            onClick={() => void deleteChapter()}
+            onClick={() => setArchiveOpen(true)}
             className="rounded px-2 py-1 text-sm text-danger transition-colors hover:bg-danger/10"
-            aria-label="حذف الفصل"
+            aria-label="أرشفة الفصل"
           >
-            <Trash2 className="size-4" />
+            <Archive className="size-4" />
           </button>
-          <Button size="sm" variant="outline" onClick={() => setAddingLesson(true)}>
+          <Button size="sm" variant="outline" onClick={() => setAddingUnit(true)}>
             <Plus className="ms-1 size-4" />
-            درس
+            وحدة
           </Button>
         </div>
       </div>
 
       <div className="divide-y divide-border-default/30">
         {chapter.units.map((unit, index) => (
-          <LessonCard
+          <button
             key={unit.id}
-            unit={unit}
-            index={index + 1}
-            chapterId={chapter.id}
-            courseId={courseId}
-            assessmentByLessonId={assessmentByLessonId}
-            prerequisiteOptions={prerequisiteOptions}
-            unitPosition={unitPositions[unit.id] ?? 0}
-            onReload={onReload}
-          />
+            type="button"
+            onClick={() => router.push(`/dashboard/courses/${courseId}/units/${unit.id}`)}
+            className="group flex min-h-20 w-full items-center gap-4 bg-canvas/30 p-4 text-start transition hover:bg-surface-2"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-black text-brand-700">
+              {index + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2">
+                <strong className="text-base text-ink">{unit.titleAr}</strong>
+                <Badge
+                  tone={
+                    unit.status === 'PUBLISHED'
+                      ? 'success'
+                      : unit.status === 'ARCHIVED'
+                        ? 'neutral'
+                        : 'amber'
+                  }
+                >
+                  {unit.status === 'PUBLISHED'
+                    ? 'منشورة'
+                    : unit.status === 'ARCHIVED'
+                      ? 'مؤرشفة'
+                      : 'مسودة'}
+                </Badge>
+              </span>
+              <span className="mt-1 block text-xs text-ink-3">
+                {unit.lessons.length} درس · {unit.assessments.length} اختبار
+              </span>
+            </span>
+            <ArrowLeft className="size-5 shrink-0 text-ink-3 transition group-hover:-translate-x-1 group-hover:text-brand-600" />
+          </button>
         ))}
 
-        {chapter.units.length === 0 && !addingLesson && (
+        {chapter.units.length === 0 && !addingUnit && (
           <div className="p-6 text-center text-sm text-text-muted">
-            لا يوجد دروس في هذا الفصل — أضف أول درس
+            لا توجد وحدات في هذا الفصل — أضف أول وحدة
           </div>
         )}
 
-        {addingLesson && (
+        {addingUnit && (
           <div className="p-4">
             <InlineForm
-              label="اسم الدرس"
-              placeholder="مثال: الدوال وأنواعها"
-              onSave={addLesson}
-              onCancel={() => setAddingLesson(false)}
+              label="اسم الوحدة"
+              placeholder="مثال: الوحدة الأولى — أساسيات اللغة"
+              onSave={addUnit}
+              onCancel={() => setAddingUnit(false)}
             />
           </div>
         )}
       </div>
+      <ReasonActionDialog
+        open={archiveOpen}
+        title="أرشفة الفصل"
+        description={`سيختفي الفصل "${chapter.titleAr}" ومحتواه من العمل اليومي، مع الاحتفاظ بكل البيانات وإمكانية الاستعادة لاحقاً.`}
+        confirmLabel="أرشفة الفصل"
+        onClose={() => setArchiveOpen(false)}
+        onConfirm={archiveChapter}
+      />
     </section>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Archive, Edit3, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -16,6 +17,7 @@ import {
   Select,
 } from '@bahrawy/ui';
 import { API_BASE, fetchApi } from '../../../lib/api';
+import { LifecycleDialog } from '../_components/LifecycleDialog';
 
 type Course = {
   id: string;
@@ -86,13 +88,6 @@ const EMPTY_FORM: ProductForm = {
   billingPeriod: 'ONCE',
 };
 
-function toLocalDateTime(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
 function statusBadge(product: Product) {
   if (product.status === 'ARCHIVED') return <Badge tone="neutral">مؤرشفة</Badge>;
   if (product.status === 'DRAFT') return <Badge tone="amber">مسودة</Badge>;
@@ -107,6 +102,7 @@ function currentPrice(product: Product) {
 }
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
@@ -114,45 +110,47 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [lifecycleProduct, setLifecycleProduct] = useState<Product | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
+      const query = new URLSearchParams({
+        page: String(page),
+        pageSize: '24',
+      });
+      if (deferredSearch.trim()) query.set('search', deferredSearch.trim());
+      if (status) query.set('status', status);
       const [productResponse, courseResponse, academicResponse] = await Promise.all([
-        fetchApi('/admin/v1/products'),
-        fetchApi('/admin/v1/courses'),
+        fetchApi(`/admin/v1/products?${query}`),
+        fetchApi('/admin/v1/courses?pageSize=100'),
         fetchApi('/admin/v1/academic'),
       ]);
-      setProducts(productResponse.data as Product[]);
-      setCourses(courseResponse.data as Course[]);
+      setProducts(productResponse.data.items as Product[]);
+      setPageCount(Number(productResponse.data.meta.pageCount) || 1);
+      setCourses(courseResponse.data.items as Course[]);
       setGrades(academicResponse.data.grades as Grade[]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الباقات');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [deferredSearch, page, status]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const visible = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return products.filter(
-      (product) =>
-        (!status || product.status === status) &&
-        (!query ||
-          product.titleAr.toLowerCase().includes(query) ||
-          product.code.toLowerCase().includes(query)),
-    );
-  }, [products, search, status]);
+  const visible = products;
 
   const openCreate = () => {
     setEditing(null);
@@ -161,26 +159,14 @@ export default function ProductsPage() {
     setDrawerOpen(true);
   };
 
-  const openEdit = (product: Product) => {
-    const price = currentPrice(product);
-    setEditing(product);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('create') !== '1') return;
+    setEditing(null);
+    setForm(EMPTY_FORM);
     setCoverFile(null);
-    setForm({
-      titleAr: product.titleAr,
-      titleEn: product.titleEn ?? '',
-      code: product.code,
-      descriptionAr: product.descriptionAr ?? '',
-      status: product.status === ('ACTIVE' as Product['status']) ? 'PUBLISHED' : product.status,
-      publishAt: toLocalDateTime(product.publishAt),
-      unpublishAt: toLocalDateTime(product.unpublishAt),
-      gradeId: product.gradeId ?? product.grade?.id ?? product.courses[0]?.course.gradeId ?? '',
-      courseIds: product.courses.map((entry) => entry.course.id),
-      priceAmount: '',
-      isFree: Number(price?.amount) === 0,
-      billingPeriod: price?.billingPeriod ?? 'ONCE',
-    });
     setDrawerOpen(true);
-  };
+    window.history.replaceState(null, '', '/dashboard/products');
+  }, []);
 
   const updateForm = <TKey extends keyof ProductForm>(key: TKey, value: ProductForm[TKey]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -258,16 +244,6 @@ export default function ProductsPage() {
     }
   };
 
-  const archive = async (product: Product) => {
-    if (!confirm(`أرشفة باقة "${product.titleAr}"؟`)) return;
-    await fetchApi(`/admin/v1/products/${product.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'ARCHIVED', version: product.version }),
-    });
-    toast.success('تمت أرشفة الباقة');
-    await load();
-  };
-
   if (loading && !products.length) return <PageSkeleton cards={5} />;
   if (error && !products.length) {
     return <ErrorState title="تعذر تحميل الباقات" description={error} onRetry={load} />;
@@ -287,13 +263,19 @@ export default function ProductsPage() {
       />
       <FilterBar
         value={search}
-        onSearch={setSearch}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="ابحث بالاسم أو الكود"
         filters={
           <Select
             aria-label="تصفية بالحالة"
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
           >
             <option value="">كل الحالات</option>
             <option value="DRAFT">مسودة</option>
@@ -307,6 +289,9 @@ export default function ProductsPage() {
         emptyMessage="لا توجد باقات مطابقة"
         data={visible}
         keyExtractor={(product) => product.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         columns={[
           {
             id: 'product',
@@ -367,20 +352,22 @@ export default function ProductsPage() {
               variant="ghost"
               size="icon"
               aria-label="تعديل الباقة"
-              onClick={() => openEdit(product)}
+              onClick={() => router.push(`/dashboard/products/${product.id}`)}
             >
               <Edit3 className="size-4" />
             </Button>
-            {product.status !== 'ARCHIVED' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="أرشفة الباقة"
-                onClick={() => void archive(product)}
-              >
-                <Archive className="size-4" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={
+                product.status === 'ARCHIVED'
+                  ? 'استعادة الباقة'
+                  : 'إدارة أرشفة الباقة'
+              }
+              onClick={() => setLifecycleProduct(product)}
+            >
+              <Archive className="size-4" />
+            </Button>
           </div>
         )}
       />
@@ -539,6 +526,25 @@ export default function ProductsPage() {
           )}
         </form>
       </Drawer>
+
+      <LifecycleDialog
+        open={Boolean(lifecycleProduct)}
+        endpoint={
+          lifecycleProduct ? `/admin/v1/products/${lifecycleProduct.id}` : '/admin/v1/products/none'
+        }
+        version={lifecycleProduct?.version ?? 1}
+        onClose={() => setLifecycleProduct(null)}
+        onComplete={async (action) => {
+          toast.success(
+            action === 'RESTORE'
+              ? 'تمت استعادة الباقة'
+              : action === 'PERMANENT_DELETE'
+                ? 'تم حذف المسودة نهائياً'
+                : 'تمت أرشفة الباقة',
+          );
+          await load();
+        }}
+      />
     </div>
   );
 }

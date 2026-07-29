@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -27,6 +28,10 @@ import {
   UpdateLessonLifecycleDto,
 } from './courses.dto';
 import { AdminV1CoursesService } from './courses.service';
+import {
+  LifecycleMutationDto,
+  PermanentDeleteDto,
+} from '../common/dto/lifecycle.dto';
 
 type AdminRequest = Request & {
   account: { id: string; organizationId: string };
@@ -45,22 +50,51 @@ export class AdminV1CoursesController {
     @Req() request: AdminRequest,
     @Query('gradeId') gradeId?: string,
     @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('termId') termId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     return this.coursesService.list(
       request.account.organizationId,
       gradeId,
       status,
+      search,
+      subjectId,
+      termId,
+      Number(page) || 1,
+      Number(pageSize) || 24,
     );
   }
 
   @Post()
   create(@Req() request: AdminRequest, @Body() input: CreateCourseDto) {
-    return this.coursesService.create(request.account.organizationId, input);
+    return this.coursesService.create(request.account, input);
   }
 
   @Get(':id')
   detail(@Req() request: AdminRequest, @Param('id') id: string) {
     return this.coursesService.detail(request.account.organizationId, id);
+  }
+
+  @Get('units/:unitId')
+  unitDetail(@Req() request: AdminRequest, @Param('unitId') unitId: string) {
+    return this.coursesService.unitDetail(
+      request.account.organizationId,
+      unitId,
+    );
+  }
+
+  @Get('lessons/:lessonId')
+  lessonDetail(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+  ) {
+    return this.coursesService.lessonDetail(
+      request.account.organizationId,
+      lessonId,
+    );
   }
 
   @Patch(':id')
@@ -69,11 +103,42 @@ export class AdminV1CoursesController {
     @Param('id') id: string,
     @Body() input: UpdateCourseDto,
   ) {
-    return this.coursesService.update(
+    return this.coursesService.update(request.account, id, input);
+  }
+
+  @Get(':id/deletion-impact')
+  deletionImpact(@Req() request: AdminRequest, @Param('id') id: string) {
+    return this.coursesService.deletionImpact(
       request.account.organizationId,
       id,
-      input,
     );
+  }
+
+  @Post(':id/archive')
+  archive(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.coursesService.setArchived(request.account, id, true, input);
+  }
+
+  @Post(':id/restore')
+  restore(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.coursesService.setArchived(request.account, id, false, input);
+  }
+
+  @Delete(':id')
+  permanentlyDelete(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: PermanentDeleteDto,
+  ) {
+    return this.coursesService.permanentlyDelete(request.account, id, input);
   }
 
   @Post(':courseId/chapters')
@@ -83,7 +148,7 @@ export class AdminV1CoursesController {
     @Body() input: CreateContentNodeDto,
   ) {
     return this.coursesService.createNode(
-      request.account.organizationId,
+      request.account,
       'course',
       courseId,
       input,
@@ -97,7 +162,7 @@ export class AdminV1CoursesController {
     @Body() input: CreateContentNodeDto,
   ) {
     return this.coursesService.createNode(
-      request.account.organizationId,
+      request.account,
       'chapter',
       chapterId,
       input,
@@ -111,7 +176,7 @@ export class AdminV1CoursesController {
     @Body() input: CreateContentNodeDto,
   ) {
     return this.coursesService.createNode(
-      request.account.organizationId,
+      request.account,
       'unit',
       unitId,
       input,
@@ -125,12 +190,7 @@ export class AdminV1CoursesController {
     @Param('id') id: string,
     @Body() input: UpdateContentNodeDto,
   ) {
-    return this.coursesService.updateNode(
-      request.account.organizationId,
-      nodeType,
-      id,
-      input,
-    );
+    return this.coursesService.updateNode(request.account, nodeType, id, input);
   }
 
   @Patch(':nodeType/:parentId/reorder')
@@ -141,7 +201,7 @@ export class AdminV1CoursesController {
     @Body() input: ReorderContentDto,
   ) {
     return this.coursesService.reorder(
-      request.account.organizationId,
+      request.account,
       nodeType,
       parentId,
       input.ids,
@@ -155,7 +215,7 @@ export class AdminV1CoursesController {
     @Body() input: UpdateLessonLifecycleDto,
   ) {
     return this.coursesService.updateLessonLifecycle(
-      request.account.organizationId,
+      request.account,
       unitId,
       input.status,
       input.version,

@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import toast from 'react-hot-toast';
 import {
   ArrowRight,
@@ -15,6 +16,7 @@ import {
 import { Button, ErrorState, Input, PageSkeleton } from '@bahrawy/ui';
 import { API_BASE, fetchApi } from '../../../../../../lib/api';
 import { QuestionBankDrawer } from './QuestionBankDrawer';
+import { ReasonActionDialog } from '../../../../_components/ReasonActionDialog';
 
 type AssessmentType = 'HOMEWORK' | 'QUIZ';
 type AssessmentStatus = 'DRAFT' | 'PUBLISHED';
@@ -150,9 +152,12 @@ function QuestionImagePicker({
       <label className="mb-2 block text-sm font-bold">صورة السؤال (اختياري)</label>
       {visibleImage ? (
         <div className="relative inline-block">
-          <img
+          <Image
             src={visibleImage}
             alt="صورة السؤال"
+            width={640}
+            height={360}
+            unoptimized={visibleImage.startsWith('blob:')}
             className="max-h-40 rounded-lg border border-border-default object-contain"
           />
           <button
@@ -405,17 +410,18 @@ function QuestionCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const question = assessmentQuestion.question;
   const options = normalizeOptions(question.options);
 
-  const handleDelete = async () => {
-    if (!confirm(`هل تريد حذف السؤال ${index}؟`)) return;
+  const handleDelete = async (reason: string) => {
     setDeleting(true);
     try {
       await fetchApi(`/admin/v1/questions/assessments/${assessmentId}/${question.id}`, {
         method: 'DELETE',
+        body: JSON.stringify({ reason }),
       });
-      toast.success('تم حذف السؤال');
+      toast.success('تمت إزالة السؤال من الاختبار');
       await onReload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'فشل حذف السؤال');
@@ -443,7 +449,7 @@ function QuestionCard({
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              void handleDelete();
+              setRemoveOpen(true);
             }}
             disabled={deleting}
             className="rounded p-1.5 text-text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
@@ -469,6 +475,15 @@ function QuestionCard({
           />
         </div>
       )}
+      <ReasonActionDialog
+        open={removeOpen}
+        title={`إزالة السؤال ${index} من الاختبار`}
+        description="سيتم فصل السؤال عن هذا الاختبار فقط. سيظل السؤال محفوظاً في بنك الأسئلة ولن تتأثر المحاولات التاريخية."
+        confirmLabel="إزالة من الاختبار"
+        reasonLabel="سبب إزالة السؤال"
+        onClose={() => setRemoveOpen(false)}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

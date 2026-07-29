@@ -41,7 +41,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
       formData.append('file', file);
 
       const request = new XMLHttpRequest();
-      request.open('POST', `${API_BASE}/admin/video/${lessonId}/upload`);
+      request.open('POST', `${API_BASE}/admin/v1/video/${lessonId}/upload`);
       request.withCredentials = true;
       request.timeout = 0;
       request.upload.onprogress = (event) => updateProgress(event);
@@ -55,7 +55,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
     });
 
   const uploadR2Video = async (lessonId: string, file: File) => {
-    const response = await fetchApi(`/admin/video/${lessonId}/r2/upload-url`, {
+    const response = await fetchApi(`/admin/v1/video/${lessonId}/r2/upload-url`, {
       method: 'POST',
       timeoutMs: 60_000,
       body: JSON.stringify({
@@ -85,7 +85,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
       request.send(file);
     });
 
-    await fetchApi(`/admin/video/${lessonId}/r2/complete`, {
+    await fetchApi(`/admin/v1/video/${lessonId}/r2/complete`, {
       method: 'POST',
       timeoutMs: 60_000,
       body: JSON.stringify({
@@ -146,7 +146,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
 
     setUploading(true);
     try {
-      await fetchApi(`/admin/video/${videoItem.id}/youtube`, {
+      await fetchApi(`/admin/v1/video/${videoItem.id}/youtube`, {
         method: 'POST',
         body: JSON.stringify({ youtubeUrl: youtubeUrl.trim() }),
       });
@@ -167,7 +167,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
 
   const handlePreview = () => {
     if (!videoItem) return;
-    window.open(`${API_BASE}/admin/video/${videoItem.id}/preview`, '_blank');
+    window.open(`${API_BASE}/admin/v1/video/${videoItem.id}/preview`, '_blank');
   };
 
   return (

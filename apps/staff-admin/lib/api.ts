@@ -48,6 +48,9 @@ export class ApiRequestError extends Error {
 
 type ApiRequestOptions = RequestInit & { timeoutMs?: number };
 
+// The admin API is being migrated route-by-route to explicit response types.
+// Keep legacy callers working without leaking `any` into newly typed modules.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchApi<T = any>(
   endpoint: string,
   options: ApiRequestOptions = {},

@@ -77,6 +77,8 @@ export default function StaffSupportPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,18 +88,21 @@ export default function StaffSupportPage() {
       if (search.trim()) query.set('search', search.trim());
       if (status) query.set('status', status);
       if (priority) query.set('priority', priority);
+      query.set('page', String(page));
+      query.set('pageSize', '25');
       const [ticketResponse, staffResponse] = await Promise.all([
         fetchApi(`/admin/v1/support?${query}`),
         fetchApi('/admin/v1/support/staff'),
       ]);
-      setTickets(ticketResponse.data as Ticket[]);
+      setTickets((ticketResponse.data.items ?? ticketResponse.data) as Ticket[]);
+      setPageCount(ticketResponse.data.meta?.pageCount ?? 1);
       setStaff(staffResponse.data as Staff[]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل تذاكر الدعم');
     } finally {
       setLoading(false);
     }
-  }, [priority, search, status]);
+  }, [page, priority, search, status]);
 
   useEffect(() => {
     const timeout = setTimeout(() => void load(), 250);
@@ -173,14 +178,20 @@ export default function StaffSupportPage() {
       />
       <FilterBar
         value={search}
-        onSearch={setSearch}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="ابحث بالطالب أو عنوان التذكرة"
         filters={
           <>
             <Select
               aria-label="تصفية بالحالة"
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setPage(1);
+              }}
             >
               <option value="">كل الحالات</option>
               <option value="OPEN">مفتوحة</option>
@@ -192,7 +203,10 @@ export default function StaffSupportPage() {
             <Select
               aria-label="تصفية بالأولوية"
               value={priority}
-              onChange={(event) => setPriority(event.target.value)}
+              onChange={(event) => {
+                setPriority(event.target.value);
+                setPage(1);
+              }}
             >
               <option value="">كل الأولويات</option>
               <option value="URGENT">عاجلة</option>
@@ -209,6 +223,9 @@ export default function StaffSupportPage() {
         emptyMessage="لا توجد تذاكر مطابقة"
         data={tickets}
         keyExtractor={(ticket) => ticket.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         columns={[
           {
             id: 'subject',

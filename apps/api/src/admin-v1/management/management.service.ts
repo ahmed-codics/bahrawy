@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from '@bahrawy/db';
+import type { AdminDeletionImpact } from '@bahrawy/types';
 import { randomBytes } from 'node:crypto';
 import { SecurityService } from '../../security/security.service';
 import { AdminAuditService } from '../common/services/audit.service';
@@ -14,6 +15,7 @@ import {
   UpdateOrganizationDto,
   UpdateStaffDto,
 } from './management.dto';
+import { LifecycleMutationDto } from '../common/dto/lifecycle.dto';
 
 type Actor = { id: string; organizationId: string };
 
@@ -24,39 +26,78 @@ export class AdminV1ManagementService {
     private readonly audit: AdminAuditService,
   ) {}
 
-  async staff(organizationId: string) {
-    const profiles = await db.staffProfile.findMany({
-      where: { account: { organizationId, deletedAt: null } },
-      orderBy: { displayName: 'asc' },
-      include: {
-        account: {
-          include: {
-            accountRoles: {
-              include: {
-                role: {
-                  include: {
-                    rolePermissions: { include: { permission: true } },
+  async staff(
+    organizationId: string,
+    search = '',
+    status?: string,
+    page = 1,
+    pageSize = 25,
+  ) {
+    const take = Math.min(Math.max(pageSize, 1), 100);
+    const skip = Math.max(page - 1, 0) * take;
+    const where = {
+      displayName: search
+        ? { contains: search.trim(), mode: 'insensitive' as const }
+        : undefined,
+      account: {
+        organizationId,
+        deletedAt: null,
+        ...(status === 'ARCHIVED'
+          ? { archivedAt: { not: null } }
+          : {
+              archivedAt: null,
+              ...(status ? { status } : {}),
+            }),
+      },
+    };
+    const [profiles, total] = await Promise.all([
+      db.staffProfile.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { displayName: 'asc' },
+        include: {
+          account: {
+            include: {
+              accountRoles: {
+                include: {
+                  role: {
+                    include: {
+                      rolePermissions: { include: { permission: true } },
+                    },
                   },
                 },
               },
-            },
-            authSessions: {
-              where: { revokedAt: null },
-              select: { id: true },
+              authSessions: {
+                where: { revokedAt: null },
+                select: { id: true },
+              },
             },
           },
         },
-      },
-    });
-    return profiles.map((profile: any) => {
+      }),
+      db.staffProfile.count({ where }),
+    ]);
+    const items = profiles.map((profile: any) => {
       let email = 'HIDDEN';
       try {
         if (profile.account.emailEncrypted) {
           email = this.security.decrypt(profile.account.emailEncrypted);
         }
-      } catch {}
+      } catch {
+        // Keep the masked fallback when legacy encrypted data is unreadable.
+      }
       return { ...profile, email };
     });
+    return {
+      items,
+      meta: {
+        page,
+        pageSize: take,
+        total,
+        pageCount: Math.ceil(total / take),
+      },
+    };
   }
 
   roles() {
@@ -128,6 +169,7 @@ export class AdminV1ManagementService {
       throw new ConflictException({
         code: 'VERSION_CONFLICT',
         message: 'This staff account was changed by another administrator',
+        currentVersion: profile.account.version,
       });
     }
     if (profile.accountId === actor.id && input.status === 'SUSPENDED') {
@@ -143,6 +185,12 @@ export class AdminV1ManagementService {
       : false;
     if (profile.accountId === actor.id && wasOwner && !remainsOwner) {
       throw new ForbiddenException('You cannot remove your own owner role');
+    }
+    if (wasOwner && (!remainsOwner || input.status === 'SUSPENDED')) {
+      await this.assertAnotherActiveOwner(
+        actor.organizationId,
+        profile.accountId,
+      );
     }
     const updated = await db.$transaction(async (tx: any) => {
       const account = await tx.account.update({
@@ -188,24 +236,153 @@ export class AdminV1ManagementService {
     return updated;
   }
 
+  async staffDeletionImpact(
+    organizationId: string,
+    staffId: string,
+  ): Promise<AdminDeletionImpact> {
+    const profile = await db.staffProfile.findFirst({
+      where: {
+        id: staffId,
+        account: { organizationId, deletedAt: null },
+      },
+      include: {
+        account: {
+          include: {
+            accountRoles: { include: { role: true } },
+            _count: { select: { authSessions: true } },
+          },
+        },
+      },
+    });
+    if (!profile) throw new NotFoundException('Staff member not found');
+    return {
+      id: profile.id,
+      resource: 'STAFF',
+      label: profile.displayName,
+      currentStatus: profile.account.archivedAt
+        ? 'ARCHIVED'
+        : profile.account.status,
+      actions: [profile.account.archivedAt ? 'RESTORE' : 'ARCHIVE'],
+      blockers: profile.account.accountRoles.some(
+        (assignment: any) => assignment.role.code === 'OWNER',
+      )
+        ? [{ code: 'OWNER_ROLE', label: 'حساب مالك للأكاديمية', count: 1 }]
+        : [],
+      affectedChildren: [
+        {
+          type: 'AUTH_SESSIONS',
+          label: 'جلسات دخول مرتبطة',
+          count: profile.account._count.authSessions,
+        },
+      ],
+      requiresReason: true,
+      requiresTypedConfirmation: false,
+    };
+  }
+
+  async setStaffArchived(
+    actor: Actor,
+    staffId: string,
+    archived: boolean,
+    input: LifecycleMutationDto,
+  ) {
+    const profile = await db.staffProfile.findFirst({
+      where: {
+        id: staffId,
+        account: { organizationId: actor.organizationId, deletedAt: null },
+      },
+      include: {
+        account: { include: { accountRoles: { include: { role: true } } } },
+      },
+    });
+    if (!profile) throw new NotFoundException('Staff member not found');
+    if (profile.account.version !== input.version) {
+      throw new ConflictException({
+        code: 'VERSION_CONFLICT',
+        message: 'This staff account was changed by another administrator',
+        currentVersion: profile.account.version,
+      });
+    }
+    if (archived && profile.accountId === actor.id) {
+      throw new ForbiddenException('You cannot archive your own account');
+    }
+    if (
+      archived &&
+      profile.account.accountRoles.some(
+        (assignment: any) => assignment.role.code === 'OWNER',
+      )
+    ) {
+      await this.assertAnotherActiveOwner(
+        actor.organizationId,
+        profile.accountId,
+      );
+    }
+    const updated = await db.$transaction(async (tx: any) => {
+      const account = await tx.account.update({
+        where: { id: profile.accountId },
+        data: {
+          status: archived ? 'ARCHIVED' : 'ACTIVE',
+          archivedAt: archived ? new Date() : null,
+          version: { increment: 1 },
+        },
+      });
+      if (archived) {
+        await tx.authSession.updateMany({
+          where: { accountId: profile.accountId, revokedAt: null },
+          data: { revokedAt: new Date(), revokedReason: input.reason },
+        });
+      }
+      return account;
+    });
+    await this.audit.logEvent({
+      organizationId: actor.organizationId,
+      actorType: 'STAFF',
+      actorId: actor.id,
+      action: archived ? 'STAFF_ARCHIVED' : 'STAFF_RESTORED',
+      targetType: 'ACCOUNT',
+      targetId: profile.accountId,
+      before: profile.account,
+      after: updated,
+      reason: input.reason,
+    });
+    return updated;
+  }
+
   auditEvents(
     organizationId: string,
     action?: string,
     actorId?: string,
     targetType?: string,
+    page = 1,
+    pageSize = 50,
   ) {
-    return db.auditEvent.findMany({
-      where: {
-        organizationId,
-        ...(action
-          ? { action: { contains: action, mode: 'insensitive' } }
-          : {}),
-        ...(actorId ? { actorId } : {}),
-        ...(targetType ? { targetType } : {}),
+    const take = Math.min(Math.max(pageSize, 1), 100);
+    const skip = Math.max(page - 1, 0) * take;
+    const where = {
+      organizationId,
+      ...(action
+        ? { action: { contains: action, mode: 'insensitive' as const } }
+        : {}),
+      ...(actorId ? { actorId } : {}),
+      ...(targetType ? { targetType } : {}),
+    };
+    return Promise.all([
+      db.auditEvent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      db.auditEvent.count({ where }),
+    ]).then(([items, total]) => ({
+      items,
+      meta: {
+        page,
+        pageSize: take,
+        total,
+        pageCount: Math.ceil(total / take),
       },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+    }));
   }
 
   async organization(organizationId: string) {
@@ -222,6 +399,7 @@ export class AdminV1ManagementService {
       throw new ConflictException({
         code: 'VERSION_CONFLICT',
         message: 'Organization settings were changed by another administrator',
+        currentVersion: organization.version,
       });
     }
     try {
@@ -263,5 +441,26 @@ export class AdminV1ManagementService {
     const count = await db.role.count({ where: { id: { in: unique } } });
     if (count !== unique.length)
       throw new BadRequestException('One or more roles are invalid');
+  }
+
+  private async assertAnotherActiveOwner(
+    organizationId: string,
+    excludedAccountId: string,
+  ) {
+    const activeOwners = await db.account.count({
+      where: {
+        organizationId,
+        kind: 'STAFF',
+        status: 'ACTIVE',
+        archivedAt: null,
+        id: { not: excludedAccountId },
+        accountRoles: { some: { role: { code: 'OWNER' } } },
+      },
+    });
+    if (activeOwners === 0) {
+      throw new ForbiddenException(
+        'The last active Owner cannot be suspended, archived, or stripped of ownership',
+      );
+    }
   }
 }

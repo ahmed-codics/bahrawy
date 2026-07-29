@@ -39,12 +39,16 @@ export class AdminV1SupportController {
     @Query('status') status?: string,
     @Query('priority') priority?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     return this.support.list(
       request.account.organizationId,
       status,
       priority,
       search,
+      Number(page) || 1,
+      Number(pageSize) || 25,
     );
   }
 

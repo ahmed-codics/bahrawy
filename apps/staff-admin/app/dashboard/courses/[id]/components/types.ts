@@ -69,6 +69,7 @@ export type UnitRecord = {
   version: number;
   lessonProduct?: {
     id: string;
+    version: number;
     titleAr: string;
     coverImageUrl?: string | null;
     prices?: Array<{ amount: number | string; currency: string }>;
@@ -109,6 +110,7 @@ export type CourseWithContent = {
   version: number;
   courseProduct?: {
     id: string;
+    version: number;
     titleAr: string;
     coverImageUrl?: string | null;
     prices?: Array<{ amount: number | string; currency: string }>;

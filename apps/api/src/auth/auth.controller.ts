@@ -228,6 +228,9 @@ export class AuthController {
         studentProfile: { select: { id: true, displayName: true } },
         guardianProfile: { select: { id: true, displayName: true } },
         staffProfile: { select: { id: true, displayName: true } },
+        accountRoles: {
+          select: { role: { select: { code: true, description: true } } },
+        },
       },
     });
     const activeProfile =
@@ -246,6 +249,8 @@ export class AuthController {
         accountId: account.id,
         profileId: activeProfile?.id ?? null,
         role: account.kind,
+        roles:
+          profile?.accountRoles.map((assignment) => assignment.role.code) ?? [],
         kind: account.kind,
         name: activeProfile?.displayName ?? '',
         mustChangePassword: account.mustChangePassword,

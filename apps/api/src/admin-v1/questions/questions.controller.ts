@@ -25,8 +25,12 @@ import {
   UpdateQuestionDto,
 } from './questions.dto';
 import { AdminV1QuestionsService } from './questions.service';
+import { LifecycleMutationDto } from '../common/dto/lifecycle.dto';
+import { ReasonDto } from '../students/students.dto';
 
-type AdminRequest = Request & { account: { organizationId: string } };
+type AdminRequest = Request & {
+  account: { id: string; organizationId: string };
+};
 
 @Controller('admin/v1/questions')
 @UseGuards(SessionAuthGuard, PermissionsGuard)
@@ -42,18 +46,22 @@ export class AdminV1QuestionsController {
     @Query('search') search?: string,
     @Query('gradeId') gradeId?: string,
     @Query('archived') archived?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     return this.questionsService.list(
       request.account.organizationId,
       search,
       gradeId,
       archived === 'true',
+      Number(page) || 1,
+      Number(pageSize) || 25,
     );
   }
 
   @Post()
   create(@Req() request: AdminRequest, @Body() input: QuestionInputDto) {
-    return this.questionsService.create(request.account.organizationId, input);
+    return this.questionsService.create(request.account, input);
   }
 
   @Patch(':id')
@@ -62,29 +70,25 @@ export class AdminV1QuestionsController {
     @Param('id') id: string,
     @Body() input: UpdateQuestionDto,
   ) {
-    return this.questionsService.update(
-      request.account.organizationId,
-      id,
-      input,
-    );
+    return this.questionsService.update(request.account, id, input);
   }
 
   @Patch(':id/archive')
-  archive(@Req() request: AdminRequest, @Param('id') id: string) {
-    return this.questionsService.setArchived(
-      request.account.organizationId,
-      id,
-      true,
-    );
+  archive(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.questionsService.setArchived(request.account, id, true, input);
   }
 
   @Patch(':id/restore')
-  restore(@Req() request: AdminRequest, @Param('id') id: string) {
-    return this.questionsService.setArchived(
-      request.account.organizationId,
-      id,
-      false,
-    );
+  restore(
+    @Req() request: AdminRequest,
+    @Param('id') id: string,
+    @Body() input: LifecycleMutationDto,
+  ) {
+    return this.questionsService.setArchived(request.account, id, false, input);
   }
 
   @Post('assessments/:assessmentId/assign')
@@ -94,7 +98,7 @@ export class AdminV1QuestionsController {
     @Body() input: AssignQuestionsDto,
   ) {
     return this.questionsService.assign(
-      request.account.organizationId,
+      request.account,
       assessmentId,
       input.questionIds,
     );
@@ -105,11 +109,13 @@ export class AdminV1QuestionsController {
     @Req() request: AdminRequest,
     @Param('assessmentId') assessmentId: string,
     @Param('questionId') questionId: string,
+    @Body() input: ReasonDto,
   ) {
     return this.questionsService.unassign(
-      request.account.organizationId,
+      request.account,
       assessmentId,
       questionId,
+      input.reason,
     );
   }
 }

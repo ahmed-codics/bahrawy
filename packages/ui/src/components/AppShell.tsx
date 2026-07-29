@@ -1,7 +1,19 @@
 'use client';
 
 import React, { type ReactNode, useState } from 'react';
-import { KeyRound, LogOut, Menu, Palette, Plus, Settings2, X } from 'lucide-react';
+import {
+  BookPlus,
+  KeyRound,
+  LogOut,
+  Menu,
+  PackagePlus,
+  Palette,
+  Plus,
+  Settings2,
+  UserPlus,
+  UsersRound,
+  X,
+} from 'lucide-react';
 import { AnimatePresence, domAnimation, LazyMotion, m, useReducedMotion } from 'motion/react';
 import { cn } from '../utils';
 import { BrandMark } from './BrandMark';
@@ -366,33 +378,83 @@ export function GuardianShell({
 }
 
 const staffGroups = [
-  { label: 'Overview', match: ['dashboard'] },
-  { label: 'Content', match: ['academic', 'courses', 'products', 'questions'] },
-  { label: 'Students', match: ['students'] },
-  { label: 'Operations', match: ['payments', 'support'] },
+  { label: 'نظرة عامة', match: ['/dashboard'] },
+  { label: 'الأكاديمية', match: ['/dashboard/academic'] },
+  {
+    label: 'المحتوى',
+    match: ['/dashboard/courses', '/dashboard/questions'],
+  },
+  {
+    label: 'التجارة',
+    match: ['/dashboard/products', '/dashboard/payments'],
+  },
+  { label: 'الأشخاص', match: ['/dashboard/students', '/dashboard/staff'] },
+  { label: 'العمليات', match: ['/dashboard/support'] },
+  {
+    label: 'الحوكمة',
+    match: ['/dashboard/audit', '/dashboard/settings'],
+  },
 ];
 
 function staffGroupFor(item: NavigationItem) {
   const href = item.href.toLowerCase();
+  if (href === '/dashboard') return 'نظرة عامة';
   return (
-    staffGroups.find((group) => group.match.some((part) => href.includes(part)))?.label ??
-    'Overview'
+    staffGroups
+      .slice(1)
+      .find((group) => group.match.some((part) => href.startsWith(part)))?.label ??
+    'نظرة عامة'
   );
 }
 
 export function StaffShell({ children, user, navigation, onNavigate, onLogout }: BaseShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const createActions = [
+    navigation.some((item) => item.href.startsWith('/dashboard/courses'))
+      ? {
+          label: 'كورس جديد',
+          description: 'إنشاء كورس كمسودة ثم بناء المنهج',
+          href: '/dashboard/courses/new',
+          icon: <BookPlus className="size-5" />,
+        }
+      : null,
+    navigation.some((item) => item.href.startsWith('/dashboard/products'))
+      ? {
+          label: 'باقة جديدة',
+          description: 'تجميع كورسات ووحدات في منتج واحد',
+          href: '/dashboard/products?create=1',
+          icon: <PackagePlus className="size-5" />,
+        }
+      : null,
+    navigation.some((item) => item.href.startsWith('/dashboard/students'))
+      ? {
+          label: 'طالب جديد',
+          description: 'إنشاء حساب طالب ببيانات دخول مؤقتة',
+          href: '/dashboard/students?create=1',
+          icon: <UserPlus className="size-5" />,
+        }
+      : null,
+    navigation.some((item) => item.href.startsWith('/dashboard/staff'))
+      ? {
+          label: 'عضو فريق جديد',
+          description: 'إضافة موظف أو مساعد وتحديد دوره',
+          href: '/dashboard/staff?create=1',
+          icon: <UsersRound className="size-5" />,
+        }
+      : null,
+  ].filter((action): action is NonNullable<typeof action> => Boolean(action));
   const grouped = staffGroups.map((group) => ({
     ...group,
     items: navigation.filter((item) => staffGroupFor(item) === group.label),
   }));
 
   const nav = (
-    <nav aria-label="Staff navigation" className="flex-1 space-y-5 overflow-y-auto">
+    <nav aria-label="التنقل في مركز الإدارة" className="flex-1 space-y-5 overflow-y-auto">
       {grouped.map((group) =>
         group.items.length ? (
           <div key={group.label}>
-            <p className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-wide text-ink-4">
+            <p className="mb-1.5 px-3 text-xs font-bold text-ink-4">
               {group.label}
             </p>
             <div className="space-y-1">
@@ -408,10 +470,10 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
 
   return (
     <div
-      className="min-h-dvh bg-canvas text-ink lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]"
-      dir="ltr"
+      className="min-h-dvh bg-canvas text-ink lg:grid lg:grid-cols-[minmax(0,1fr)_16rem]"
+      dir="rtl"
     >
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-surface p-4 lg:flex">
+      <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 flex-col border-l border-border bg-surface p-4 lg:flex">
         <div className="mb-2 border-b border-border pb-4">
           <BrandMark admin />
         </div>
@@ -420,17 +482,17 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
           <div className="mb-3 flex items-center gap-3">
             <Avatar user={user} size="sm" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{user?.name || 'Staff member'}</p>
-              <p className="truncate text-xs text-ink-3">{user?.role || 'Admin'}</p>
+              <p className="truncate text-sm font-semibold">{user?.name || 'عضو فريق'}</p>
+              <p className="truncate text-xs text-ink-3">{user?.role || 'الإدارة'}</p>
             </div>
           </div>
           <Button variant="ghost" className="w-full justify-start" onClick={onLogout}>
-            Logout
+            تسجيل الخروج
           </Button>
         </div>
       </aside>
 
-      <div className="min-w-0 lg:col-start-2">
+      <div className="min-w-0 lg:col-start-1">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-surface px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <Button
@@ -438,22 +500,24 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
               size="icon"
               className="lg:hidden"
               onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
+              aria-label="فتح القائمة"
             >
               <Menu className="size-5" />
             </Button>
-            <p className="font-heading text-base font-semibold">Bahrawy Academy</p>
+            <p className="font-heading text-base font-semibold">مركز إدارة أكاديمية البحراوي</p>
           </div>
           <div className="flex items-center gap-2">
             <ThemeSelector />
-            <Button
-              variant="primary"
-              size="sm"
-              leadingIcon={<Plus className="size-4" />}
-              onClick={() => onNavigate?.('/dashboard/courses')}
-            >
-              New
-            </Button>
+            {createActions.length > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                leadingIcon={<Plus className="size-4" />}
+                onClick={() => setCreateOpen(true)}
+              >
+                إنشاء
+              </Button>
+            )}
           </div>
         </header>
         <main id="main-content" className="ba-page w-full px-4 py-6 lg:px-8">
@@ -474,15 +538,15 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
             >
               <button
                 className="absolute inset-0 bg-ink/50"
-                aria-label="Close menu"
+                aria-label="إغلاق القائمة"
                 onClick={() => setMobileOpen(false)}
               />
               <m.aside
-                initial={{ x: '-100%' }}
+                initial={{ x: '100%' }}
                 animate={{ x: 0 }}
-                exit={{ x: '-100%' }}
+                exit={{ x: '100%' }}
                 transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-y-0 left-0 flex w-[min(88vw,20rem)] flex-col bg-surface p-4 shadow-[var(--shadow-lg)]"
+                className="absolute inset-y-0 right-0 flex w-[min(88vw,20rem)] flex-col bg-surface p-4 shadow-[var(--shadow-lg)]"
               >
                 <div className="mb-6 flex items-center justify-between">
                   <BrandMark admin />
@@ -490,7 +554,7 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
                     variant="ghost"
                     size="icon"
                     onClick={() => setMobileOpen(false)}
-                    aria-label="Close"
+                    aria-label="إغلاق"
                   >
                     <X className="size-5" />
                   </Button>
@@ -501,6 +565,36 @@ export function StaffShell({ children, user, navigation, onNavigate, onLogout }:
           </LazyMotion>
         )}
       </AnimatePresence>
+      <MobileSheet
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="إنشاء سجل جديد"
+        description="اختر الإجراء المتاح وفق صلاحياتك."
+      >
+        <div className="grid gap-3 sm:grid-cols-2" dir="rtl">
+          {createActions.map((action) => (
+            <button
+              key={action.href}
+              type="button"
+              className="ba-focus flex min-h-24 items-start gap-3 rounded-2xl border border-border bg-surface-2 p-4 text-start transition hover:border-brand-400 hover:bg-brand-50/50"
+              onClick={() => {
+                setCreateOpen(false);
+                onNavigate?.(action.href);
+              }}
+            >
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700">
+                {action.icon}
+              </span>
+              <span>
+                <strong className="block text-sm text-ink">{action.label}</strong>
+                <span className="mt-1 block text-xs leading-5 text-ink-3">
+                  {action.description}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </MobileSheet>
     </div>
   );
 }

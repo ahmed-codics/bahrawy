@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Edit3, Plus } from 'lucide-react';
+import { Archive, Copy, Edit3, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   Badge,
@@ -15,6 +15,7 @@ import {
   Select,
 } from '@bahrawy/ui';
 import { fetchApi } from '../../../lib/api';
+import { LifecycleDialog } from '../_components/LifecycleDialog';
 
 type Role = {
   id: string;
@@ -43,23 +44,28 @@ export default function StaffPage() {
   const [editing, setEditing] = useState<Staff | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [lifecycleMember, setLifecycleMember] = useState<Staff | null>(null);
+  const [credentialsCopied, setCredentialsCopied] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const [staffResponse, roleResponse] = await Promise.all([
-        fetchApi('/admin/v1/management/staff'),
+        fetchApi(`/admin/v1/management/staff?page=${page}&pageSize=24`),
         fetchApi('/admin/v1/management/roles'),
       ]);
-      setMembers(staffResponse.data as Staff[]);
+      setMembers((staffResponse.data.items ?? staffResponse.data) as Staff[]);
+      setPageCount(staffResponse.data.meta?.pageCount ?? 1);
       setRoles(roleResponse.data as Role[]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل فريق العمل');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => void load(), [load]);
 
@@ -67,12 +73,24 @@ export default function StaffPage() {
     setEditing(null);
     setSelectedRoles([]);
     setTemporaryPassword('');
+    setCredentialsCopied(false);
     setDrawerOpen(true);
   };
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('create') !== '1') return;
+    setEditing(null);
+    setSelectedRoles([]);
+    setTemporaryPassword('');
+    setCredentialsCopied(false);
+    setDrawerOpen(true);
+    window.history.replaceState(null, '', '/dashboard/staff');
+  }, []);
   const openEdit = (member: Staff) => {
     setEditing(member);
     setSelectedRoles(member.account.accountRoles.map((assignment) => assignment.roleId));
     setTemporaryPassword('');
+    setCredentialsCopied(false);
     setDrawerOpen(true);
   };
   const toggleRole = (roleId: string) =>
@@ -139,6 +157,9 @@ export default function StaffPage() {
         emptyMessage="لا يوجد موظفون"
         data={members}
         keyExtractor={(member) => member.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         columns={[
           {
             id: 'member',
@@ -176,14 +197,28 @@ export default function StaffPage() {
           },
         ]}
         rowActions={(member) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="تعديل الموظف"
-            onClick={() => openEdit(member)}
-          >
-            <Edit3 className="size-4" />
-          </Button>
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="تعديل الموظف"
+              onClick={() => openEdit(member)}
+            >
+              <Edit3 className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={
+                member.account.status === 'ARCHIVED'
+                  ? 'استعادة الموظف'
+                  : 'أرشفة الموظف'
+              }
+              onClick={() => setLifecycleMember(member)}
+            >
+              <Archive className="size-4" />
+            </Button>
+          </div>
         )}
       />
       <Drawer
@@ -192,7 +227,12 @@ export default function StaffPage() {
         title={temporaryPassword ? 'تم إنشاء الحساب' : editing ? 'تعديل الموظف' : 'موظف جديد'}
         footer={
           temporaryPassword ? (
-            <Button onClick={() => setDrawerOpen(false)}>تم</Button>
+            <Button
+              onClick={() => setDrawerOpen(false)}
+              disabled={!credentialsCopied}
+            >
+              تم حفظ بيانات الدخول
+            </Button>
           ) : (
             <Button form="staff-form" type="submit" loading={saving}>
               حفظ
@@ -208,6 +248,22 @@ export default function StaffPage() {
             <div className="border border-border bg-surface-2 p-4 font-mono text-lg" dir="ltr">
               {temporaryPassword}
             </div>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await navigator.clipboard.writeText(temporaryPassword);
+                setCredentialsCopied(true);
+                toast.success('تم نسخ كلمة المرور المؤقتة');
+              }}
+            >
+              <Copy className="size-4" />
+              نسخ كلمة المرور
+            </Button>
+            {!credentialsCopied && (
+              <p className="text-xs font-medium text-amber-700">
+                انسخ كلمة المرور قبل إغلاق النافذة؛ لن تظهر مرة أخرى.
+              </p>
+            )}
           </div>
         ) : (
           <form id="staff-form" className="space-y-5" onSubmit={save}>
@@ -255,6 +311,18 @@ export default function StaffPage() {
           </form>
         )}
       </Drawer>
+      {lifecycleMember && (
+        <LifecycleDialog
+          open
+          endpoint={`/admin/v1/management/staff/${lifecycleMember.id}`}
+          version={lifecycleMember.account.version}
+          onClose={() => setLifecycleMember(null)}
+          onComplete={async () => {
+            setLifecycleMember(null);
+            await load();
+          }}
+        />
+      )}
     </div>
   );
 }

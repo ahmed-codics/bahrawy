@@ -15,44 +15,14 @@ import {
   ShoppingBag,
   Users,
 } from 'lucide-react';
-import { Button, ErrorState, PageSkeleton, PageTransition, Select, StaffShell } from '@bahrawy/ui';
+import { Button, ErrorState, PageSkeleton, PageTransition, StaffShell } from '@bahrawy/ui';
 import { ApiRequestError, fetchApi, fetchCsrfToken, clearCsrfToken } from '../../lib/api';
-import { GradeProvider, useGrade } from './GradeContext';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const { grades, selectedGradeId, setSelectedGradeId, loading } = useGrade();
   const pathname = usePathname();
-  const showGradeContext = pathname.startsWith('/dashboard/courses');
-  const pagePath = pathname;
-
-  if (loading) return <PageSkeleton cards={4} />;
 
   return (
-    <div className="space-y-6">
-      {showGradeContext && grades.length > 0 && (
-        <section className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-border-default bg-surface px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-heading font-bold">سياق المرحلة الدراسية</p>
-            <p className="text-sm text-text-muted">
-              كل البيانات والإجراءات التالية تخص المرحلة المحددة.
-            </p>
-          </div>
-          <Select
-            aria-label="المرحلة الدراسية الحالية"
-            value={selectedGradeId}
-            onChange={(event) => setSelectedGradeId(event.target.value)}
-            className="min-w-56"
-          >
-            {grades.map((grade) => (
-              <option key={grade.id} value={grade.id}>
-                {grade.nameAr}
-              </option>
-            ))}
-          </Select>
-        </section>
-      )}
-      <PageTransition pathname={pagePath}>{children}</PageTransition>
-    </div>
+    <PageTransition pathname={pathname}>{children}</PageTransition>
   );
 }
 
@@ -81,7 +51,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             status: 'ready',
             user: {
               name: response.data.name || 'مدير الأكاديمية',
-              role: response.data.role || 'فريق الإدارة',
+              role:
+                Array.isArray(response.data.roles) && response.data.roles.length
+                  ? response.data.roles.join(' · ')
+                  : 'فريق الإدارة',
             },
             permissions: response.data.permissions || [],
           });
@@ -236,9 +209,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       onNavigate={router.push}
       onLogout={handleLogout}
     >
-      <GradeProvider>
-        <DashboardContent>{children}</DashboardContent>
-      </GradeProvider>
+      <DashboardContent>{children}</DashboardContent>
     </StaffShell>
   );
 }

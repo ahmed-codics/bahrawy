@@ -35,7 +35,7 @@ type Student = {
 
 type StudentListResponse = {
   students: Student[];
-  meta: { page: number; pageSize: number; total: number };
+  meta: { page: number; pageSize: number; total: number; pageCount: number };
 };
 
 export default function StudentsPage() {
@@ -50,12 +50,21 @@ export default function StudentsPage() {
   const [error, setError] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+
+  const openCreate = useCallback(() => {
+    setTemporaryPassword('');
+    setDrawerOpen(true);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const query = new URLSearchParams();
+      query.set('page', String(page));
+      query.set('pageSize', '24');
       if (search.trim()) query.set('search', search.trim());
       if (status) query.set('status', status);
       if (gradeId) query.set('gradeId', gradeId);
@@ -63,19 +72,27 @@ export default function StudentsPage() {
         fetchApi(`/admin/v1/students?${query}`),
         fetchApi('/admin/v1/academic'),
       ]);
-      setStudents((studentResponse.data as StudentListResponse).students);
+      const studentData = studentResponse.data as StudentListResponse;
+      setStudents(studentData.students);
+      setPageCount(studentData.meta.pageCount || 1);
       setGrades((academicResponse.data as { grades: Grade[] }).grades);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الطلاب');
     } finally {
       setLoading(false);
     }
-  }, [gradeId, search, status]);
+  }, [gradeId, page, search, status]);
 
   useEffect(() => {
     const timeout = setTimeout(() => void load(), 250);
     return () => clearTimeout(timeout);
   }, [load]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('create') !== '1') return;
+    openCreate();
+    window.history.replaceState(null, '', '/dashboard/students');
+  }, [openCreate]);
 
   const activeCount = useMemo(
     () => students.filter((student) => student.account.status === 'ACTIVE').length,
@@ -115,10 +132,7 @@ export default function StudentsPage() {
         actions={
           <Button
             leadingIcon={<Plus className="size-4" />}
-            onClick={() => {
-              setTemporaryPassword('');
-              setDrawerOpen(true);
-            }}
+            onClick={openCreate}
           >
             طالب جديد
           </Button>
@@ -160,6 +174,9 @@ export default function StudentsPage() {
         emptyMessage="لا يوجد طلاب مطابقون"
         data={students}
         keyExtractor={(student) => student.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         columns={[
           {
             id: 'student',

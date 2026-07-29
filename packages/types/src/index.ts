@@ -121,6 +121,7 @@ export type AdminApiResponse<T> = {
     page?: number;
     pageSize?: number;
     total?: number;
+    pageCount?: number;
     nextCursor?: string | null;
   };
   message?: string;
@@ -131,4 +132,45 @@ export type AdminApiError = {
   message: string;
   fieldErrors?: Record<string, string[]>;
   traceId: string;
+  conflict?: {
+    currentVersion: number;
+  };
+};
+
+export type AdminListMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+  pageCount: number;
+};
+
+export type AdminListResult<T> = {
+  items: T[];
+  meta: AdminListMeta;
+};
+
+export type AdminLifecycleAction = 'ARCHIVE' | 'RESTORE' | 'PERMANENT_DELETE';
+
+export type AdminDeletionBlocker = {
+  code: string;
+  label: string;
+  count: number;
+};
+
+export type AdminAffectedChildren = {
+  type: string;
+  label: string;
+  count: number;
+};
+
+export type AdminDeletionImpact = {
+  id: string;
+  resource: string;
+  label: string;
+  currentStatus: string;
+  actions: AdminLifecycleAction[];
+  blockers: AdminDeletionBlocker[];
+  affectedChildren: AdminAffectedChildren[];
+  requiresReason: boolean;
+  requiresTypedConfirmation: boolean;
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { Archive, Eye, ImageIcon, Plus } from 'lucide-react';
 import type { AdminApiResponse } from '@bahrawy/types';
 import {
@@ -40,6 +40,10 @@ type Course = {
   _count: { chapters: number; products: number };
   readiness: { lessons: number; videos: number; pdfs: number; assessments: number };
 };
+type CourseList = {
+  items: Course[];
+  meta: { page: number; pageSize: number; total: number; pageCount: number };
+};
 
 function lifecycleBadge(course: Course) {
   if (course.status === 'ARCHIVED') return <Badge tone="neutral">مؤرشف</Badge>;
@@ -65,8 +69,11 @@ export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [academic, setAcademic] = useState<AcademicOverview | null>(null);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [gradeId, setGradeId] = useState('');
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,34 +86,30 @@ export default function CoursesPage() {
       const query = new URLSearchParams();
       if (gradeId) query.set('gradeId', gradeId);
       if (status) query.set('status', status);
+      if (deferredSearch.trim()) query.set('search', deferredSearch.trim());
+      query.set('page', String(page));
+      query.set('pageSize', '24');
       const [courseResponse, academicResponse] = await Promise.all([
-        fetchApi<AdminApiResponse<Course[]>>(`/admin/v1/courses${query.size ? `?${query}` : ''}`),
+        fetchApi<AdminApiResponse<CourseList>>(`/admin/v1/courses?${query}`),
         fetchApi<AdminApiResponse<AcademicOverview>>('/admin/v1/academic'),
       ]);
-      setCourses(courseResponse.data);
+      setCourses(courseResponse.data.items);
+      setPageCount(courseResponse.data.meta.pageCount);
       setAcademic(academicResponse.data);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الكورسات');
     } finally {
       setLoading(false);
     }
-  }, [gradeId, status]);
+  }, [deferredSearch, gradeId, page, status]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const visibleCourses = useMemo(() => {
-    const normalized = search.trim().toLowerCase();
-    return courses.filter(
-      (course) =>
-        (status === 'ARCHIVED' || course.status !== 'ARCHIVED') &&
-        (!normalized ||
-          [course.titleAr, course.titleEn, course.code]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(normalized))),
-    );
-  }, [courses, search, status]);
+  const visibleCourses = courses.filter(
+    (course) => status === 'ARCHIVED' || course.status !== 'ARCHIVED',
+  );
 
   if (loading && !academic) return <PageSkeleton cards={6} />;
   if (error && !academic) {
@@ -142,13 +145,19 @@ export default function CoursesPage() {
       <FilterBar
         value={search}
         searchPlaceholder="ابحث بالاسم أو الكود"
-        onSearch={setSearch}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         filters={
           <>
             <Select
               aria-label="تصفية بالمرحلة"
               value={gradeId}
-              onChange={(event) => setGradeId(event.target.value)}
+              onChange={(event) => {
+                setGradeId(event.target.value);
+                setPage(1);
+              }}
             >
               <option value="">كل المراحل</option>
               {academic?.grades.map((grade) => (
@@ -166,10 +175,11 @@ export default function CoursesPage() {
           {error}
         </p>
       )}
-      {false && <DataTable
-        loading={loading}
-        emptyMessage="لا توجد كورسات مطابقة"
-        columns={[
+      <div className="hidden xl:block">
+        <DataTable
+          loading={loading}
+          emptyMessage="لا توجد كورسات مطابقة"
+          columns={[
           {
             id: 'course',
             header: 'الكورس',
@@ -228,10 +238,12 @@ export default function CoursesPage() {
             align: 'center',
           },
         ]}
-        data={visibleCourses}
-        keyExtractor={(course) => course.id}
-        rowActions={(course) => (
-          <div className="flex justify-end gap-1">
+          data={visibleCourses}
+          keyExtractor={(course) => course.id}
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          rowActions={(course) => (
             <Button
               variant="ghost"
               size="icon"
@@ -240,16 +252,16 @@ export default function CoursesPage() {
             >
               <Eye className="size-4" />
             </Button>
-          </div>
-        )}
-      />}
+          )}
+        />
+      </div>
 
       {!loading && visibleCourses.length === 0 ? (
         <div className="border border-dashed border-border p-10 text-center text-ink-3">
           {status === 'ARCHIVED' ? 'لا توجد كورسات مؤرشفة' : 'لا توجد كورسات مطابقة'}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:hidden">
           {visibleCourses.map((course) => (
             <article
               key={course.id}
@@ -295,6 +307,28 @@ export default function CoursesPage() {
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between xl:hidden">
+          <Button
+            variant="outline"
+            disabled={page <= 1}
+            onClick={() => setPage((value) => value - 1)}
+          >
+            السابق
+          </Button>
+          <span className="text-sm text-ink-3">
+            صفحة {page} من {pageCount}
+          </span>
+          <Button
+            variant="outline"
+            disabled={page >= pageCount}
+            onClick={() => setPage((value) => value + 1)}
+          >
+            التالي
+          </Button>
         </div>
       )}
 

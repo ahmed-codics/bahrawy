@@ -16,6 +16,7 @@ import {
   Select,
 } from '@bahrawy/ui';
 import { fetchApi } from '../../../lib/api';
+import { LifecycleDialog } from '../_components/LifecycleDialog';
 
 type RecordStatus = 'ACTIVE' | 'ARCHIVED';
 type Grade = {
@@ -89,6 +90,10 @@ export default function AcademicPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [lifecycleRecord, setLifecycleRecord] = useState<{
+    entity: 'grades' | 'subjects';
+    record: Grade | Subject;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,22 +113,6 @@ export default function AcademicPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  const updateStatus = async (entity: 'grades' | 'subjects', record: Grade | Subject) => {
-    setSaving(true);
-    try {
-      await fetchApi(`/admin/v1/academic/${entity}/${record.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: record.status === 'ARCHIVED' ? 'ACTIVE' : 'ARCHIVED',
-          version: record.version,
-        }),
-      });
-      await load();
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'grades', label: 'المراحل الدراسية', count: data.grades.length },
@@ -228,7 +217,7 @@ export default function AcademicPage() {
               size="icon"
               disabled={saving}
               aria-label={row.status === 'ARCHIVED' ? 'استعادة المرحلة' : 'أرشفة المرحلة'}
-              onClick={() => void updateStatus('grades', row)}
+              onClick={() => setLifecycleRecord({ entity: 'grades', record: row })}
             >
               {row.status === 'ARCHIVED' ? (
                 <RotateCcw className="size-4" />
@@ -282,7 +271,7 @@ export default function AcademicPage() {
               size="icon"
               disabled={saving}
               aria-label={row.status === 'ARCHIVED' ? 'استعادة المادة' : 'أرشفة المادة'}
-              onClick={() => void updateStatus('subjects', row)}
+              onClick={() => setLifecycleRecord({ entity: 'subjects', record: row })}
             >
               {row.status === 'ARCHIVED' ? (
                 <RotateCcw className="size-4" />
@@ -375,6 +364,18 @@ export default function AcademicPage() {
           }
         }}
       />
+      {lifecycleRecord && (
+        <LifecycleDialog
+          open
+          endpoint={`/admin/v1/academic/${lifecycleRecord.entity}/${lifecycleRecord.record.id}`}
+          version={lifecycleRecord.record.version}
+          onClose={() => setLifecycleRecord(null)}
+          onComplete={async () => {
+            setLifecycleRecord(null);
+            await load();
+          }}
+        />
+      )}
     </div>
   );
 }

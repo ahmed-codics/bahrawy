@@ -182,12 +182,6 @@ async function main() {
   });
 
   // 2. Roles & Permissions
-  const ownerRole = await db.role.upsert({
-    where: { code: 'OWNER' },
-    update: {},
-    create: { code: 'OWNER', description: 'System Owner' },
-  });
-
   const permissions = [
     'CATALOG_MANAGE',
     'PRODUCT_MANAGE',
@@ -198,27 +192,75 @@ async function main() {
     'ASSESSMENT_MANAGE',
   ];
 
+  const permissionByCode = new Map<string, string>();
   for (const p of permissions) {
     const perm = await db.permission.upsert({
       where: { code: p },
       update: {},
       create: { code: p, description: p },
     });
-
-    await db.rolePermission.upsert({
-      where: {
-        roleId_permissionId: {
-          roleId: ownerRole.id,
-          permissionId: perm.id,
-        },
-      },
-      update: {},
-      create: {
-        roleId: ownerRole.id,
-        permissionId: perm.id,
-      },
-    });
+    permissionByCode.set(p, perm.id);
   }
+
+  const rolePresets: Record<string, { description: string; permissions: string[] }> = {
+    OWNER: {
+      description: 'System Owner',
+      permissions,
+    },
+    ADMINISTRATOR: {
+      description: 'Academy administrator',
+      permissions,
+    },
+    ACADEMIC_MANAGER: {
+      description: 'Academic structure, content, and assessments',
+      permissions: ['CATALOG_MANAGE', 'PRODUCT_MANAGE', 'ASSESSMENT_MANAGE'],
+    },
+    CONTENT_EDITOR: {
+      description: 'Course and assessment content editor',
+      permissions: ['CATALOG_MANAGE', 'ASSESSMENT_MANAGE'],
+    },
+    ASSISTANT: {
+      description: 'Student operations assistant',
+      permissions: ['STUDENT_MANAGE', 'SUPPORT_MANAGE'],
+    },
+    FINANCE: {
+      description: 'Payment reviewer',
+      permissions: ['PAYMENT_MANAGE'],
+    },
+    SUPPORT: {
+      description: 'Student support specialist',
+      permissions: ['SUPPORT_MANAGE', 'STUDENT_MANAGE'],
+    },
+    READ_ONLY_AUDITOR: {
+      description: 'Governance auditor with no mutation permissions',
+      permissions: [],
+    },
+  };
+
+  const roles = new Map<string, { id: string }>();
+  for (const [code, preset] of Object.entries(rolePresets)) {
+    const role = await db.role.upsert({
+      where: { code },
+      update: { description: preset.description },
+      create: { code, description: preset.description },
+    });
+    roles.set(code, role);
+    for (const permissionCode of preset.permissions) {
+      const permissionId = permissionByCode.get(permissionCode);
+      if (!permissionId) continue;
+      await db.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: role.id,
+            permissionId,
+          },
+        },
+        update: {},
+        create: { roleId: role.id, permissionId },
+      });
+    }
+  }
+  const ownerRole = roles.get('OWNER')!;
 
   // 3. Test Identities
   const studentPhone = '+201000000001';

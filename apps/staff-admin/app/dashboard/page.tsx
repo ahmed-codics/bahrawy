@@ -59,7 +59,7 @@ export default function StaffDashboard() {
         actions={
           <Button
             leadingIcon={<Plus className="size-4" />}
-            onClick={() => router.push('/dashboard/courses')}
+            onClick={() => router.push('/dashboard/courses/new')}
           >
             إنشاء كورس
           </Button>
@@ -153,7 +153,7 @@ export default function StaffDashboard() {
               <Button
                 className="w-full justify-start"
                 leadingIcon={<Plus className="size-4" />}
-                onClick={() => router.push('/dashboard/courses')}
+                onClick={() => router.push('/dashboard/courses/new')}
               >
                 إضافة كورس أو محتوى
               </Button>
@@ -161,7 +161,7 @@ export default function StaffDashboard() {
                 variant="outline"
                 className="w-full justify-start"
                 leadingIcon={<Plus className="size-4" />}
-                onClick={() => router.push('/dashboard/products')}
+                onClick={() => router.push('/dashboard/products?create=1')}
               >
                 إنشاء باقة وسعر
               </Button>

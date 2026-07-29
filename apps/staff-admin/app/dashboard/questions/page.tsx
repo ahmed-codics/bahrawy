@@ -1,8 +1,7 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { Archive, Pencil, Plus, RotateCcw } from 'lucide-react';
-import type { AdminApiResponse } from '@bahrawy/types';
 import {
   Badge,
   Button,
@@ -15,6 +14,7 @@ import {
   PageSkeleton,
 } from '@bahrawy/ui';
 import { fetchApi } from '../../../lib/api';
+import { ReasonActionDialog } from '../_components/ReasonActionDialog';
 
 type Question = {
   id: string;
@@ -26,6 +26,7 @@ type Question = {
   tags: string[];
   archivedAt?: string | null;
   _count: { assessments: number };
+  version: number;
 };
 
 export default function QuestionsPage() {
@@ -36,34 +37,35 @@ export default function QuestionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [lifecycleQuestion, setLifecycleQuestion] = useState<Question | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+  const deferredSearch = useDeferredValue(search);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetchApi<AdminApiResponse<Question[]>>(
-        `/admin/v1/questions?archived=${showArchived}`,
-      );
-      setQuestions(response.data);
+      const query = new URLSearchParams({
+        archived: String(showArchived),
+        page: String(page),
+        pageSize: '25',
+      });
+      if (deferredSearch.trim()) query.set('search', deferredSearch.trim());
+      const response = await fetchApi(`/admin/v1/questions?${query}`);
+      setQuestions(response.data.items as Question[]);
+      setPageCount(response.data.meta.pageCount);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الأسئلة');
     } finally {
       setLoading(false);
     }
-  }, [showArchived]);
+  }, [deferredSearch, page, showArchived]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  const visible = useMemo(() => {
-    const value = search.trim().toLowerCase();
-    return value
-      ? questions.filter((question) =>
-          [question.titleAr, ...question.tags].some((text) => text.toLowerCase().includes(value)),
-        )
-      : questions;
-  }, [questions, search]);
 
   if (loading && !questions.length) return <PageSkeleton cards={5} />;
   if (error && !questions.length) {
@@ -77,21 +79,33 @@ export default function QuestionsPage() {
         title="بنك الأسئلة"
         description="أسئلة قابلة لإعادة الاستخدام مع تتبع عدد الاختبارات المرتبطة."
         actions={
-          <Button leadingIcon={<Plus className="size-4" />} onClick={() => setDrawerOpen(true)}>
+          <Button
+            leadingIcon={<Plus className="size-4" />}
+            onClick={() => {
+              setEditingQuestion(null);
+              setDrawerOpen(true);
+            }}
+          >
             سؤال جديد
           </Button>
         }
       />
       <FilterBar
         value={search}
-        onSearch={setSearch}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="ابحث في نص السؤال أو الوسوم"
         filters={
           <label className="flex min-h-10 items-center gap-2 whitespace-nowrap text-sm">
             <input
               type="checkbox"
               checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
+              onChange={(event) => {
+                setShowArchived(event.target.checked);
+                setPage(1);
+              }}
             />
             عرض المؤرشف
           </label>
@@ -124,24 +138,29 @@ export default function QuestionsPage() {
             align: 'center',
           },
         ]}
-        data={visible}
+        data={questions}
         keyExtractor={(row) => row.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="icon" aria-label="تعديل السؤال">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="تعديل السؤال"
+              onClick={() => {
+                setEditingQuestion(row);
+                setDrawerOpen(true);
+              }}
+            >
               <Pencil className="size-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
               aria-label={showArchived ? 'استعادة السؤال' : 'أرشفة السؤال'}
-              onClick={async () => {
-                await fetchApi(
-                  `/admin/v1/questions/${row.id}/${showArchived ? 'restore' : 'archive'}`,
-                  { method: 'PATCH' },
-                );
-                await load();
-              }}
+              onClick={() => setLifecycleQuestion(row)}
             >
               {showArchived ? <RotateCcw className="size-4" /> : <Archive className="size-4" />}
             </Button>
@@ -151,7 +170,7 @@ export default function QuestionsPage() {
       <Drawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title="إضافة سؤال"
+        title={editingQuestion ? 'تعديل السؤال' : 'إضافة سؤال'}
         footer={
           <Button type="submit" form="question-form" loading={saving}>
             حفظ السؤال
@@ -166,8 +185,12 @@ export default function QuestionsPage() {
             const form = new FormData(event.currentTarget);
             setSaving(true);
             try {
-              await fetchApi('/admin/v1/questions', {
-                method: 'POST',
+              await fetchApi(
+                editingQuestion
+                  ? `/admin/v1/questions/${editingQuestion.id}`
+                  : '/admin/v1/questions',
+                {
+                method: editingQuestion ? 'PATCH' : 'POST',
                 body: JSON.stringify({
                   titleAr: form.get('titleAr'),
                   options: [
@@ -180,22 +203,40 @@ export default function QuestionsPage() {
                     .split(',')
                     .map((tag) => tag.trim())
                     .filter(Boolean),
+                  ...(editingQuestion ? { version: editingQuestion.version } : {}),
                 }),
               });
               setDrawerOpen(false);
+              setEditingQuestion(null);
               await load();
             } finally {
               setSaving(false);
             }
           }}
         >
-          <Input name="titleAr" label="نص السؤال" required />
-          <Input name="option1" label="الاختيار الأول" required />
-          <Input name="option2" label="الاختيار الثاني" required />
+          <Input
+            name="titleAr"
+            label="نص السؤال"
+            defaultValue={editingQuestion?.titleAr ?? ''}
+            required
+          />
+          <Input
+            name="option1"
+            label="الاختيار الأول"
+            defaultValue={editingQuestion?.options[0]?.textAr ?? ''}
+            required
+          />
+          <Input
+            name="option2"
+            label="الاختيار الثاني"
+            defaultValue={editingQuestion?.options[1]?.textAr ?? ''}
+            required
+          />
           <label className="block text-sm font-medium text-ink-2">
             الإجابة الصحيحة
             <select
               name="correctOptionId"
+              defaultValue={editingQuestion?.correctOptionId ?? '1'}
               className="mt-1 h-10 w-full rounded-[var(--radius-md)] border border-border bg-surface px-3"
               required
             >
@@ -203,10 +244,49 @@ export default function QuestionsPage() {
               <option value="2">الاختيار الثاني</option>
             </select>
           </label>
-          <Input name="points" type="number" min="1" defaultValue="1" label="الدرجة" />
-          <Input name="tags" label="الوسوم" hint="افصل بين الوسوم بفاصلة" />
+          <Input
+            name="points"
+            type="number"
+            min="1"
+            defaultValue={editingQuestion?.points ?? 1}
+            label="الدرجة"
+          />
+          <Input
+            name="tags"
+            label="الوسوم"
+            defaultValue={editingQuestion?.tags.join(', ') ?? ''}
+            hint="افصل بين الوسوم بفاصلة"
+          />
         </form>
       </Drawer>
+      {lifecycleQuestion && (
+        <ReasonActionDialog
+          open
+          title={showArchived ? 'استعادة السؤال' : 'أرشفة السؤال'}
+          description={
+            showArchived
+              ? 'سيعود السؤال إلى بنك الأسئلة النشط ويمكن استخدامه في اختبارات جديدة.'
+              : `سيختفي السؤال من الاختيار للاختبارات الجديدة، لكنه سيظل محفوظاً في ${lifecycleQuestion._count.assessments} اختبار مرتبط.`
+          }
+          confirmLabel={showArchived ? 'استعادة السؤال' : 'أرشفة السؤال'}
+          tone={showArchived ? 'primary' : 'danger'}
+          onClose={() => setLifecycleQuestion(null)}
+          onConfirm={async (reason) => {
+            await fetchApi(
+              `/admin/v1/questions/${lifecycleQuestion.id}/${showArchived ? 'restore' : 'archive'}`,
+              {
+                method: 'PATCH',
+                body: JSON.stringify({
+                  version: lifecycleQuestion.version,
+                  reason,
+                }),
+              },
+            );
+            setLifecycleQuestion(null);
+            await load();
+          }}
+        />
+      )}
     </div>
   );
 }

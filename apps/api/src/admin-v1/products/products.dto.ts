@@ -89,4 +89,42 @@ export class UpdateProductDto extends ProductInputDto {
 
   @IsOptional()
   declare titleAr: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  declare version: number;
+}
+
+export class UpsertCommerceDto {
+  @IsOptional()
+  @IsString()
+  titleAr?: string;
+
+  @IsOptional()
+  @IsString()
+  titleEn?: string;
+
+  @IsOptional()
+  @IsString()
+  descriptionAr?: string;
+
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  priceAmount!: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  version?: number;
 }

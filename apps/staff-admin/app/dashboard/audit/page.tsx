@@ -33,6 +33,8 @@ export default function AuditPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<AuditEvent | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,14 +42,17 @@ export default function AuditPage() {
     try {
       const query = new URLSearchParams();
       if (search.trim()) query.set('action', search.trim());
+      query.set('page', String(page));
+      query.set('pageSize', '50');
       const response = await fetchApi(`/admin/v1/management/audit?${query}`);
-      setEvents(response.data as AuditEvent[]);
+      setEvents((response.data.items ?? response.data) as AuditEvent[]);
+      setPageCount(response.data.meta?.pageCount ?? response.meta?.pageCount ?? 1);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل سجل التدقيق');
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [page, search]);
 
   useEffect(() => {
     const timeout = setTimeout(() => void load(), 250);
@@ -65,12 +70,22 @@ export default function AuditPage() {
         title="سجل التدقيق"
         description="آخر 500 إجراء إداري حساس مع السبب والحالة قبل وبعد التنفيذ."
       />
-      <FilterBar value={search} onSearch={setSearch} searchPlaceholder="ابحث باسم الإجراء" />
+      <FilterBar
+        value={search}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        searchPlaceholder="ابحث باسم الإجراء"
+      />
       <DataTable
         loading={loading}
         emptyMessage="لا توجد أحداث مطابقة"
         data={events}
         keyExtractor={(event) => event.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         columns={[
           {
             id: 'date',

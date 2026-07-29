@@ -64,6 +64,8 @@ export default function PaymentsPage() {
   const [selected, setSelected] = useState<Order | null>(null);
   const [decision, setDecision] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [note, setNote] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,14 +74,17 @@ export default function PaymentsPage() {
       const query = new URLSearchParams();
       if (status) query.set('status', status);
       if (search.trim()) query.set('search', search.trim());
+      query.set('page', String(page));
+      query.set('pageSize', '25');
       const response = await fetchApi(`/admin/v1/payments?${query}`);
-      setOrders(response.data as Order[]);
+      setOrders((response.data.items ?? response.data) as Order[]);
+      setPageCount(response.data.meta?.pageCount ?? 1);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل المدفوعات');
     } finally {
       setLoading(false);
     }
-  }, [search, status]);
+  }, [page, search, status]);
 
   useEffect(() => {
     const timeout = setTimeout(() => void load(), 250);
@@ -133,13 +138,19 @@ export default function PaymentsPage() {
       />
       <FilterBar
         value={search}
-        onSearch={setSearch}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         searchPlaceholder="ابحث باسم الطالب"
         filters={
           <Select
             aria-label="تصفية بالحالة"
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
           >
             <option value="">كل الحالات</option>
             <option value="PENDING_REVIEW">بانتظار المراجعة</option>
@@ -154,6 +165,9 @@ export default function PaymentsPage() {
         emptyMessage="لا توجد مدفوعات مطابقة"
         data={orders}
         keyExtractor={(order) => order.id}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         columns={[
           {
             id: 'student',
