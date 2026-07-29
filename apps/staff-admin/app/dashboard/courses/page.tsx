@@ -1,8 +1,9 @@
 'use client';
 
 import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from 'react';
-import { Archive, Eye, ImageIcon, Plus } from 'lucide-react';
+import { Archive, Eye, ImageIcon, Plus, Trash2 } from 'lucide-react';
 import type { AdminApiResponse } from '@bahrawy/types';
+import toast from 'react-hot-toast';
 import {
   Badge,
   Button,
@@ -17,6 +18,7 @@ import {
 } from '@bahrawy/ui';
 import { useRouter } from 'next/navigation';
 import { API_BASE, fetchApi } from '../../../lib/api';
+import { LifecycleDialog } from '../_components/LifecycleDialog';
 
 type AcademicOption = { id: string; nameAr?: string; label?: string; code: string };
 type AcademicOverview = {
@@ -31,6 +33,7 @@ type Course = {
   titleEn?: string;
   coverImageUrl?: string | null;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  version: number;
   publishAt?: string;
   unpublishAt?: string;
   updatedAt: string;
@@ -78,6 +81,7 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [lifecycleCourse, setLifecycleCourse] = useState<Course | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -244,14 +248,28 @@ export default function CoursesPage() {
           pageCount={pageCount}
           onPageChange={setPage}
           rowActions={(course) => (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="فتح الكورس"
-              onClick={() => router.push(`/dashboard/courses/${course.id}`)}
-            >
-              <Eye className="size-4" />
-            </Button>
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="فتح الكورس"
+                onClick={() => router.push(`/dashboard/courses/${course.id}`)}
+              >
+                <Eye className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={
+                  course.status === 'ARCHIVED'
+                    ? 'استعادة أو حذف الكورس'
+                    : 'أرشفة أو حذف الكورس'
+                }
+                onClick={() => setLifecycleCourse(course)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
           )}
         />
       </div>
@@ -296,14 +314,26 @@ export default function CoursesPage() {
                   <div><strong className="block text-base">{readiness(course.readiness.pdfs, course.readiness.lessons)}</strong>PDF</div>
                   <div><strong className="block text-base">{course._count.products}</strong>باقة</div>
                 </div>
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  leadingIcon={<Eye className="size-4" />}
-                  onClick={() => router.push(`/dashboard/courses/${course.id}`)}
-                >
-                  إدارة الكورس
-                </Button>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    leadingIcon={<Eye className="size-4" />}
+                    onClick={() => router.push(`/dashboard/courses/${course.id}`)}
+                  >
+                    إدارة الكورس
+                  </Button>
+                  <Button
+                    className="w-full"
+                    variant="ghost"
+                    leadingIcon={<Trash2 className="size-4" />}
+                    onClick={() => setLifecycleCourse(course)}
+                  >
+                    {course.status === 'ARCHIVED'
+                      ? 'استعادة أو حذف'
+                      : 'أرشفة أو حذف'}
+                  </Button>
+                </div>
               </div>
             </article>
           ))}
@@ -409,6 +439,27 @@ export default function CoursesPage() {
           </div>
         </form>
       </Drawer>
+
+      <LifecycleDialog
+        open={Boolean(lifecycleCourse)}
+        endpoint={
+          lifecycleCourse
+            ? `/admin/v1/courses/${lifecycleCourse.id}`
+            : '/admin/v1/courses/none'
+        }
+        version={lifecycleCourse?.version ?? 1}
+        onClose={() => setLifecycleCourse(null)}
+        onComplete={async (action) => {
+          toast.success(
+            action === 'RESTORE'
+              ? 'تمت استعادة الكورس'
+              : action === 'PERMANENT_DELETE'
+                ? 'تم حذف الكورس نهائياً'
+                : 'تمت أرشفة الكورس',
+          );
+          await load();
+        }}
+      />
     </div>
   );
 }

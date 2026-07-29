@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Archive, Edit3, Plus } from 'lucide-react';
+import { Edit3, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   Badge,
@@ -361,12 +361,12 @@ export default function ProductsPage() {
               size="icon"
               aria-label={
                 product.status === 'ARCHIVED'
-                  ? 'استعادة الباقة'
-                  : 'إدارة أرشفة الباقة'
+                  ? 'استعادة أو حذف الباقة'
+                  : 'أرشفة أو حذف الباقة'
               }
               onClick={() => setLifecycleProduct(product)}
             >
-              <Archive className="size-4" />
+              <Trash2 className="size-4" />
             </Button>
           </div>
         )}

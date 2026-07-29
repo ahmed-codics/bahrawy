@@ -342,6 +342,7 @@ export class AdminV1ProductsService {
       },
       { code: 'PAYMENTS', label: 'طلبات دفع مرتبطة', count: payments },
     ].filter((item) => item.count > 0);
+    const canPermanentlyDelete = blockers.length === 0;
     return {
       id,
       resource: 'product',
@@ -349,9 +350,7 @@ export class AdminV1ProductsService {
       currentStatus: product.status,
       actions: [
         product.status === 'ARCHIVED' ? 'RESTORE' : 'ARCHIVE',
-        ...(product.status === 'DRAFT' && blockers.length === 0
-          ? (['PERMANENT_DELETE'] as const)
-          : []),
+        ...(canPermanentlyDelete ? (['PERMANENT_DELETE'] as const) : []),
       ],
       blockers,
       affectedChildren: [
@@ -367,8 +366,7 @@ export class AdminV1ProductsService {
         },
       ].filter((item) => item.count > 0),
       requiresReason: true,
-      requiresTypedConfirmation:
-        product.status === 'DRAFT' && blockers.length === 0,
+      requiresTypedConfirmation: canPermanentlyDelete,
     };
   }
 

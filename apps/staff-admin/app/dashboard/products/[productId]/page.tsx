@@ -101,7 +101,9 @@ export default function ProductDetailsPage({
         actions={
           <Button variant="outline" onClick={() => setLifecycleOpen(true)}>
             <Archive className="size-4" />
-            إدارة دورة الحياة
+            {product.status === 'ARCHIVED'
+              ? 'استعادة أو حذف الباقة'
+              : 'أرشفة أو حذف الباقة'}
           </Button>
         }
       />

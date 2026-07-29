@@ -130,7 +130,9 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
           </Button>
           <Button variant="ghost" onClick={() => setLifecycleOpen(true)}>
             <Archive className="size-4" />
-            {course.status === 'ARCHIVED' ? 'استعادة أو حذف' : 'إدارة الأرشفة'}
+            {course.status === 'ARCHIVED'
+              ? 'استعادة أو حذف الكورس'
+              : 'أرشفة أو حذف الكورس'}
           </Button>
         </div>
       </header>

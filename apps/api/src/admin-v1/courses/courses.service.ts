@@ -719,7 +719,13 @@ export class AdminV1CoursesService {
         label: 'متطلبات أكاديمية مرتبطة',
         count: course._count.prerequisites + course._count.prerequisiteFor,
       },
+      {
+        code: 'PRODUCT_MEMBERSHIPS',
+        label: 'منتجات أو باقات مرتبطة بالكورس',
+        count: productIds.length,
+      },
     ].filter((item) => item.count > 0);
+    const canPermanentlyDelete = blockers.length === 0;
     const chapterCount = course.chapters.length;
     const unitCount = course.chapters.reduce(
       (total: number, chapter: any) => total + chapter.units.length,
@@ -732,9 +738,7 @@ export class AdminV1CoursesService {
       currentStatus: course.status,
       actions: [
         course.status === 'ARCHIVED' ? 'RESTORE' : 'ARCHIVE',
-        ...(course.status === 'DRAFT' && blockers.length === 0
-          ? (['PERMANENT_DELETE'] as const)
-          : []),
+        ...(canPermanentlyDelete ? (['PERMANENT_DELETE'] as const) : []),
       ],
       blockers,
       affectedChildren: [
@@ -748,8 +752,7 @@ export class AdminV1CoursesService {
         },
       ].filter((item) => item.count > 0),
       requiresReason: true,
-      requiresTypedConfirmation:
-        course.status === 'DRAFT' && blockers.length === 0,
+      requiresTypedConfirmation: canPermanentlyDelete,
     };
   }
 

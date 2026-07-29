@@ -5,6 +5,11 @@ jest.mock('@bahrawy/db', () => {
   return {
     db: {
       unit: { findFirst: jest.fn() },
+      course: { findFirst: jest.fn() },
+      assessmentAttempt: { count: jest.fn() },
+      lessonProgress: { count: jest.fn() },
+      entitlement: { count: jest.fn() },
+      paymentOrder: { count: jest.fn() },
       $transaction: jest.fn(),
     },
   };
@@ -69,5 +74,32 @@ describe('AdminV1CoursesService lesson lifecycle', () => {
         targetId: 'unit-1',
       }),
     );
+  });
+
+  it('blocks permanent course deletion while a product or bundle references it', async () => {
+    (db.course.findFirst as jest.Mock).mockResolvedValue({
+      id: 'course-1',
+      titleAr: 'كورس تجريبي',
+      status: 'DRAFT',
+      chapters: [],
+      products: [{ productId: 'product-1' }],
+      _count: {
+        assessments: 0,
+        prerequisites: 0,
+        prerequisiteFor: 0,
+      },
+    });
+    (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(0);
+    (db.entitlement.count as jest.Mock).mockResolvedValue(0);
+    (db.paymentOrder.count as jest.Mock).mockResolvedValue(0);
+
+    const impact = await service.deletionImpact('org-1', 'course-1');
+
+    expect(impact.actions).toEqual(['ARCHIVE']);
+    expect(impact.blockers).toContainEqual({
+      code: 'PRODUCT_MEMBERSHIPS',
+      label: 'منتجات أو باقات مرتبطة بالكورس',
+      count: 1,
+    });
   });
 });
