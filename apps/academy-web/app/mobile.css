@@ -979,6 +979,8 @@ textarea {
   .academy-landing .academy-hero-image {
     width: min(100%, 32rem);
     max-width: 32rem;
+    animation: academy-float 8s ease-in-out infinite;
+    will-change: transform;
   }
 
   .academy-hero-copy {
@@ -1116,6 +1118,12 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .academy-hero-image,
+  .academy-landing .academy-hero-image {
+    animation: none !important;
+    transform: none !important;
+  }
+
   *,
   *::before,
   *::after {
