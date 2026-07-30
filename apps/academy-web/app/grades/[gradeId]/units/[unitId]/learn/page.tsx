@@ -99,6 +99,7 @@ export default function LearnPage({
   const router = useRouter();
   const [payload, setPayload] = useState<UnitPayload | null>(null);
   const [videoPlaybacks, setVideoPlaybacks] = useState<Record<string, VideoPlayback>>({});
+  const [resumePositions, setResumePositions] = useState<Record<string, number>>({});
   const [assessment, setAssessment] = useState<AttemptPayload | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<AssessmentResult | null>(null);
@@ -119,18 +120,36 @@ export default function LearnPage({
     );
     const signedEntries = await Promise.all(
       videos.map(async (item) => {
-        const video = await fetchApi(`/video/${item.lessonId}/hls`);
+        const [video, resume] = await Promise.all([
+          fetchApi(`/video/${item.lessonId}/hls`),
+          fetchApi(`/video/${item.lessonId}/resume`).catch(() => null),
+        ]);
+        const savedPosition = Number(resume?.data?.position ?? 0);
+        lastProgressReport.current[item.lessonId!] = Number.isFinite(savedPosition)
+          ? Math.floor(savedPosition)
+          : 0;
         return [
           item.lessonId!,
-          video.data ?? {
-            provider: video.provider ?? 'LOCAL',
-            url: video.signedUrl,
-            videoId: video.videoId,
+          {
+            playback:
+              video.data ?? {
+                provider: video.provider ?? 'LOCAL',
+                url: video.signedUrl,
+                videoId: video.videoId,
+              },
+            resumePosition: Number.isFinite(savedPosition) ? savedPosition : 0,
           },
         ] as const;
       }),
     );
-    setVideoPlaybacks(Object.fromEntries(signedEntries));
+    setVideoPlaybacks(
+      Object.fromEntries(signedEntries.map(([lessonId, value]) => [lessonId, value.playback])),
+    );
+    setResumePositions(
+      Object.fromEntries(
+        signedEntries.map(([lessonId, value]) => [lessonId, value.resumePosition]),
+      ),
+    );
   }, [gradeId, router, unitId]);
 
   useEffect(() => {
@@ -164,14 +183,16 @@ export default function LearnPage({
   };
 
   const reportProgress = (lessonId: string, currentTime = 1, duration = 1) => {
-    const bucket = Math.floor((currentTime / Math.max(1, duration)) * 10);
-    if (bucket <= (lastProgressReport.current[lessonId] ?? 0)) return;
-    lastProgressReport.current[lessonId] = bucket;
+    const watchedSeconds = Math.max(0, Math.floor(currentTime));
+    const ratio = watchedSeconds / Math.max(1, duration);
+    const previous = lastProgressReport.current[lessonId] ?? 0;
+    if (ratio < 0.9 && Math.abs(watchedSeconds - previous) < 5) return;
+    lastProgressReport.current[lessonId] = watchedSeconds;
 
     return fetchApi(`/video/${lessonId}/progress`, {
       method: 'POST',
       body: JSON.stringify({
-        watchedSeconds: Math.floor(currentTime),
+        watchedSeconds,
         durationSeconds: Math.max(1, Math.floor(duration)),
       }),
     }).catch(() => undefined);
@@ -203,11 +224,11 @@ export default function LearnPage({
                   {item.available && videoPlaybacks[item.lessonId] ? (
                     <ProviderVideoPlayer
                       playback={videoPlaybacks[item.lessonId]}
+                      initialTime={resumePositions[item.lessonId] ?? 0}
                       className="aspect-video overflow-hidden rounded-xl"
-                      onProgress={(ratio, currentTime, duration) => {
-                        if (ratio > 0.9) void reportProgress(item.lessonId!, currentTime, duration);
-                      }}
-                      onEnded={() => void reportProgress(item.lessonId!)}
+                      onProgress={(_ratio, currentTime, duration) =>
+                        void reportProgress(item.lessonId!, currentTime, duration)
+                      }
                     />
                   ) : (
                     <LockedMessage />

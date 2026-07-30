@@ -20,6 +20,7 @@ export interface VideoPlayerProps {
   src: string;
   poster?: string;
   className?: string;
+  initialTime?: number;
   onEnded?: () => void;
   onTimeUpdate?: (time: number) => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
@@ -73,6 +74,7 @@ export function VideoPlayer({
   src,
   poster,
   className = '',
+  initialTime = 0,
   onEnded,
   onTimeUpdate,
   onProgress,
@@ -81,6 +83,7 @@ export function VideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const appliedInitialTimeRef = useRef(false);
   const bufferingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rateChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutedForBufferingRef = useRef(false);
@@ -116,6 +119,7 @@ export function VideoPlayer({
     let hls: Hls | null = null;
     setError(null);
     setIsBuffering(true);
+    appliedInitialTimeRef.current = false;
     setSelectedQuality(DEFAULT_QUALITY_LABEL);
     setQualityOptions(DEFAULT_QUALITY_OPTIONS);
 
@@ -209,7 +213,18 @@ export function VideoPlayer({
     if (!video) return;
 
     const handleLoadedMetadata = () => {
-      setDuration(video.duration || 0);
+      const videoDuration = video.duration || 0;
+      setDuration(videoDuration);
+      if (
+        !appliedInitialTimeRef.current &&
+        initialTime > 1 &&
+        videoDuration > 0 &&
+        initialTime < videoDuration - 10
+      ) {
+        video.currentTime = initialTime;
+        setCurrentTime(initialTime);
+      }
+      appliedInitialTimeRef.current = true;
       setIsBuffering(false);
     };
     const handleTimeUpdate = () => {
@@ -271,7 +286,7 @@ export function VideoPlayer({
       video.removeEventListener('volumechange', handleVolumeChange);
       mutedForBufferingRef.current = false;
     };
-  }, [onEnded, onProgress, onTimeUpdate, syncPlayState]);
+  }, [initialTime, onEnded, onProgress, onTimeUpdate, syncPlayState]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {

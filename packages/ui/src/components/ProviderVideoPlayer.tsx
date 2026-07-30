@@ -13,6 +13,7 @@ export type VideoPlayback = {
 export type ProviderVideoPlayerProps = {
   playback: VideoPlayback;
   className?: string;
+  initialTime?: number;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
 };
@@ -20,6 +21,7 @@ export type ProviderVideoPlayerProps = {
 export function ProviderVideoPlayer({
   playback,
   className = '',
+  initialTime = 0,
   onEnded,
   onProgress,
 }: ProviderVideoPlayerProps) {
@@ -29,6 +31,7 @@ export function ProviderVideoPlayer({
         key={playback.videoId}
         videoId={playback.videoId}
         className={className}
+        initialTime={initialTime}
         onEnded={onEnded}
         onProgress={onProgress}
       />
@@ -40,6 +43,7 @@ export function ProviderVideoPlayer({
       <VideoPlayer
         src={playback.url}
         className={className}
+        initialTime={initialTime}
         onEnded={onEnded}
         onProgress={onProgress}
       />
@@ -52,6 +56,7 @@ export function ProviderVideoPlayer({
 type YouTubePlayerProps = {
   videoId: string;
   className: string;
+  initialTime: number;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
 };
@@ -60,6 +65,7 @@ type YouTubePlayerInstance = {
   destroy: () => void;
   getCurrentTime: () => number;
   getDuration: () => number;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
 };
 
 type YouTubeNamespace = {
@@ -110,7 +116,13 @@ function loadYouTubeApi() {
   return youtubeApiPromise;
 }
 
-function YouTubePlayer({ videoId, className, onEnded, onProgress }: YouTubePlayerProps) {
+function YouTubePlayer({
+  videoId,
+  className,
+  initialTime,
+  onEnded,
+  onProgress,
+}: YouTubePlayerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -157,7 +169,20 @@ function YouTubePlayer({ videoId, className, onEnded, onProgress }: YouTubePlaye
           rel: 0,
         },
         events: {
-          onReady: reportProgress,
+          onReady: () => {
+            const player = playerRef.current;
+            const duration = player?.getDuration() ?? 0;
+            if (
+              player &&
+              initialTime > 1 &&
+              duration > 0 &&
+              initialTime < duration - 10
+            ) {
+              player.seekTo(initialTime, true);
+              return;
+            }
+            reportProgress();
+          },
           onStateChange: ({ data }) => {
             if (data === 1 && !progressTimerRef.current) {
               progressTimerRef.current = setInterval(reportProgress, 5000);
@@ -177,7 +202,7 @@ function YouTubePlayer({ videoId, className, onEnded, onProgress }: YouTubePlaye
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [videoId]);
+  }, [initialTime, videoId]);
 
   return (
     <div

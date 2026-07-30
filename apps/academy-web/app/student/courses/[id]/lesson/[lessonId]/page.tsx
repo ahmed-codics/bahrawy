@@ -53,6 +53,7 @@ export default function LessonDetailPage({
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [playback, setPlayback] = useState<VideoPlayback | null>(null);
+  const [resumePosition, setResumePosition] = useState(0);
   const [accessError, setAccessError] = useState('');
   const [loading, setLoading] = useState(true);
   const lastReported = useRef(0);
@@ -63,7 +64,15 @@ export default function LessonDetailPage({
         const current = response.data.lesson as Lesson;
         setLesson(current);
         if (current.contentType === 'VIDEO') {
-          const video = await fetchApi(`/video/${lessonId}/hls`);
+          const [video, resume] = await Promise.all([
+            fetchApi(`/video/${lessonId}/hls`),
+            fetchApi(`/video/${lessonId}/resume`).catch(() => null),
+          ]);
+          const savedPosition = Number(resume?.data?.position ?? 0);
+          setResumePosition(Number.isFinite(savedPosition) ? savedPosition : 0);
+          lastReported.current = Number.isFinite(savedPosition)
+            ? Math.floor(savedPosition)
+            : 0;
           setPlayback(
             video.data ?? {
               provider: video.provider ?? 'LOCAL',
@@ -108,13 +117,14 @@ export default function LessonDetailPage({
   }, [id, lessonId]);
 
   const reportProgress = (ratio: number, currentTime: number, duration: number) => {
-    const bucket = Math.floor(ratio * 10);
-    if (bucket <= lastReported.current) return;
-    lastReported.current = bucket;
+    const watchedSeconds = Math.max(0, Math.floor(currentTime));
+    const isComplete = ratio >= 0.9;
+    if (!isComplete && Math.abs(watchedSeconds - lastReported.current) < 5) return;
+    lastReported.current = watchedSeconds;
     fetchApi(`/video/${lessonId}/progress`, {
       method: 'POST',
       body: JSON.stringify({
-        watchedSeconds: Math.floor(currentTime),
+        watchedSeconds,
         durationSeconds: Math.floor(duration),
       }),
     }).catch(() => undefined);
@@ -163,13 +173,13 @@ export default function LessonDetailPage({
       {lesson ? (
         <>
           {lesson.contentType === 'VIDEO' ? (
-            <section className="overflow-hidden rounded-[1.5rem] bg-[#04151f] p-2 shadow-2xl sm:p-3">
+            <section className="overflow-hidden rounded-[1.5rem] border border-border-default bg-surface shadow-sm">
               {playback ? (
                 <ProviderVideoPlayer
                   playback={playback}
-                  className="aspect-video"
+                  initialTime={resumePosition}
+                  className="aspect-video rounded-none shadow-none"
                   onProgress={reportProgress}
-                  onEnded={() => reportProgress(1, 1, 1)}
                 />
               ) : (
                 <div className="flex aspect-video items-center justify-center text-white/65">
