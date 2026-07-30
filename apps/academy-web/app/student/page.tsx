@@ -88,9 +88,9 @@ export default function StudentDashboard() {
             </span>
             <h1 className="ba-heading mt-4 max-w-3xl text-3xl leading-[1.2] sm:mt-5 sm:text-5xl">
               أهلاً يا {firstName}،<br />
-              <span className="text-[#69ddeb]">يلا نكمّل من مكانك.</span>
+              <span className="text-brand-700">يلا نكمّل من مكانك.</span>
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-cyan-50/75 sm:mt-4 sm:text-base sm:leading-8">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted sm:mt-4 sm:text-base sm:leading-8">
               كل درس تخلصه بيقرّبك من هدفك. افتح آخر كورس، راجع تقدمك، وخلي المذاكرة ماشية بخطوات
               واضحة.
             </p>
@@ -108,7 +108,7 @@ export default function StudentDashboard() {
                 {activeCourse ? 'كمّل مذاكرتك' : 'استكشف الكورسات'}
               </Button>
               <Button
-                className="w-full border-white/25 bg-white/5 text-white hover:bg-white/10 sm:w-auto"
+                className="w-full sm:w-auto"
                 variant="outline"
                 onClick={() => router.push('/student/products')}
               >
@@ -116,31 +116,31 @@ export default function StudentDashboard() {
               </Button>
             </div>
           </div>
-          <div className="student-entrance-late rounded-[1.6rem] border border-white/12 bg-white/8 p-5 backdrop-blur-sm">
+          <div className="student-entrance-late rounded-[1.6rem] border border-border-default bg-white/85 p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-cyan-100/70">تقدمك الكلي</p>
+                <p className="text-sm font-bold text-text-muted">تقدمك الكلي</p>
                 <p className="ba-number mt-1 text-4xl font-black">{number.format(overall)}%</p>
               </div>
               <div
                 className="relative flex size-20 items-center justify-center rounded-full"
                 style={{
-                  background: `conic-gradient(#66deeb ${overall * 3.6}deg, rgba(255,255,255,.12) 0)`,
+                  background: `conic-gradient(#25a9c0 ${overall * 3.6}deg, rgba(25,110,130,.12) 0)`,
                 }}
               >
-                <div className="flex size-14 items-center justify-center rounded-full bg-[#073247]">
-                  <Target className="size-6 text-[#69ddeb]" />
+                <div className="flex size-14 items-center justify-center rounded-full bg-white">
+                  <Target className="size-6 text-brand-600" />
                 </div>
               </div>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
+            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border-default pt-4">
               <div>
                 <p className="ba-number text-xl font-black">{number.format(completed)}</p>
-                <p className="text-xs text-cyan-50/60">درس مكتمل</p>
+                <p className="text-xs text-text-muted">درس مكتمل</p>
               </div>
               <div>
                 <p className="ba-number text-xl font-black">{number.format(courses.length)}</p>
-                <p className="text-xs text-cyan-50/60">كورس في حسابك</p>
+                <p className="text-xs text-text-muted">كورس في حسابك</p>
               </div>
             </div>
           </div>

@@ -38,15 +38,15 @@ export default function StudentProductsPage() {
             <h1 className="ba-heading mt-4 text-3xl leading-[1.2] sm:mt-5 sm:text-5xl">
               اختار اللي يناسب مذاكرتك،
               <br />
-              <span className="text-[#69ddeb]">وافهم كل حاجة قبل الدفع.</span>
+              <span className="text-brand-700">وافهم كل حاجة قبل الدفع.</span>
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-cyan-50/75 sm:mt-4 sm:text-base sm:leading-8">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted sm:mt-4 sm:text-base sm:leading-8">
               الباقة تجمع لك أكتر من كورس بسعر واحد، وتقدر تشوف محتوى كل كورس ودروسه قبل ما تقرر.
             </p>
           </div>
           <div className="flex gap-3">
-            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-sm font-bold">
-              <ShieldCheck className="size-5 text-[#69ddeb]" /> دفع ومراجعة آمنة
+            <span className="inline-flex items-center gap-2 rounded-2xl border border-border-default bg-white/85 px-4 py-3 text-sm font-bold shadow-sm">
+              <ShieldCheck className="size-5 text-brand-600" /> دفع ومراجعة آمنة
             </span>
           </div>
         </div>

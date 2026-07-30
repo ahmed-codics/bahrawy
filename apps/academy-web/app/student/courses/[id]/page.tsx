@@ -102,12 +102,12 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
             <h1 className="ba-heading mt-4 text-3xl leading-[1.2] sm:mt-5 sm:text-5xl">
               {course.titleAr}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-cyan-50/75 sm:mt-4 sm:text-base sm:leading-8">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted sm:mt-4 sm:text-base sm:leading-8">
               {course.descriptionAr ||
                 'كل درس له صفحته وسعره ومحتواه. تقدر تشتري درساً واحداً، الكورس كاملاً، أو الباقة الأشمل.'}
             </p>
             <Button
-              className="mt-5 w-full border-white/20 bg-white/5 text-white hover:bg-white/10 sm:mt-6 sm:w-auto"
+              className="mt-5 w-full sm:mt-6 sm:w-auto"
               variant="outline"
               onClick={() => router.push('/student/courses')}
             >
@@ -339,9 +339,9 @@ function PurchaseChoice({
 }
 function Metric({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
+    <div className="rounded-2xl border border-border-default bg-white/85 p-4 shadow-sm">
       <p className="ba-number text-3xl font-black">{value.toLocaleString('ar-EG')}</p>
-      <p className="mt-1 text-xs font-bold text-cyan-50/65">{label}</p>
+      <p className="mt-1 text-xs font-bold text-text-muted">{label}</p>
     </div>
   );
 }

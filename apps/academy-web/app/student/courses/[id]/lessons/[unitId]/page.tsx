@@ -106,7 +106,7 @@ export default function LessonPage({
               <Sparkles className="size-4" /> {unit.chapter.titleAr}
             </span>
             <h1 className="ba-heading mt-5 text-4xl leading-[1.2] sm:text-5xl">{unit.titleAr}</h1>
-            <p className="mt-4 max-w-xl text-base leading-8 text-cyan-50/75">
+            <p className="mt-4 max-w-xl text-base leading-8 text-text-muted">
               صفحة مستقلة للدرس: الفيديو والملفات والواجب في مكان واحد، وتقدمك محفوظ تلقائياً.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
@@ -124,7 +124,7 @@ export default function LessonPage({
               <Badge tone="cyan">{contentItems.length} مواد تعليمية</Badge>
             </div>
           </div>
-          <div className="student-cover relative aspect-video min-h-0 border-t border-white/10 lg:aspect-auto lg:min-h-60 lg:border-r lg:border-t-0">
+          <div className="student-cover relative aspect-video min-h-0 border-t border-border-default lg:aspect-auto lg:min-h-60 lg:border-r lg:border-t-0">
             {lessonProduct?.coverImageUrl ? (
               <Image
                 src={`${API_BASE}${lessonProduct.coverImageUrl}`}

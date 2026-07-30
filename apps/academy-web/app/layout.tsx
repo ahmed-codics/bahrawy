@@ -131,7 +131,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${alexandria.variable} ${notoArabic.variable} ${inter.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" forcedTheme="light" enableSystem={false}>
           <DataSaverProvider>
             {children}
             <PwaManager />

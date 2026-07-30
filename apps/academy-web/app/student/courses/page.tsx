@@ -74,9 +74,9 @@ export default function StudentCoursesPage() {
             <h1 className="ba-heading mt-4 text-3xl leading-[1.2] sm:mt-5 sm:text-5xl">
               كل كورس واضح
               <br />
-              <span className="text-[#69ddeb]">قبل ما تبدأه.</span>
+              <span className="text-brand-700">قبل ما تبدأه.</span>
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-cyan-50/75 sm:mt-4 sm:text-base sm:leading-8">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted sm:mt-4 sm:text-base sm:leading-8">
               تصفّح الفصول والدروس مجاناً، واعرف شكل المسار قبل الاشتراك. الكورسات المفتوحة في حسابك
               هتلاقي تقدمك محفوظ فيها.
             </p>
@@ -257,9 +257,9 @@ function CourseCard({
 
 function MiniStat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="min-w-32 rounded-2xl border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
+    <div className="min-w-32 rounded-2xl border border-border-default bg-white/85 p-4 shadow-sm">
       <p className="ba-number text-3xl font-black">{value.toLocaleString('ar-EG')}</p>
-      <p className="mt-1 text-xs font-bold text-cyan-50/65">{label}</p>
+      <p className="mt-1 text-xs font-bold text-text-muted">{label}</p>
     </div>
   );
 }

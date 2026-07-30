@@ -110,7 +110,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
             تم إرسال طلبك
           </Badge>
           <h1 className="ba-heading mt-4 text-4xl">الإيصال وصل للمراجعة</h1>
-          <p className="mx-auto mt-4 max-w-xl leading-8 text-cyan-50/75">
+          <p className="mx-auto mt-4 max-w-xl leading-8 text-text-muted">
             الإدارة هتراجع الصورة والرقم المرجعي. بعد الاعتماد، هيفتح لك هذا الدرس فقط تلقائياً في
             حسابك.
           </p>
@@ -120,7 +120,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
             </Button>
             <Button
               variant="outline"
-              className="w-full border-white/20 bg-white/5 text-white sm:w-auto"
+              className="w-full sm:w-auto"
               onClick={() => router.push('/student')}
             >
               الرئيسية
@@ -152,14 +152,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
           <section className="student-hero p-6">
             <Badge tone="cyan">ملخص الطلب</Badge>
             <h2 className="ba-heading mt-5 text-2xl">{product.titleAr}</h2>
-            <div className="my-5 h-px bg-white/10" />
-            <p className="text-sm font-bold text-cyan-50/60">المبلغ المطلوب</p>
+            <div className="my-5 h-px bg-border-default" />
+            <p className="text-sm font-bold text-text-muted">المبلغ المطلوب</p>
             <p className="ba-number mt-1 text-4xl font-black">
               {price ? Number(price.amount).toLocaleString('ar-EG') : '—'}{' '}
               <span className="font-sans text-sm">{price?.currency || 'EGP'}</span>
             </p>
-            <div className="mt-6 flex gap-2 text-xs leading-6 text-cyan-50/70">
-              <LockKeyhole className="mt-1 size-4 shrink-0 text-[#69ddeb]" />
+            <div className="mt-6 flex gap-2 text-xs leading-6 text-text-muted">
+              <LockKeyhole className="mt-1 size-4 shrink-0 text-brand-600" />
               <p>الوصول يفتح بعد مراجعة الإدارة واعتماد الدفع.</p>
             </div>
           </section>
