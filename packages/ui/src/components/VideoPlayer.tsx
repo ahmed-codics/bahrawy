@@ -18,6 +18,8 @@ import { useDataSaver } from './DataSaverProvider';
 
 export interface VideoPlayerProps {
   src: string;
+  sources?: Array<{ quality: string; url: string }>;
+  defaultQuality?: string;
   poster?: string;
   className?: string;
   initialTime?: number;
@@ -30,9 +32,11 @@ type QualityOption = {
   label: string;
   levelIndex: number;
   available: boolean;
+  sourceUrl?: string;
 };
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
+const EMPTY_VIDEO_SOURCES: Array<{ quality: string; url: string }> = [];
 const DEFAULT_QUALITY_LABEL = 'تلقائي';
 const QUALITY_LADDER = ['1080p', '720p', '480p', '360p', '240p', '144p'];
 const DEFAULT_QUALITY_OPTIONS = QUALITY_LADDER.map((label) => ({
@@ -65,13 +69,17 @@ function chooseDefaultQualityLevel(levels: Hls['levels']) {
     .sort((a, b) => b.height - a.height)[0];
   if (lowerOrEqual) return lowerOrEqual.index;
 
-  return levels
-    .map((level, index) => ({ distance: Math.abs((level.height || 480) - 480), index }))
-    .sort((a, b) => a.distance - b.distance)[0]?.index ?? -1;
+  return (
+    levels
+      .map((level, index) => ({ distance: Math.abs((level.height || 480) - 480), index }))
+      .sort((a, b) => a.distance - b.distance)[0]?.index ?? -1
+  );
 }
 
 export function VideoPlayer({
   src,
+  sources = EMPTY_VIDEO_SOURCES,
+  defaultQuality,
   poster,
   className = '',
   initialTime = 0,
@@ -84,6 +92,10 @@ export function VideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const appliedInitialTimeRef = useRef(false);
+  const pendingSourceChangeRef = useRef<{
+    time: number;
+    shouldPlay: boolean;
+  } | null>(null);
   const bufferingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rateChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutedForBufferingRef = useRef(false);
@@ -120,8 +132,21 @@ export function VideoPlayer({
     setError(null);
     setIsBuffering(true);
     appliedInitialTimeRef.current = false;
-    setSelectedQuality(DEFAULT_QUALITY_LABEL);
-    setQualityOptions(DEFAULT_QUALITY_OPTIONS);
+    const directDefault = sources.find((source) => source.quality === defaultQuality) ?? sources[0];
+    setSelectedQuality(directDefault?.quality ?? DEFAULT_QUALITY_LABEL);
+    setQualityOptions(
+      sources.length
+        ? QUALITY_LADDER.map((label) => {
+            const source = sources.find((entry) => entry.quality === label);
+            return {
+              label,
+              levelIndex: -2,
+              available: !!source,
+              sourceUrl: source?.url,
+            };
+          })
+        : DEFAULT_QUALITY_OPTIONS,
+    );
 
     const handleNativeError = () => {
       setError('حدث خطأ أثناء تحميل الفيديو.');
@@ -206,7 +231,7 @@ export function VideoPlayer({
       }
       hlsRef.current = null;
     };
-  }, [dataSaver, src]);
+  }, [dataSaver, defaultQuality, sources, src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -215,7 +240,15 @@ export function VideoPlayer({
     const handleLoadedMetadata = () => {
       const videoDuration = video.duration || 0;
       setDuration(videoDuration);
-      if (
+      const pendingSourceChange = pendingSourceChangeRef.current;
+      if (pendingSourceChange) {
+        video.currentTime = Math.min(pendingSourceChange.time, Math.max(0, videoDuration - 1));
+        setCurrentTime(video.currentTime);
+        pendingSourceChangeRef.current = null;
+        if (pendingSourceChange.shouldPlay) {
+          void video.play().catch(() => undefined);
+        }
+      } else if (
         !appliedInitialTimeRef.current &&
         initialTime > 1 &&
         videoDuration > 0 &&
@@ -321,7 +354,10 @@ export function VideoPlayer({
   const skipBy = (seconds: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.min(Math.max(video.currentTime + seconds, 0), duration || video.duration || 0);
+    video.currentTime = Math.min(
+      Math.max(video.currentTime + seconds, 0),
+      duration || video.duration || 0,
+    );
   };
 
   const changeVolume = (value: number) => {
@@ -376,6 +412,15 @@ export function VideoPlayer({
     if (!option.available) return;
     if (option.levelIndex >= 0 && hlsRef.current) {
       hlsRef.current.currentLevel = option.levelIndex;
+    } else if (option.sourceUrl && videoRef.current) {
+      const video = videoRef.current;
+      pendingSourceChangeRef.current = {
+        time: video.currentTime,
+        shouldPlay: !video.paused && !video.ended,
+      };
+      setIsBuffering(true);
+      video.src = option.sourceUrl;
+      video.load();
     }
     setSelectedQuality(option.label);
   };
@@ -485,7 +530,11 @@ export function VideoPlayer({
               className="flex size-11 items-center justify-center rounded-full text-white transition hover:bg-white/12"
               aria-label={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
             >
-              {isPlaying ? <Pause className="size-5 fill-current" /> : <Play className="size-5 fill-current" />}
+              {isPlaying ? (
+                <Pause className="size-5 fill-current" />
+              ) : (
+                <Play className="size-5 fill-current" />
+              )}
             </button>
             <button
               type="button"
@@ -501,7 +550,11 @@ export function VideoPlayer({
               className="flex size-11 items-center justify-center rounded-full text-white transition hover:bg-white/12"
               aria-label={isMuted ? 'تشغيل الصوت' : 'كتم الصوت'}
             >
-              {isMuted || volume === 0 ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
+              {isMuted || volume === 0 ? (
+                <VolumeX className="size-5" />
+              ) : (
+                <Volume2 className="size-5" />
+              )}
             </button>
             <input
               type="range"
@@ -541,12 +594,13 @@ export function VideoPlayer({
               title="إعدادات الفيديو"
               description={dataSaver ? 'توفير البيانات مفعل' : 'اختار الجودة وسرعة التشغيل'}
             >
-                <div className="space-y-5" dir="rtl">
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-3">
-                      <Settings className="size-4" />
-                      الجودة
-                    </div>
+              <div className="space-y-5" dir="rtl">
+                <div>
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-3">
+                    <Settings className="size-4" />
+                    الجودة
+                  </div>
+                  {sources.length === 0 && (
                     <button
                       type="button"
                       onClick={() => {
@@ -562,58 +616,61 @@ export function VideoPlayer({
                     >
                       تلقائي
                     </button>
-                    <div className="grid grid-cols-3 gap-2">
-                      {qualityOptions.map((option) => (
-                        <button
-                          key={option.label}
-                          type="button"
-                          onClick={() => changeQuality(option)}
-                          disabled={!option.available}
-                          title={
-                            option.available
-                              ? option.label
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    {qualityOptions.map((option) => (
+                      <button
+                        key={option.label}
+                        type="button"
+                        onClick={() => changeQuality(option)}
+                        disabled={!option.available}
+                        title={
+                          option.available
+                            ? option.label
+                            : sources.length
+                              ? 'هذه الجودة غير متاحة لهذا الدرس'
                               : 'هذه الجودة تحتاج توليد نسخة HLS بعد رفع الفيديو'
-                          }
-                          className={`min-h-11 rounded-xl px-2 py-2 text-sm font-bold transition ${
-                            selectedQuality === option.label
-                              ? 'bg-brand-500 text-white'
-                              : option.available
-                                ? 'bg-surface-2 text-ink hover:bg-surface-3'
-                                : 'bg-surface-2 text-ink-4'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-border" />
-
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-3">
-                      <Gauge className="size-4" />
-                      السرعة
-                    </div>
-                    <div className="grid grid-cols-5 gap-2">
-                      {PLAYBACK_RATES.map((rate) => (
-                        <button
-                          key={rate}
-                          type="button"
-                          onClick={() => void changePlaybackRate(rate)}
-                          disabled={isChangingRate}
-                          className={`min-h-11 rounded-xl px-1 py-2 text-xs font-bold transition ${
-                            playbackRate === rate
-                              ? 'bg-brand-500 text-white'
-                              : 'bg-surface-2 text-ink hover:bg-surface-3'
-                          }`}
-                        >
-                          {rate}x
-                        </button>
-                      ))}
-                    </div>
+                        }
+                        className={`min-h-11 rounded-xl px-2 py-2 text-sm font-bold transition ${
+                          selectedQuality === option.label
+                            ? 'bg-brand-500 text-white'
+                            : option.available
+                              ? 'bg-surface-2 text-ink hover:bg-surface-3'
+                              : 'bg-surface-2 text-ink-4'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
+
+                <div className="h-px bg-border" />
+
+                <div>
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-3">
+                    <Gauge className="size-4" />
+                    السرعة
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {PLAYBACK_RATES.map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => void changePlaybackRate(rate)}
+                        disabled={isChangingRate}
+                        className={`min-h-11 rounded-xl px-1 py-2 text-xs font-bold transition ${
+                          playbackRate === rate
+                            ? 'bg-brand-500 text-white'
+                            : 'bg-surface-2 text-ink hover:bg-surface-3'
+                        }`}
+                      >
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </MobileSheet>
           </div>
         </div>

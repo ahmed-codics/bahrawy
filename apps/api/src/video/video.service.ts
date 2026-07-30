@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CatalogService } from '../catalog/catalog.service';
 
-const PLAYBACK_URL_TTL_SECONDS = 2 * 60 * 60;
+const PLAYBACK_URL_TTL_SECONDS = 8 * 60 * 60;
 const UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const VIDEO_PATH_CACHE_MAX = 1000;
@@ -28,13 +28,19 @@ export type VideoPlayback = {
   url?: string;
   videoId?: string;
   expiresInSeconds?: number;
+  defaultQuality?: string;
+  sources?: Array<{ quality: string; url: string }>;
+  processingStatus?: string;
 };
 
 type StoredVideo = {
+  id: string;
   lessonId: string;
   provider: VideoProvider;
   sourceRef: string;
   mimeType: string | null;
+  status: string;
+  renditions?: Array<{ quality: string; objectKey: string; mimeType: string }>;
 };
 
 @Injectable()
@@ -69,7 +75,10 @@ export class VideoService {
     isStaff = false,
   ): Promise<VideoPlayback> {
     await this.catalogService.canAccessLesson(accountId, lessonId, isStaff);
-    const video = await db.videoLesson.findUnique({ where: { lessonId } });
+    const video = await db.videoLesson.findUnique({
+      where: { lessonId },
+      include: { renditions: { orderBy: { height: 'asc' } } },
+    });
     if (!video) {
       throw new NotFoundException('Video lesson not found');
     }
@@ -77,7 +86,10 @@ export class VideoService {
   }
 
   async getAdminPlayback(lessonId: string): Promise<VideoPlayback> {
-    const video = await db.videoLesson.findUnique({ where: { lessonId } });
+    const video = await db.videoLesson.findUnique({
+      where: { lessonId },
+      include: { renditions: { orderBy: { height: 'asc' } } },
+    });
     if (!video) {
       throw new NotFoundException('Video lesson not found');
     }
@@ -224,6 +236,7 @@ export class VideoService {
       sourceRef: objectKey,
       originalFileName,
       mimeType: uploadedObject.ContentType || mimeType,
+      status: 'QUEUED',
     });
   }
 
@@ -356,19 +369,35 @@ export class VideoService {
 
     if (video.provider === VideoProvider.R2) {
       const { bucket } = this.getR2Config();
-      const url = await getSignedUrl(
-        this.getR2Client(),
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: video.sourceRef,
-          ResponseContentType: video.mimeType || 'video/mp4',
-          ResponseContentDisposition: 'inline',
-        }),
-        { expiresIn: PLAYBACK_URL_TTL_SECONDS },
+      const signObject = (objectKey: string, mimeType = 'video/mp4') =>
+        getSignedUrl(
+          this.getR2Client(),
+          new GetObjectCommand({
+            Bucket: bucket,
+            Key: objectKey,
+            ResponseContentType: mimeType,
+            ResponseContentDisposition: 'inline',
+          }),
+          { expiresIn: PLAYBACK_URL_TTL_SECONDS },
+        );
+      const sources = await Promise.all(
+        (video.renditions || []).map(async (rendition) => ({
+          quality: rendition.quality,
+          url: await signObject(rendition.objectKey, rendition.mimeType),
+        })),
       );
+      const defaultSource =
+        sources.find((source) => source.quality === '480p') ?? sources[0];
+      const url =
+        defaultSource?.url ??
+        (await signObject(video.sourceRef, video.mimeType || 'video/mp4'));
       return {
         provider: VideoProvider.R2,
         url,
+        ...(sources.length
+          ? { sources, defaultQuality: defaultSource?.quality }
+          : {}),
+        ...(video.status ? { processingStatus: video.status } : {}),
         expiresInSeconds: PLAYBACK_URL_TTL_SECONDS,
       };
     }
@@ -400,21 +429,25 @@ export class VideoService {
       sourceRef: string;
       originalFileName: string | null;
       mimeType: string | null;
+      status?: string;
     },
   ) {
-    const previous = await db.videoLesson.findUnique({ where: { lessonId } });
+    const previous = await db.videoLesson.findUnique({
+      where: { lessonId },
+      include: { renditions: true },
+    });
     const videoLesson = await db.videoLesson.upsert({
       where: { lessonId },
       update: {
         ...data,
         durationSeconds: 0,
-        status: 'READY',
+        status: data.status || 'READY',
       },
       create: {
         lessonId,
         ...data,
         durationSeconds: 0,
-        status: 'READY',
+        status: data.status || 'READY',
       },
     });
 
@@ -439,8 +472,16 @@ export class VideoService {
     }
     if (video.provider === VideoProvider.R2) {
       const { bucket } = this.getR2Config();
-      await this.getR2Client().send(
-        new DeleteObjectCommand({ Bucket: bucket, Key: video.sourceRef }),
+      const keys = new Set([
+        video.sourceRef,
+        ...(video.renditions || []).map((rendition) => rendition.objectKey),
+      ]);
+      await Promise.all(
+        [...keys].map((key) =>
+          this.getR2Client().send(
+            new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+          ),
+        ),
       );
     }
   }

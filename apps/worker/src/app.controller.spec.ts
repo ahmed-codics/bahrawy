@@ -6,6 +6,9 @@ describe('AppController', () => {
   let appController: AppController;
 
   beforeEach(async () => {
+    process.env.R2_ACCESS_KEY_ID = 'test-key';
+    process.env.R2_SECRET_ACCESS_KEY = 'test-secret';
+    process.env.R2_ENDPOINT = 'https://example.r2.cloudflarestorage.com';
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [AppService],
@@ -15,8 +18,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('identifies the video worker', () => {
+      expect(appController.getHello()).toBe('Bahrawy video worker');
     });
   });
 });

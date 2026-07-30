@@ -124,7 +124,11 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
       } else {
         await uploadLocalVideo(videoItem.id, file);
       }
-      toast.success('تم حفظ الفيديو بنجاح');
+      toast.success(
+        provider === 'R2'
+          ? 'تم الرفع. جاري تجهيز نسختي 480p و720p في الخلفية.'
+          : 'تم حفظ الفيديو بنجاح',
+      );
       await onReload();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'فشل رفع الفيديو');
@@ -178,12 +182,29 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
           الفيديو
         </div>
         {currentVideo && (
-          <span className="flex items-center gap-1 text-xs font-bold text-success">
+          <span
+            className={`flex items-center gap-1 text-xs font-bold ${
+              currentVideo.status === 'FAILED' ? 'text-danger' : 'text-success'
+            }`}
+          >
             <CheckCircle2 className="size-3.5" />
-            {currentVideo.provider}
+            {currentVideo.provider} · {currentVideo.status}
           </span>
         )}
       </div>
+
+      {currentVideo?.provider === 'R2' &&
+        ['QUEUED', 'PROCESSING'].includes(currentVideo.status) && (
+          <div className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-bold text-brand-800">
+            جاري تجهيز الفيديو. سيعمل مؤقتًا بالملف الأصلي، ثم يصبح 480p افتراضيًا مع خيار 720p عند
+            اكتمال المعالجة.
+          </div>
+        )}
+      {currentVideo?.provider === 'R2' && currentVideo.status === 'FAILED' && (
+        <div className="rounded-md border border-danger/25 bg-danger/5 px-3 py-2 text-xs font-bold text-danger">
+          تعذرت معالجة الفيديو. أعد رفع الملف أو راجع سجل عامل الفيديو.
+        </div>
+      )}
 
       <div
         className="grid grid-cols-3 overflow-hidden rounded-md border border-border-default"

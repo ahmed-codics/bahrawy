@@ -3,7 +3,6 @@ import { AppModule } from './app.module';
 import '@bahrawy/config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  await NestFactory.createApplicationContext(AppModule);
 }
 void bootstrap();

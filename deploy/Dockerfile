@@ -47,6 +47,27 @@ USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
 
+FROM source AS worker-build
+RUN npm run build -w @bahrawy/config \
+ && npm run build -w @bahrawy/db \
+ && npm run build -w worker \
+ && npm prune --omit=dev
+
+FROM node:24-alpine AS worker
+WORKDIR /app/apps/worker
+ENV NODE_ENV=production
+RUN apk add --no-cache libc6-compat openssl ffmpeg \
+ && chown -R node:node /app
+
+COPY --from=worker-build --chown=node:node /app/node_modules /app/node_modules
+COPY --from=worker-build --chown=node:node /app/apps/worker/package.json ./package.json
+COPY --from=worker-build --chown=node:node /app/apps/worker/dist ./dist
+COPY --from=worker-build --chown=node:node /app/packages/config /app/packages/config
+COPY --from=worker-build --chown=node:node /app/packages/db /app/packages/db
+
+USER node
+CMD ["node", "dist/main.js"]
+
 FROM source AS migrate
 RUN npm run build -w @bahrawy/config \
  && npm run build -w @bahrawy/db

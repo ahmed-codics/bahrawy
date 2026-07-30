@@ -827,7 +827,27 @@ model VideoLesson {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  tokens VideoDeliveryToken[]
+  tokens     VideoDeliveryToken[]
+  renditions VideoRendition[]
+}
+
+model VideoRendition {
+  id            String   @id @default(uuid())
+  videoLessonId String
+  quality       String
+  objectKey     String
+  width         Int
+  height        Int
+  bitrateKbps   Int
+  fileSizeBytes BigInt
+  mimeType      String   @default("video/mp4")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  videoLesson VideoLesson @relation(fields: [videoLessonId], references: [id], onDelete: Cascade)
+
+  @@unique([videoLessonId, quality])
+  @@index([videoLessonId])
 }
 
 model VideoDeliveryToken {

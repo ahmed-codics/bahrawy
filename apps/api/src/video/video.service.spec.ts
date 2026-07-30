@@ -123,7 +123,7 @@ describe('VideoService', () => {
       ).resolves.toEqual({
         provider: VideoProvider.R2,
         url: 'https://signed-r2.example/video',
-        expiresInSeconds: 7200,
+        expiresInSeconds: 28800,
       });
     });
   });

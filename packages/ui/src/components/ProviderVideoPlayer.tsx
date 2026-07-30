@@ -8,6 +8,9 @@ export type VideoPlayback = {
   url?: string;
   videoId?: string;
   expiresInSeconds?: number;
+  defaultQuality?: string;
+  sources?: Array<{ quality: string; url: string }>;
+  processingStatus?: string;
 };
 
 export type ProviderVideoPlayerProps = {
@@ -42,6 +45,8 @@ export function ProviderVideoPlayer({
     return (
       <VideoPlayer
         src={playback.url}
+        sources={playback.sources}
+        defaultQuality={playback.defaultQuality}
         className={className}
         initialTime={initialTime}
         onEnded={onEnded}
@@ -177,12 +182,7 @@ function YouTubePlayer({
           onReady: () => {
             const player = playerRef.current;
             const duration = player?.getDuration() ?? 0;
-            if (
-              player &&
-              initialTime > 1 &&
-              duration > 0 &&
-              initialTime < duration - 10
-            ) {
+            if (player && initialTime > 1 && duration > 0 && initialTime < duration - 10) {
               player.seekTo(initialTime, true);
               return;
             }
