@@ -94,6 +94,14 @@ declare global {
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
 
+/**
+ * Some older YouTube exports include black padding inside the encoded frame.
+ * Keep corrections source-specific so correctly exported lessons are never cropped.
+ */
+const YOUTUBE_LETTERBOX_SCALE: Record<string, number> = {
+  nNh_Jq7mPbM: 1.18,
+};
+
 function loadYouTubeApi() {
   if (window.YT) return Promise.resolve(window.YT);
   if (youtubeApiPromise) return youtubeApiPromise;
@@ -128,6 +136,7 @@ function YouTubePlayer({
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onEndedRef = useRef(onEnded);
   const onProgressRef = useRef(onProgress);
+  const letterboxScale = YOUTUBE_LETTERBOX_SCALE[videoId] ?? 1;
 
   useEffect(() => {
     onEndedRef.current = onEnded;
@@ -208,7 +217,15 @@ function YouTubePlayer({
     <div
       className={`aspect-video w-full overflow-hidden rounded-[var(--radius-xl)] bg-black ${className}`}
     >
-      <div ref={mountRef} className="h-full w-full" />
+      <div
+        ref={mountRef}
+        className="relative left-1/2 h-full w-full origin-top -translate-x-1/2"
+        style={
+          letterboxScale === 1
+            ? undefined
+            : { transform: `translateX(-50%) scale(${letterboxScale})` }
+        }
+      />
     </div>
   );
 }
