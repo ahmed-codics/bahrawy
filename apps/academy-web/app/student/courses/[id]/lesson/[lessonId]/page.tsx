@@ -16,6 +16,7 @@ import {
   Button,
   Card,
   CardContent,
+  ErrorState,
   PageSkeleton,
   ProviderVideoPlayer,
   VideoPlayback,
@@ -52,6 +53,7 @@ export default function LessonDetailPage({
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [playback, setPlayback] = useState<VideoPlayback | null>(null);
+  const [accessError, setAccessError] = useState('');
   const [loading, setLoading] = useState(true);
   const lastReported = useRef(0);
 
@@ -71,7 +73,17 @@ export default function LessonDetailPage({
           );
         }
       })
-      .catch(async () => {
+      .catch(async (requestError) => {
+        const message =
+          requestError instanceof Error ? requestError.message : '';
+        if (
+          /device|fingerprint|جهاز/i.test(message)
+        ) {
+          setAccessError(
+            'وصل هذا الحساب إلى الحد الأقصى للأجهزة. أعد تحميل الصفحة بعد إعادة ضبط الأجهزة من الإدارة.',
+          );
+          return;
+        }
         try {
           const response = await fetchApi(`/catalog/courses/${id}`);
           for (const chapter of response.data.course.chapters || []) {
@@ -206,6 +218,12 @@ export default function LessonDetailPage({
             </p>
           </div>
         </>
+      ) : accessError ? (
+        <ErrorState
+          title="تعذر فتح الدرس على هذا الجهاز"
+          description={accessError}
+          onRetry={() => window.location.reload()}
+        />
       ) : preview ? (
         <LockedLesson
           preview={preview}
@@ -238,11 +256,11 @@ function LockedLesson({
 }) {
   const cost = preview.product?.prices?.[0];
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-brand-200 bg-[radial-gradient(circle_at_85%_10%,rgba(76,201,240,.25),transparent_21rem),linear-gradient(135deg,#f8fdff,#eaf8fb)] p-7 text-center dark:border-brand-900 dark:bg-[linear-gradient(135deg,#061f2b,#092f40)] sm:p-11">
-      <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-brand-700 text-white shadow-lg">
+    <section className="relative overflow-hidden rounded-[2rem] border border-brand-200 bg-[radial-gradient(circle_at_85%_10%,rgba(76,201,240,.2),transparent_21rem),linear-gradient(135deg,#ffffff,#edf9fb)] p-7 text-center shadow-[0_18px_55px_rgb(15_64_77/0.08)] sm:p-11">
+      <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 shadow-sm">
         <LockKeyhole className="size-7" />
       </div>
-      <p className="mt-6 text-sm font-bold text-brand-700 dark:text-brand-200">
+      <p className="mt-6 text-sm font-bold text-brand-700">
         معاينة محتوى الدرس
       </p>
       <h2 className="ba-heading mt-2 text-3xl">هذا المحتوى جاهز لك عند فتح الدرس</h2>
