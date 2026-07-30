@@ -6,6 +6,7 @@ jest.mock('@bahrawy/db', () => {
     db: {
       unit: { findFirst: jest.fn() },
       course: { findFirst: jest.fn() },
+      lesson: { findFirst: jest.fn(), findUnique: jest.fn() },
       assessmentAttempt: { count: jest.fn() },
       lessonProgress: { count: jest.fn() },
       entitlement: { count: jest.fn() },
@@ -32,9 +33,10 @@ describe('AdminV1CoursesService lesson lifecycle', () => {
       unitId: 'unit-1',
       chapterId: 'chapter-1',
       version: 3,
-      chapter: { id: 'chapter-1', status: 'DRAFT' },
+      chapter: { id: 'chapter-1', courseId: 'course-1', status: 'DRAFT' },
     });
     const tx = {
+      course: { updateMany: jest.fn() },
       chapter: { update: jest.fn() },
       lesson: { updateMany: jest.fn() },
       unit: { update: jest.fn().mockResolvedValue({ id: 'unit-1' }) },
@@ -56,6 +58,12 @@ describe('AdminV1CoursesService lesson lifecycle', () => {
         data: expect.objectContaining({ status: 'PUBLISHED' }),
       }),
     );
+    expect(tx.course.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'course-1' }),
+        data: expect.objectContaining({ status: 'PUBLISHED' }),
+      }),
+    );
     expect(tx.lesson.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { unitId: 'unit-1' },
@@ -74,6 +82,64 @@ describe('AdminV1CoursesService lesson lifecycle', () => {
         targetId: 'unit-1',
       }),
     );
+  });
+
+  it('publishes the lesson ancestors when the lesson editor publishes content', async () => {
+    (db.lesson.findFirst as jest.Mock).mockResolvedValue({
+      id: 'lesson-1',
+      version: 2,
+      titleAr: 'فيديو شرح',
+    });
+    (db.lesson.findUnique as jest.Mock).mockResolvedValue({
+      id: 'lesson-1',
+      unitId: 'unit-1',
+      unit: {
+        chapterId: 'chapter-1',
+        chapter: { id: 'chapter-1', courseId: 'course-1' },
+      },
+    });
+    const tx = {
+      course: { updateMany: jest.fn() },
+      chapter: { updateMany: jest.fn() },
+      unit: { updateMany: jest.fn() },
+      lesson: {
+        update: jest.fn().mockResolvedValue({
+          id: 'lesson-1',
+          status: 'PUBLISHED',
+        }),
+      },
+    };
+    (db.$transaction as jest.Mock).mockImplementationOnce((callback) =>
+      callback(tx),
+    );
+
+    await service.updateNode(
+      { id: 'staff-1', organizationId: 'org-1' },
+      'lesson',
+      'lesson-1',
+      {
+        version: 2,
+        titleAr: 'فيديو شرح',
+        status: 'PUBLISHED',
+      },
+    );
+
+    expect(tx.course.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'course-1' }),
+      }),
+    );
+    expect(tx.chapter.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'chapter-1' }),
+      }),
+    );
+    expect(tx.unit.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'unit-1' }),
+      }),
+    );
+    expect(tx.lesson.update).toHaveBeenCalled();
   });
 
   it('blocks permanent course deletion while a product or bundle references it', async () => {

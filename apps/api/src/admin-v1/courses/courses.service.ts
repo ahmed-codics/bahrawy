@@ -527,10 +527,57 @@ export class AdminV1CoursesService {
         },
       });
     } else {
-      updated = await db.lesson.update({
-        where: { id },
-        data: { ...data, ...lifecycle },
-      });
+      if (input.status === 'PUBLISHED') {
+        const lessonWithParents = await db.lesson.findUnique({
+          where: { id },
+          include: { unit: { include: { chapter: true } } },
+        });
+        if (!lessonWithParents) throw new NotFoundException('Lesson not found');
+        updated = await db.$transaction(async (tx: any) => {
+          await tx.course.updateMany({
+            where: {
+              id: lessonWithParents.unit.chapter.courseId,
+              status: { not: 'PUBLISHED' },
+            },
+            data: {
+              status: 'PUBLISHED',
+              archivedAt: null,
+              version: { increment: 1 },
+            },
+          });
+          await tx.chapter.updateMany({
+            where: {
+              id: lessonWithParents.unit.chapterId,
+              status: { not: 'PUBLISHED' },
+            },
+            data: {
+              status: 'PUBLISHED',
+              archivedAt: null,
+              version: { increment: 1 },
+            },
+          });
+          await tx.unit.updateMany({
+            where: {
+              id: lessonWithParents.unitId,
+              status: { not: 'PUBLISHED' },
+            },
+            data: {
+              status: 'PUBLISHED',
+              archivedAt: null,
+              version: { increment: 1 },
+            },
+          });
+          return tx.lesson.update({
+            where: { id },
+            data: { ...data, ...lifecycle },
+          });
+        });
+      } else {
+        updated = await db.lesson.update({
+          where: { id },
+          data: { ...data, ...lifecycle },
+        });
+      }
     }
     await this.audit.logEvent({
       organizationId: actor.organizationId,
@@ -622,6 +669,19 @@ export class AdminV1CoursesService {
 
     const archivedAt = status === 'ARCHIVED' ? new Date() : null;
     const updated = await db.$transaction(async (tx: any) => {
+      if (status === 'PUBLISHED') {
+        await tx.course.updateMany({
+          where: {
+            id: unit.chapter.courseId,
+            status: { not: 'PUBLISHED' },
+          },
+          data: {
+            status: 'PUBLISHED',
+            archivedAt: null,
+            version: { increment: 1 },
+          },
+        });
+      }
       if (status === 'PUBLISHED' && unit.chapter.status !== 'PUBLISHED') {
         await tx.chapter.update({
           where: { id: unit.chapterId },
