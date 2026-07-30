@@ -94,6 +94,10 @@ declare global {
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
 
+const YOUTUBE_ASPECT_RATIOS: Record<string, string> = {
+  nNh_Jq7mPbM: '2.08 / 1',
+};
+
 function loadYouTubeApi() {
   if (window.YT) return Promise.resolve(window.YT);
   if (youtubeApiPromise) return youtubeApiPromise;
@@ -128,6 +132,7 @@ function YouTubePlayer({
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onEndedRef = useRef(onEnded);
   const onProgressRef = useRef(onProgress);
+  const aspectRatio = YOUTUBE_ASPECT_RATIOS[videoId] ?? '16 / 9';
 
   useEffect(() => {
     onEndedRef.current = onEnded;
@@ -207,6 +212,7 @@ function YouTubePlayer({
   return (
     <div
       className={`aspect-video w-full overflow-hidden rounded-[var(--radius-xl)] bg-black ${className}`}
+      style={{ aspectRatio }}
     >
       <div ref={mountRef} className="h-full w-full" />
     </div>
