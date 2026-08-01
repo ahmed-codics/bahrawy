@@ -18,16 +18,21 @@ export function BrandMark({
       </span>
       {!compact && (
         <span className="ba-brand-copy min-w-0">
-          <span className="block truncate font-heading text-sm font-bold leading-tight text-ink sm:text-base">
-            أكاديمية البحراوي
-          </span>
           <span
-            dir="ltr"
-            lang="en"
-            className="ba-brand-tagline block truncate text-[0.58rem] font-semibold tracking-[0.11em] text-ink-3 sm:text-[0.65rem] sm:tracking-[0.13em]"
+            className="block truncate text-xl font-bold leading-tight text-ink sm:text-2xl"
+            style={{ fontFamily: 'var(--font-marhey), sans-serif' }}
           >
-            {admin ? 'STAFF COMMAND CENTER' : 'LEARN • PRACTICE • MASTER'}
+            البحراوي
           </span>
+          {admin && (
+            <span
+              dir="ltr"
+              lang="en"
+              className="ba-brand-tagline block truncate text-[0.58rem] font-semibold tracking-[0.11em] text-ink-3 sm:text-[0.65rem] sm:tracking-[0.13em]"
+            >
+              STAFF COMMAND CENTER
+            </span>
+          )}
         </span>
       )}
     </div>

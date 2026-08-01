@@ -8,9 +8,11 @@ export function AcademyBrand({ compact = false }: { compact?: boolean }) {
       </span>
       {!compact && (
         <span>
-          <span className="academy-brand-name">أكاديمية السيد البحراوي</span>
-          <span className="academy-brand-tagline" dir="ltr" lang="en">
-            LEARN · PRACTICE · MASTER
+          <span
+            className="academy-brand-name"
+            style={{ fontFamily: 'var(--font-marhey), sans-serif', fontSize: '1.25rem' }}
+          >
+            البحراوي
           </span>
         </span>
       )}

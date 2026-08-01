@@ -1,29 +1,22 @@
 import type { Metadata, Viewport } from 'next';
-import { Alexandria, Inter, Noto_Sans_Arabic } from 'next/font/google';
+import { Marhey, Tajawal } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import './globals.css';
 import './mobile.css';
 import { DataSaverProvider } from '@bahrawy/ui';
 import { PwaManager } from '../components/PwaManager';
 
-const alexandria = Alexandria({
-  weight: 'variable',
+const tajawal = Tajawal({
+  weight: ['200', '300', '400', '500', '700', '800', '900'],
   subsets: ['arabic', 'latin'],
-  variable: '--font-alexandria',
+  variable: '--font-tajawal',
   display: 'swap',
 });
 
-const notoArabic = Noto_Sans_Arabic({
-  weight: 'variable',
-  subsets: ['arabic', 'latin'],
-  variable: '--font-noto-arabic',
-  display: 'swap',
-});
-
-const inter = Inter({
-  weight: 'variable',
-  subsets: ['latin'],
-  variable: '--font-inter',
+const marhey = Marhey({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['arabic'],
+  variable: '--font-marhey',
   display: 'swap',
 });
 
@@ -123,14 +116,20 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="ar" dir="rtl" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html
+      lang="ar"
+      dir="rtl"
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+      className={`${tajawal.variable} ${marhey.variable}`}
+    >
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
       </head>
-      <body className={`${alexandria.variable} ${notoArabic.variable} ${inter.variable}`}>
+      <body>
         <ThemeProvider attribute="class" forcedTheme="light" enableSystem={false}>
           <DataSaverProvider>
             {children}

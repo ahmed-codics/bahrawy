@@ -112,9 +112,9 @@
     --motion-normal: var(--duration-base);
     --motion-slow: var(--duration-slow);
     --focus-ring: var(--color-brand-500);
-    --font-heading: 'Alexandria', 'Noto Sans Arabic', sans-serif;
-    --font-body: 'Noto Sans Arabic', 'Alexandria', sans-serif;
-    --font-mono: var(--font-inter), 'Inter', monospace;
+    --font-heading: var(--font-tajawal), 'Tajawal', sans-serif;
+    --font-body: var(--font-tajawal), 'Tajawal', sans-serif;
+    --font-mono: var(--font-tajawal), 'Tajawal', monospace;
     --text-xs: 0.75rem;
     --text-sm: 0.875rem;
     --text-base: 1rem;
