@@ -832,6 +832,23 @@ textarea {
   }
 }
 
+/* Phone-only: the square grade artwork must crop to the wide card instead of
+   being letterboxed. Desktop keeps its existing card dimensions and artwork. */
+@media (max-width: 640px) {
+  .academy-landing .academy-grade-card--bg,
+  .academy-landing .academy-grade-card--bg1,
+  .academy-landing .academy-grade-card--bg2,
+  .academy-landing .academy-grade-card--bg3 {
+    width: 100% !important;
+    max-width: none;
+    height: auto !important;
+    aspect-ratio: 4 / 3 !important;
+    background-position: center !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+  }
+}
+
 @media (min-width: 360px) {
   :root {
     --mobile-gutter: 1rem;
