@@ -22,6 +22,9 @@ import {
 import { PublicShell } from '../components/PublicShell';
 import { WhatsAppWidget } from '../components/WhatsAppWidget';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: 'أكاديمية السيد البحراوي | English للإعدادي والثانوي',
   description:
@@ -84,7 +87,7 @@ async function getGrades(): Promise<{ grades: LandingGrade[]; usingFallback: boo
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/catalog/grades`,
-      { next: { revalidate: 60 } },
+      { cache: 'no-store' },
     );
     if (!response.ok) throw new Error('Grades are unavailable');
 

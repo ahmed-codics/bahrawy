@@ -41,9 +41,9 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   applicationName: 'أكاديمية السيد البحراوي',
   icons: {
-    icon: [{ url: '/icon', type: 'image/png' }],
-    shortcut: '/icon',
-    apple: '/icon',
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
   },
   alternates: { canonical: 'https://el-bahrawy.com' },
   robots: {
@@ -101,7 +101,7 @@ export default function RootLayout({
         '@id': 'https://el-bahrawy.com/#organization',
         name: 'أكاديمية مستر السيد البحراوي',
         url: 'https://el-bahrawy.com',
-        logo: 'https://el-bahrawy.com/icon',
+        logo: 'https://el-bahrawy.com/icon.svg',
         description: 'منصة تعليمية متخصصة في تدريس اللغة الإنجليزية لطلاب مصر.',
       },
       {

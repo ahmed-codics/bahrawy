@@ -14,6 +14,7 @@ if (apiUrl?.startsWith('http')) {
 }
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   output: 'standalone',
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
   experimental: {
