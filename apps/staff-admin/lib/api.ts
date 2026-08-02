@@ -36,6 +36,12 @@ export async function fetchCsrfToken() {
   }
 }
 
+export async function refreshCsrfToken() {
+  if (csrfTokenPromise) await csrfTokenPromise;
+  clearCsrfToken();
+  await fetchCsrfToken();
+}
+
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -61,6 +67,18 @@ export async function fetchApi<T = any>(
   const isUnsafe = !['GET', 'HEAD', 'OPTIONS'].includes(
     (requestOptions.method || 'GET').toUpperCase(),
   );
+  const isCsrfExempt = new Set([
+    '/auth/login',
+    '/auth/staff-login',
+    '/auth/register',
+    '/auth/activate',
+    '/auth/check-phone',
+    '/auth/staff/recovery-consume',
+  ]).has(endpoint.split('?')[0]);
+
+  if (isUnsafe && !isCsrfExempt && !csrfToken) {
+    await fetchCsrfToken();
+  }
 
   const execute = async (extraHeaders: Record<string, string>): Promise<Response> => {
     const headers = new Headers(requestOptions.headers || {});
@@ -90,7 +108,9 @@ export async function fetchApi<T = any>(
       });
     } catch (error) {
       if (controller.signal.aborted && !requestOptions.signal?.aborted) {
-        throw new ApiRequestError('انتهت مهلة الاتصال بالخادم. تأكد أن الـ API يعمل ثم حاول مجددًا.');
+        throw new ApiRequestError(
+          'انتهت مهلة الاتصال بالخادم. تأكد أن الـ API يعمل ثم حاول مجددًا.',
+        );
       }
       throw error;
     } finally {
@@ -105,11 +125,19 @@ export async function fetchApi<T = any>(
     let recover = false;
     try {
       const body = await response.clone().json();
-      recover = body.message === 'Missing CSRF token';
-    } catch { /* ignore */ }
+      const message =
+        typeof body.message === 'string'
+          ? body.message
+          : typeof body.message?.message === 'string'
+            ? body.message.message
+            : '';
+      recover = message === 'Missing CSRF token' || message === 'Invalid CSRF token';
+    } catch {
+      /* ignore */
+    }
 
     if (recover) {
-      await fetchCsrfToken();
+      await refreshCsrfToken();
       if (csrfToken) {
         response = await execute({});
       }

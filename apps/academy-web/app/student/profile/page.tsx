@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   GraduationCap,
+  Hash,
   KeyRound,
   Phone,
   School,
@@ -33,6 +34,7 @@ import {
 import { fetchApi } from '../../../lib/api';
 
 type Profile = {
+  studentNumber: number;
   displayName: string;
   gradeId?: string | null;
   schoolName?: string | null;
@@ -169,11 +171,7 @@ export default function StudentProfilePage() {
   if (loading) return <PageSkeleton cards={4} />;
   if (!profile || loadError) {
     return (
-      <ErrorState
-        title="تعذر فتح حسابك"
-        description={loadError}
-        onRetry={() => void load()}
-      />
+      <ErrorState title="تعذر فتح حسابك" description={loadError} onRetry={() => void load()} />
     );
   }
 
@@ -216,7 +214,13 @@ export default function StudentProfilePage() {
             </div>
           </div>
 
-          <dl className="mt-6 grid gap-3 sm:grid-cols-3">
+          <dl className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <AccountFact
+              icon={<Hash className="size-5" />}
+              label="رقم الطالب"
+              value={`#${profile.studentNumber}`}
+              ltr
+            />
             <AccountFact
               icon={<Phone className="size-5" />}
               label="رقم تسجيل الدخول"
@@ -306,12 +310,18 @@ export default function StudentProfilePage() {
             </div>
 
             {saveError && (
-              <p role="alert" className="mt-4 rounded-xl bg-danger/10 p-3 text-sm font-bold text-danger">
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-danger/10 p-3 text-sm font-bold text-danger"
+              >
                 {saveError}
               </p>
             )}
             {message && (
-              <p role="status" className="mt-4 flex items-center gap-2 text-sm font-bold text-success">
+              <p
+                role="status"
+                className="mt-4 flex items-center gap-2 text-sm font-bold text-success"
+              >
                 <CheckCircle2 className="size-4" aria-hidden="true" />
                 {message}
               </p>

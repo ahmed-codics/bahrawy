@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, LockKeyhole, Mail } from 'lucide-react';
 import { BrandMark, Button, Card, Input } from '@bahrawy/ui';
-import { fetchApi, fetchCsrfToken } from '../../lib/api';
+import { fetchApi, refreshCsrfToken } from '../../lib/api';
 
 export default function StaffLoginPage() {
   const [identifier, setIdentifier] = useState('');
@@ -18,7 +18,6 @@ export default function StaffLoginPage() {
     setError('');
     setLoading(true);
     try {
-      await fetchCsrfToken();
       const response = await fetchApi('/auth/staff-login', {
         method: 'POST',
         body: JSON.stringify({
@@ -26,7 +25,7 @@ export default function StaffLoginPage() {
           password,
         }),
       });
-      await fetchCsrfToken();
+      await refreshCsrfToken();
       if (response?.mustChangePassword) return router.push('/change-password');
       if (response?.kind === 'STAFF') return router.push('/dashboard');
       setError('هذا الحساب غير مصرح له بالدخول إلى مركز الإدارة.');

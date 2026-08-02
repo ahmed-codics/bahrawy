@@ -14,6 +14,7 @@ export class DashboardService {
     const student = await db.studentProfile.findUnique({
       where: { accountId },
       select: {
+        studentNumber: true,
         displayName: true,
         gradeId: true,
         schoolName: true,
@@ -48,6 +49,7 @@ export class DashboardService {
 
     return {
       profile: {
+        studentNumber: student.studentNumber,
         displayName: student.displayName,
         gradeId: student.gradeId,
         schoolName: student.schoolName,

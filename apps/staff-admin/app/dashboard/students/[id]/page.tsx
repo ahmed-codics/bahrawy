@@ -77,6 +77,7 @@ type Payment = {
 };
 type Student = {
   id: string;
+  studentNumber: number;
   displayName: string;
   firstName?: string | null;
   secondName?: string | null;
@@ -142,9 +143,7 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
         ),
       );
       setGrades(
-        (academicResponse.data.grades as Grade[]).filter(
-          (grade) => grade.status !== 'ARCHIVED',
-        ),
+        (academicResponse.data.grades as Grade[]).filter((grade) => grade.status !== 'ARCHIVED'),
       );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل ملف الطالب');
@@ -286,7 +285,7 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
       <PageHeader
         eyebrow={student.grade?.nameAr ?? 'بدون مرحلة'}
         title={student.displayName}
-        description={`${student.phone} · انضم ${new Date(student.account.createdAt).toLocaleDateString('ar-EG')}`}
+        description={`رقم الطالب #${student.studentNumber} · ${student.phone} · انضم ${new Date(student.account.createdAt).toLocaleDateString('ar-EG')}`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => router.push('/dashboard/students')}>
@@ -348,6 +347,12 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
           </Button>
         </div>
         <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ProfileItem
+            icon={<KeyRound />}
+            label="رقم الطالب"
+            value={`#${student.studentNumber}`}
+            ltr
+          />
           <ProfileItem icon={<UserRound />} label="الاسم الرباعي" value={student.displayName} />
           <ProfileItem icon={<Phone />} label="هاتف الطالب" value={student.phone} ltr />
           <ProfileItem
@@ -633,7 +638,12 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
         }
       >
         <form id="student-profile-form" className="space-y-4" onSubmit={updateProfile}>
-          <Input name="displayName" label="اسم الطالب" defaultValue={student.displayName} required />
+          <Input
+            name="displayName"
+            label="اسم الطالب"
+            defaultValue={student.displayName}
+            required
+          />
           <Input
             name="phone"
             label="رقم هاتف الطالب"

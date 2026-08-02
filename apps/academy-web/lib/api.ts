@@ -53,12 +53,28 @@ export async function fetchCsrfToken() {
   }
 }
 
+export async function refreshCsrfToken() {
+  if (csrfTokenPromise) await csrfTokenPromise;
+  clearCsrfToken();
+  await fetchCsrfToken();
+}
+
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE}${endpoint}`;
 
-  const isUnsafe = !['GET', 'HEAD', 'OPTIONS'].includes(
-    (options.method || 'GET').toUpperCase(),
-  );
+  const isUnsafe = !['GET', 'HEAD', 'OPTIONS'].includes((options.method || 'GET').toUpperCase());
+  const isCsrfExempt = new Set([
+    '/auth/login',
+    '/auth/staff-login',
+    '/auth/register',
+    '/auth/activate',
+    '/auth/check-phone',
+    '/auth/staff/recovery-consume',
+  ]).has(endpoint.split('?')[0]);
+
+  if (isUnsafe && !isCsrfExempt && !csrfToken) {
+    await fetchCsrfToken();
+  }
 
   const execute = async (): Promise<Response> => {
     const headers = new Headers(options.headers || {});
@@ -87,13 +103,19 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     let recover = false;
     try {
       const body = await response.clone().json();
-      recover = body.message === 'Missing CSRF token';
+      const message =
+        typeof body.message === 'string'
+          ? body.message
+          : typeof body.message?.message === 'string'
+            ? body.message.message
+            : '';
+      recover = message === 'Missing CSRF token' || message === 'Invalid CSRF token';
     } catch {
       // ignore
     }
 
     if (recover) {
-      await fetchCsrfToken();
+      await refreshCsrfToken();
       if (csrfToken) {
         response = await execute();
       }

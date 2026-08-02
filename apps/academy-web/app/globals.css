@@ -1586,10 +1586,31 @@
   }
 
   .academy-public-links {
-    gap: 1.35rem;
+    gap: 0.15rem;
+    padding: 0.25rem;
+    border: 1px solid color-mix(in srgb, var(--academy-border) 90%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--academy-surface) 94%, transparent);
+    box-shadow: 0 0.45rem 1.25rem color-mix(in srgb, var(--academy-text) 8%, transparent);
   }
 
-  .academy-public-links a,
+  .academy-public-links a {
+    display: inline-flex;
+    min-height: 2.35rem;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 0.9rem;
+    border-radius: 999px;
+    color: var(--academy-muted);
+    font-size: 0.84rem;
+    font-weight: 800;
+    white-space: nowrap;
+    transition:
+      color 160ms ease-out,
+      background-color 160ms ease-out,
+      box-shadow 160ms ease-out;
+  }
+
   .academy-public-actions .academy-login-link {
     color: var(--academy-muted);
     font-size: 0.84rem;
@@ -1598,7 +1619,11 @@
   }
 
   .academy-public-links a:hover,
-  .academy-public-links a[aria-current='page'],
+  .academy-public-links a:focus-visible {
+    background: color-mix(in srgb, var(--academy-cyan) 12%, var(--academy-surface));
+    color: var(--academy-text);
+  }
+
   .academy-public-actions .academy-login-link:hover {
     color: var(--academy-cyan-strong);
   }

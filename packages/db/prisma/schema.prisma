@@ -278,6 +278,7 @@ model Account {
 
 model StudentProfile {
   id                   String   @id @default(uuid())
+  studentNumber        Int      @unique @default(autoincrement())
   accountId            String   @unique
   gradeId              String?
   displayName          String

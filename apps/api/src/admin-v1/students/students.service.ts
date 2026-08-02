@@ -38,6 +38,9 @@ export class AdminV1StudentsService {
     const take = Math.min(Math.max(pageSize, 1), 100);
     const skip = Math.max(page - 1, 0) * take;
     const normalizedSearch = search.trim();
+    const studentNumber = /^\d+$/.test(normalizedSearch)
+      ? Number(normalizedSearch)
+      : undefined;
     const phoneHmac = normalizedSearch
       ? this.securityService.generatePhoneHmac(normalizedSearch)
       : undefined;
@@ -55,6 +58,10 @@ export class AdminV1StudentsService {
       ...(normalizedSearch
         ? {
             OR: [
+              ...(studentNumber !== undefined &&
+              Number.isSafeInteger(studentNumber)
+                ? [{ studentNumber }]
+                : []),
               {
                 displayName: {
                   contains: normalizedSearch,
@@ -74,6 +81,7 @@ export class AdminV1StudentsService {
         orderBy: { updatedAt: 'desc' },
         select: {
           id: true,
+          studentNumber: true,
           displayName: true,
           grade: true,
           account: {
@@ -200,7 +208,11 @@ export class AdminV1StudentsService {
       action: 'STUDENT_CREATED',
       targetType: 'ACCOUNT',
       targetId: account.id,
-      after: { displayName: input.displayName, gradeId: input.gradeId },
+      after: {
+        studentNumber: account.studentProfile?.studentNumber,
+        displayName: input.displayName,
+        gradeId: input.gradeId,
+      },
     });
     return {
       student: account.studentProfile,

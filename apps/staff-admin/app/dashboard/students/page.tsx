@@ -21,6 +21,7 @@ import { fetchApi } from '../../../lib/api';
 type Grade = { id: string; nameAr: string };
 type Student = {
   id: string;
+  studentNumber: number;
   displayName: string;
   grade?: Grade | null;
   account: {
@@ -49,12 +50,15 @@ export default function StudentsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    temporaryPassword: string;
+    studentNumber: number;
+  } | null>(null);
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
 
   const openCreate = useCallback(() => {
-    setTemporaryPassword('');
+    setCreatedCredentials(null);
     setDrawerOpen(true);
   }, []);
 
@@ -108,7 +112,14 @@ export default function StudentsPage() {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      setTemporaryPassword((response.data as { temporaryPassword: string }).temporaryPassword);
+      const created = response.data as {
+        temporaryPassword: string;
+        student: { studentNumber: number };
+      };
+      setCreatedCredentials({
+        temporaryPassword: created.temporaryPassword,
+        studentNumber: created.student.studentNumber,
+      });
       toast.success('تم إنشاء حساب الطالب');
       await load();
     } catch (requestError) {
@@ -130,10 +141,7 @@ export default function StudentsPage() {
         title="الطلاب"
         description={`${activeCount} حساب نشط ضمن النتائج الحالية. افتح ملف الطالب لإدارة الوصول والمدفوعات والأجهزة.`}
         actions={
-          <Button
-            leadingIcon={<Plus className="size-4" />}
-            onClick={openCreate}
-          >
+          <Button leadingIcon={<Plus className="size-4" />} onClick={openCreate}>
             طالب جديد
           </Button>
         }
@@ -141,7 +149,7 @@ export default function StudentsPage() {
       <FilterBar
         value={search}
         onSearch={setSearch}
-        searchPlaceholder="ابحث بالاسم أو رقم الهاتف الكامل"
+        searchPlaceholder="ابحث برقم الطالب أو الاسم أو رقم الهاتف الكامل"
         filters={
           <>
             <Select
@@ -178,6 +186,15 @@ export default function StudentsPage() {
         pageCount={pageCount}
         onPageChange={setPage}
         columns={[
+          {
+            id: 'studentNumber',
+            header: 'رقم الطالب',
+            cell: (student: Student) => (
+              <strong className="font-mono tabular-nums" dir="ltr">
+                #{student.studentNumber}
+              </strong>
+            ),
+          },
           {
             id: 'student',
             header: 'الطالب',
@@ -231,9 +248,9 @@ export default function StudentsPage() {
       <Drawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={temporaryPassword ? 'تم إنشاء الحساب' : 'طالب جديد'}
+        title={createdCredentials ? 'تم إنشاء الحساب' : 'طالب جديد'}
         footer={
-          temporaryPassword ? (
+          createdCredentials ? (
             <Button onClick={() => setDrawerOpen(false)}>تم</Button>
           ) : (
             <Button form="create-student" type="submit" loading={saving}>
@@ -242,13 +259,19 @@ export default function StudentsPage() {
           )
         }
       >
-        {temporaryPassword ? (
+        {createdCredentials ? (
           <div className="space-y-3" dir="rtl">
             <p className="text-sm text-ink-3">
               تظهر كلمة المرور المؤقتة مرة واحدة. يجب على الطالب تغييرها عند أول دخول.
             </p>
+            <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-xs font-bold text-ink-3">رقم الطالب الدائم</p>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums" dir="ltr">
+                #{createdCredentials.studentNumber}
+              </p>
+            </div>
             <div className="border border-border bg-surface-2 p-4 font-mono text-lg" dir="ltr">
-              {temporaryPassword}
+              {createdCredentials.temporaryPassword}
             </div>
           </div>
         ) : (

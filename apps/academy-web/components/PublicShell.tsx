@@ -8,7 +8,6 @@ import { AcademyBrand } from './AcademyBrand';
 
 export function PublicShell({
   children,
-  active = 'home',
 }: {
   children: React.ReactNode;
   active?: 'home' | 'courses';
@@ -61,14 +60,9 @@ export function PublicShell({
           </Link>
 
           <nav className="academy-public-links" aria-label="التنقل العام">
-            <Link href="/" aria-current={active === 'home' ? 'page' : undefined}>
-              الرئيسية
-            </Link>
-            <Link href="/courses" aria-current={active === 'courses' ? 'page' : undefined}>
-              الكورسات
-            </Link>
-            <Link href="/#learning-path">نظام المذاكرة</Link>
-            <Link href="/#teacher">عن مستر البحراوي</Link>
+            <Link href="/#levels">المراحل</Link>
+            <Link href="/#teacher">هتتعلم إزاي؟</Link>
+            <Link href="/#learning-path">عن مستر البحراوي</Link>
           </nav>
 
           <div className="academy-public-actions">
@@ -151,10 +145,13 @@ export function PublicShell({
               <Link href="/courses" onClick={() => setOpen(false)}>
                 الكورسات
               </Link>
-              <Link href="/#learning-path" onClick={() => setOpen(false)}>
-                نظام المذاكرة
+              <Link href="/#levels" onClick={() => setOpen(false)}>
+                المراحل
               </Link>
               <Link href="/#teacher" onClick={() => setOpen(false)}>
+                هتتعلم إزاي؟
+              </Link>
+              <Link href="/#learning-path" onClick={() => setOpen(false)}>
                 عن مستر البحراوي
               </Link>
             </nav>
