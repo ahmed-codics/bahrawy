@@ -1,0 +1,36 @@
+{
+  "name": "bahrawy",
+  "version": "1.0.0",
+  "description": "",
+  "packageManager": "npm@11.16.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e -w e2e",
+    "test:ui": "npm run test:ui -w e2e",
+    "build": "npm run build --workspaces --if-present",
+    "compose:validate": "docker compose config -q",
+    "generate": "npm run generate -w @bahrawy/db",
+    "migrate:dev": "npm run migrate -w @bahrawy/db",
+    "migrate:deploy": "npm run deploy -w @bahrawy/db",
+    "seed": "npm run seed -w @bahrawy/db"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.2.5"
+  }
+}

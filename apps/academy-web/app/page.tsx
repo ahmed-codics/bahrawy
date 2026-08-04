@@ -1,0 +1,469 @@
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  BrainCircuit,
+  CheckCircle2,
+  ChevronDown,
+  CirclePlay,
+  ClipboardCheck,
+  FileText,
+  GraduationCap,
+  LayoutDashboard,
+  MessagesSquare,
+  NotebookPen,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from 'lucide-react';
+import { PublicShell } from '../components/PublicShell';
+import { PremiumCtaButton } from '../components/PremiumCtaButton';
+import { HeroBrandHalo } from '../components/HeroBrandHalo';
+import { WhatsAppWidget } from '../components/WhatsAppWidget';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'أكاديمية السيد البحراوي | English للإعدادي والثانوي',
+  description:
+    'شرح ومراجعة وتدريب على منهج اللغة الإنجليزية المصري للصف الثالث الإعدادي والصفوف الأول والثاني والثالث الثانوي.',
+};
+
+export type LandingGradeSummary = {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn?: string;
+  sort: number;
+  status: string;
+};
+
+type LandingGrade = LandingGradeSummary & {
+  fallback: boolean;
+};
+
+const fallbackGrades: LandingGrade[] = [
+  {
+    id: '',
+    code: 'g3-prep',
+    nameAr: 'الصف الثالث الإعدادي',
+    nameEn: 'Third Preparatory',
+    sort: 1,
+    status: 'ACTIVE',
+    fallback: true,
+  },
+  {
+    id: '',
+    code: 'g1-sec',
+    nameAr: 'الصف الأول الثانوي',
+    nameEn: 'First Secondary',
+    sort: 2,
+    status: 'ACTIVE',
+    fallback: true,
+  },
+  {
+    id: '',
+    code: 'g2-sec',
+    nameAr: 'الصف الثاني الثانوي',
+    nameEn: 'Second Secondary',
+    sort: 3,
+    status: 'ACTIVE',
+    fallback: true,
+  },
+  {
+    id: '',
+    code: 'g3-sec',
+    nameAr: 'الصف الثالث الثانوي',
+    nameEn: 'Third Secondary',
+    sort: 4,
+    status: 'ACTIVE',
+    fallback: true,
+  },
+];
+
+async function getGrades(): Promise<{ grades: LandingGrade[]; usingFallback: boolean }> {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/catalog/grades`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) throw new Error('Grades are unavailable');
+
+    const payload = await response.json();
+    const available = ((payload.data || []) as LandingGradeSummary[]).filter(
+      (grade) => grade.status === 'ACTIVE',
+    );
+    const byCode = new Map(available.map((grade) => [grade.code, grade]));
+    const grades = fallbackGrades.map((fallback) => {
+      const match = byCode.get(fallback.code);
+      return match
+        ? {
+            ...fallback,
+            id: match.id,
+            status: match.status,
+            fallback: false,
+          }
+        : fallback;
+    });
+
+    return { grades, usingFallback: grades.some((grade) => grade.fallback) };
+  } catch {
+    return { grades: fallbackGrades, usingFallback: true };
+  }
+}
+
+const learningSteps = [
+  {
+    icon: CirclePlay,
+    number: '01',
+    title: 'اتفرّج',
+    body: 'شرح واضح ومركّز تقدر توقفه وترجعله في الوقت اللي يناسبك.',
+  },
+  {
+    icon: BrainCircuit,
+    number: '02',
+    title: 'افهم',
+    body: 'Grammar وVocabulary متقسمين لأفكار صغيرة مرتبطة بالمنهج.',
+  },
+  {
+    icon: NotebookPen,
+    number: '03',
+    title: 'طبّق',
+    body: 'حل بعد كل جزء عشان تتأكد إن المعلومة ثبتت مش مجرد سمعتها.',
+  },
+  {
+    icon: TrendingUp,
+    number: '04',
+    title: 'راجع تقدّمك',
+    body: 'نتيجتك ومحاولاتك محفوظين عشان تعرف إيه اللي محتاج مراجعة.',
+  },
+];
+
+const platformBenefits = [
+  {
+    icon: Play,
+    title: 'فيديوهات منظمة',
+    body: 'كل درس له هدف واضح وترتيب يخليك تمشي خطوة بخطوة.',
+    tone: 'cyan',
+  },
+  {
+    icon: FileText,
+    title: 'مذكرات وملفات PDF',
+    body: 'ملخصات وأوراق تدريب تفتحها وقت المراجعة أو قبل الامتحان.',
+    tone: 'amber',
+  },
+  {
+    icon: ClipboardCheck,
+    title: 'اختبارات بعد الدروس',
+    body: 'تطبيق مباشر ونتيجة واضحة بدل ما تسيب الفهم للصدفة.',
+    tone: 'navy',
+  },
+  {
+    icon: LayoutDashboard,
+    title: 'تقدّم محفوظ',
+    body: 'ارجع من نفس المكان وشوف الدروس والاختبارات الخاصة بمرحلتك.',
+    tone: 'mint',
+  },
+];
+
+const faqs = [
+  {
+    question: 'أختار المرحلة بتاعتي إزاي؟',
+    answer:
+      'اختار صفك من كروت المراحل الموجودة في الصفحة. هتروح مباشرة للكورسات والباقات المتاحة للصف ده.',
+  },
+  {
+    question: 'أقدر أشوف الدروس من الموبايل؟',
+    answer:
+      'أيوه، الأكاديمية معمولة عشان تشتغل بشكل مريح على الموبايل والتابلت والكمبيوتر من المتصفح.',
+  },
+  {
+    question: 'ينفع أرجع للشرح تاني؟',
+    answer:
+      'طول ما اشتراكك في المحتوى فعّال، تقدر ترجع للدروس المتاحة لك وتراجعها حسب نظام الباقة.',
+  },
+  {
+    question: 'إزاي أعرف تفاصيل الاشتراك؟',
+    answer:
+      'بعد اختيار المرحلة هتشوف المحتوى المتاح وتفاصيل كل باقة وسعرها قبل تسجيل الدخول وإتمام الاشتراك.',
+  },
+];
+
+function SectionHeading({
+  eyebrow,
+  title,
+  body,
+  align = 'center',
+}: {
+  eyebrow: string;
+  title: string;
+  body?: string;
+  align?: 'center' | 'start';
+}) {
+  return (
+    <div
+      className={
+        align === 'center' ? 'academy-section-heading' : 'academy-section-heading is-start'
+      }
+    >
+      <span className="academy-eyebrow">{eyebrow}</span>
+      <h2>{title}</h2>
+      {body && <p>{body}</p>}
+    </div>
+  );
+}
+
+export default async function Home() {
+  const { grades, usingFallback } = await getGrades();
+
+  return (
+    <PublicShell active="home">
+      <div className="academy-landing">
+        <section className="academy-hero">
+          <div className="academy-container academy-hero-grid">
+            <div className="academy-hero-copy">
+              <span className="academy-eyebrow">
+                <Sparkles aria-hidden="true" />
+                English على المنهج المصري
+              </span>
+              <h1>
+                <span className="academy-hero-line">منصة</span>
+                <HeroBrandHalo>البحراوي</HeroBrandHalo>
+                <span className="academy-hero-line academy-hero-line-sub" dir="ltr">
+                  English
+                </span>
+              </h1>
+              <p className="academy-hero-lead">
+                شرح واضح، تدريب بعد كل فكرة، ومراجعة تعرفك مستواك مع مستر السيد البحراوي.
+              </p>
+              <div className="academy-hero-actions">
+                <PremiumCtaButton href="/register">بينا نعمل حساب جديد</PremiumCtaButton>
+                <Link
+                  className="academy-button academy-button-lg academy-button-secondary"
+                  href="/login"
+                >
+                  أنا طالب بالفعل
+                </Link>
+              </div>
+              <ul className="academy-hero-points" aria-label="مميزات الأكاديمية">
+                <li>
+                  <CheckCircle2 aria-hidden="true" />
+                  على المنهج المصري
+                </li>
+                <li>
+                  <CheckCircle2 aria-hidden="true" />
+                  شرح وتدريب ومراجعة
+                </li>
+                <li>
+                  <CheckCircle2 aria-hidden="true" />
+                  مناسب للموبايل
+                </li>
+              </ul>
+            </div>
+            <div className="academy-hero-image-col">
+              <Image
+                src="/images/elbahrawy-hero.webp"
+                alt="مستر السيد البحراوي"
+                className="academy-hero-image"
+                width={1024}
+                height={1024}
+                sizes="(max-width: 760px) 92vw, 46vw"
+                preload
+              />
+              <div className="academy-hero-tags">
+                <span>Grammar</span>
+                <span>Vocabulary</span>
+                <span>Practice</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="levels" className="academy-section academy-levels">
+          <div className="academy-container">
+            <SectionHeading
+              eyebrow="ابدأ من مكانك"
+              title="اختار مرحلتك وخليك في المسار الصح"
+              body="كل مرحلة ليها محتواها وترتيبها. اختار صفك وهتظهر لك الكورسات والباقات المناسبة."
+            />
+
+            {usingFallback && (
+              <p className="academy-grade-notice" role="status">
+                بنحدّث قائمة الكورسات دلوقتي. تقدر تختار مرحلتك وتستعرض كل المتاح.
+              </p>
+            )}
+
+            <div className="academy-grade-grid">
+              {grades.map((grade, index) => (
+                <div key={grade.code} className="academy-grade-wrapper">
+                  <div className="academy-grade-name-box">{grade.nameAr}</div>
+                  <Link
+                    href={
+                      grade.id ? `/courses?gradeId=${encodeURIComponent(grade.id)}` : '/courses'
+                    }
+                    aria-label={`شوف محتوى ${grade.nameAr}`}
+                    className={`academy-grade-card${grade.code === 'g3-prep' ? ' academy-grade-card--bg' : ''}${grade.code === 'g1-sec' ? ' academy-grade-card--bg1' : ''}${grade.code === 'g2-sec' ? ' academy-grade-card--bg2' : ''}${grade.code === 'g3-sec' ? ' academy-grade-card--bg3' : ''}`}
+                  >
+                    <span className="academy-grade-number" aria-hidden="true">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <div className="academy-grade-spacer" />
+                    <span className="academy-grade-action">
+                      شوف محتوى المرحلة
+                      <ArrowLeft aria-hidden="true" />
+                    </span>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="learning-path" className="academy-section academy-learning-section">
+          <div className="academy-container academy-teacher-card">
+            <div className="academy-teacher-visual" aria-hidden="true">
+              <Image
+                src="/images/teacher-bg.webp"
+                alt=""
+                className="size-full object-cover"
+                width={1024}
+                height={1024}
+                sizes="(max-width: 760px) 92vw, 42vw"
+              />
+            </div>
+            <div className="academy-teacher-copy">
+              <span className="academy-eyebrow">من الحصة للمنصة</span>
+              <h2>نفس شرح مستر البحراوي، بس متاح لك وقت ما تحتاجه.</h2>
+              <p>
+                الأكاديمية معمولة عشان تنقل طريقة الشرح والتدريب من الحصة لتجربة أونلاين منظمة. تشوف
+                الدرس، تراجع النقطة اللي وقفت معاك، وتحل لحد ما المعلومة تثبت.
+              </p>
+              <div className="academy-teacher-values">
+                <span>
+                  <MessagesSquare aria-hidden="true" />
+                  شرح قريب من الطالب
+                </span>
+                <span>
+                  <Target aria-hidden="true" />
+                  تركيز على المنهج
+                </span>
+                <span>
+                  <RotateCcw aria-hidden="true" />
+                  مراجعة وقت ما تحتاج
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="academy-section academy-benefits-section">
+          <div className="academy-container academy-benefits-layout">
+            <SectionHeading
+              eyebrow="كل أدواتك في مكان واحد"
+              title="من أول الشرح لحد آخر مراجعة"
+              body="الأكاديمية بتجمع الحصة، المذكرة، التدريب، والمتابعة في تجربة واحدة بسيطة."
+              align="start"
+            />
+            <div className="academy-benefits-grid">
+              {platformBenefits.map((benefit) => {
+                const Icon = benefit.icon;
+                return (
+                  <article className="academy-benefit-card" key={benefit.title}>
+                    <span className={`academy-benefit-icon is-${benefit.tone}`}>
+                      <Icon aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h3>{benefit.title}</h3>
+                      <p>{benefit.body}</p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section id="teacher" className="academy-section academy-teacher-section">
+          <div className="academy-container">
+            <SectionHeading
+              eyebrow="نظام مذاكرة واضح"
+              title="هتتعلم إزاي؟"
+              body="مش هنسيبك قدام فيديو وخلاص. كل خطوة بتجهّزك للي بعدها."
+            />
+            <div className="academy-learning-grid">
+              {learningSteps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <article className="academy-learning-card" key={step.number}>
+                    <span className="academy-learning-number" aria-hidden="true">
+                      {step.number}
+                    </span>
+                    <span className="academy-learning-icon">
+                      <Icon aria-hidden="true" />
+                    </span>
+                    <h3>{step.title}</h3>
+                    <p>{step.body}</p>
+                    {index < learningSteps.length - 1 && (
+                      <ArrowLeft className="academy-learning-arrow" aria-hidden="true" />
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="academy-section academy-faq-section">
+          <div className="academy-container academy-faq-layout">
+            <SectionHeading
+              eyebrow="قبل ما تبدأ"
+              title="أسئلة ممكن تكون في بالك"
+              body="إجابات سريعة تساعدك تختار وتبدأ من غير لخبطة."
+              align="start"
+            />
+            <div className="academy-faq-list">
+              {faqs.map((faq) => (
+                <details key={faq.question}>
+                  <summary>
+                    {faq.question}
+                    <ChevronDown aria-hidden="true" />
+                  </summary>
+                  <p>{faq.answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="academy-final-section">
+          <div className="academy-container academy-final-card">
+            <div className="academy-final-decoration" aria-hidden="true">
+              <GraduationCap />
+            </div>
+            <span className="academy-final-kicker">جاهز تبدأ؟</span>
+            <h2>اختار مرحلتك وخلي الإنجليزي نقطة قوة.</h2>
+            <p>ابدأ بالمحتوى المناسب لصفك، وشوف تفاصيل الباقات المتاحة بوضوح قبل الاشتراك.</p>
+            <a
+              className="academy-button academy-button-lg"
+              style={{
+                borderColor: 'transparent',
+                background:
+                  'linear-gradient(135deg, #1D4ED8 0%, #2563EB 25%, #3B82F6 45%, #38BDF8 70%, #7DD3FC 100%)',
+                color: '#ffffff',
+              }}
+              href="#levels"
+            >
+              اختار مرحلتك
+              <ArrowLeft aria-hidden="true" />
+            </a>
+          </div>
+        </section>
+      </div>
+      <WhatsAppWidget />
+    </PublicShell>
+  );
+}

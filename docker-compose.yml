@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-academy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-academy_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-bahrawy_db}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-academy} -d ${POSTGRES_DB:-bahrawy_db}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - valkey-data:/data
+    command: ['valkey-server', '--save', '60 1', '--loglevel', 'warning']
+
+volumes:
+  postgres-data:
+  valkey-data:
