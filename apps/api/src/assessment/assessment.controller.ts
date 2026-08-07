@@ -127,27 +127,29 @@ export class AssessmentPlanController {
       attempt.id,
     );
 
-    const assessment = await db.assessment.findUnique({
-      where: { id: assessmentId },
-      include: {
-        questions: {
-          orderBy: { sort: 'asc' },
-          include: { question: true },
-        },
-      },
-    });
+    // Answer keys are sourced ONLY from the service's gated output. The service
+    // exposes correctOptionId/explanation on questions solely when the
+    // assessment's result-release policy allows it (IMMEDIATE). For deferred
+    // release these fields are absent, so nothing below ever echoes an answer
+    // key the policy has not explicitly released.
+    const releasedQuestions: any[] =
+      (submitted?.assessment?.questions as any[] | undefined) ?? [];
+    const correctAnswers = submitted.resultsReleased
+      ? releasedQuestions
+          .map((item: any) => ({
+            questionId: item.questionId,
+            correctOptionId: item.question?.correctOptionId,
+            explanation: item.question?.explanation,
+          }))
+          .filter((x) => x.correctOptionId !== undefined)
+      : [];
 
     return {
       status: 'SUCCESS',
       data: {
         attempt: submitted,
         score: submitted.score,
-        correctAnswers:
-          assessment?.questions.map((item: any) => ({
-            questionId: item.questionId,
-            correctOptionId: item.question.correctOptionId,
-            explanation: item.question.explanation,
-          })) ?? [],
+        correctAnswers,
       },
     };
   }
@@ -157,14 +159,41 @@ export class AssessmentPlanController {
     @Req() req: any,
     @Param('assessmentId') assessmentId: string,
   ) {
-    const data = await db.assessmentAttempt.findMany({
+    // Results are always scoped to the authenticated account, so a student can
+    // only ever read their own attempt history. Only a lean projection is
+    // returned: no autosavedAnswers, and never any correctOptionId/explanation
+    // /answer-key data. Whether correct answers are revealed individually is
+    // governed solely by the attempt/submit endpoints, which respect
+    // resultReleaseRule.
+    const attempts = await db.assessmentAttempt.findMany({
       where: {
         assessmentId,
         accountId: req.account.id,
         submittedAt: { not: null },
       },
       orderBy: { submittedAt: 'desc' },
+      select: {
+        id: true,
+        score: true,
+        resultsReleased: true,
+        submittedAt: true,
+      },
     });
+    const assessment = await db.assessment.findUnique({
+      where: { id: assessmentId },
+      select: { passingScore: true },
+    });
+    const passingScore = assessment?.passingScore ?? null;
+    const data = attempts.map((attempt) => ({
+      id: attempt.id,
+      score: attempt.score,
+      resultsReleased: attempt.resultsReleased,
+      submittedAt: attempt.submittedAt,
+      passed:
+        passingScore === null || attempt.score === null
+          ? null
+          : Number(attempt.score) >= passingScore,
+    }));
     return { status: 'SUCCESS', data };
   }
 }

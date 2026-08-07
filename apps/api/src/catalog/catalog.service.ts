@@ -134,8 +134,14 @@ export class CatalogService {
           status: { in: ['ACTIVE', 'PUBLISHED'] },
           prices: { some: { status: 'ACTIVE', amount: 0 } },
           OR: [
-            { type: 'BUNDLE', courses: { some: { courseId: unit.chapter.courseId } } },
-            { type: 'COURSE', courses: { some: { courseId: unit.chapter.courseId } } },
+            {
+              type: 'BUNDLE',
+              courses: { some: { courseId: unit.chapter.courseId } },
+            },
+            {
+              type: 'COURSE',
+              courses: { some: { courseId: unit.chapter.courseId } },
+            },
             { type: 'LESSON', unitEntries: { some: { unitId } } },
           ],
         },
@@ -145,7 +151,12 @@ export class CatalogService {
         return {
           hasAccess: true,
           hasEntitlement: true,
-          reason: freeProduct.type === 'LESSON' ? ('LESSON' as const) : freeProduct.type === 'COURSE' ? ('COURSE' as const) : ('BUNDLE' as const),
+          reason:
+            freeProduct.type === 'LESSON'
+              ? ('LESSON' as const)
+              : freeProduct.type === 'COURSE'
+                ? ('COURSE' as const)
+                : ('BUNDLE' as const),
           productId: freeProduct.id,
         };
       }
@@ -291,7 +302,87 @@ export class CatalogService {
         message: 'Course prerequisites have not been met.',
       });
     }
+    await this.enforceLessonQuizGates(accountId, lesson);
     return true;
+  }
+
+  private async enforceLessonQuizGates(
+    accountId: string,
+    lesson: {
+      id: string;
+      unitId: string;
+      sort: number;
+    },
+  ): Promise<void> {
+    const unitLessons = await db.lesson.findMany({
+      where: { unitId: lesson.unitId, status: 'PUBLISHED' },
+      orderBy: { sort: 'asc' },
+      select: { id: true, sort: true },
+    });
+    const currentIndex = unitLessons.findIndex(
+      (item: any) => item.id === lesson.id,
+    );
+    const previousLessons = unitLessons.slice(
+      0,
+      currentIndex === -1 ? unitLessons.length : currentIndex,
+    );
+    if (previousLessons.length === 0) return;
+
+    const gated = await db.assessment.findMany({
+      where: {
+        lessonId: { in: previousLessons.map((item: any) => item.id) },
+        type: 'END_OF_LESSON',
+        status: 'PUBLISHED',
+        archivedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (gated.length === 0) return;
+
+    const gatedIds = new Set(gated.map((item: any) => item.lessonId));
+    const nearestGateLesson = [...previousLessons]
+      .reverse()
+      .find((item: any) => gatedIds.has(item.id));
+    if (!nearestGateLesson) return;
+
+    const gate = gated.find(
+      (item: any) => item.lessonId === nearestGateLesson.id,
+    );
+    if (!gate) return;
+    const passed = await this.isQuizGatePassed(accountId, gate.id);
+    if (!passed) {
+      throw new ForbiddenException({
+        code: 'LESSON_LOCKED',
+        message: 'Pass the previous lesson quiz before continuing.',
+        requiredAssessmentId: gate.id,
+        requiredScore: gate.passingScore,
+        lessonId: lesson.id,
+      });
+    }
+  }
+
+  private async isQuizGatePassed(
+    accountId: string,
+    assessmentId: string,
+  ): Promise<boolean> {
+    const attempt = await db.assessmentAttempt.findFirst({
+      where: {
+        accountId,
+        assessmentId,
+        submittedAt: { not: null },
+      },
+      orderBy: { submittedAt: 'desc' },
+      select: { score: true },
+    });
+    if (!attempt) return false;
+    const assessment = await db.assessment.findUnique({
+      where: { id: assessmentId },
+      select: { passingScore: true },
+    });
+    if (!assessment || assessment.passingScore === null) return true;
+    return (
+      attempt.score !== null && Number(attempt.score) >= assessment.passingScore
+    );
   }
 
   async getGrades(): Promise<any[]> {
@@ -745,31 +836,34 @@ export class CatalogService {
 
   async getEntitledCourses(accountId: string): Promise<any[]> {
     const now = new Date();
-    const [entitlements, freeProducts] = await Promise.all([db.entitlement.findMany({
-      where: {
-        accountId,
-        status: 'ACTIVE',
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-      },
-      include: {
-        product: {
-          include: {
-            courses: {
-              include: {
-                course: true,
+    const [entitlements, freeProducts] = await Promise.all([
+      db.entitlement.findMany({
+        where: {
+          accountId,
+          status: 'ACTIVE',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        include: {
+          product: {
+            include: {
+              courses: {
+                include: {
+                  course: true,
+                },
               },
             },
           },
         },
-      },
-    }), db.product.findMany({
-      where: {
-        status: { in: ['ACTIVE', 'PUBLISHED'] },
-        prices: { some: { status: 'ACTIVE', amount: 0 } },
-        courses: { some: { course: { status: 'PUBLISHED' } } },
-      },
-      include: { courses: { include: { course: true } } },
-    })]);
+      }),
+      db.product.findMany({
+        where: {
+          status: { in: ['ACTIVE', 'PUBLISHED'] },
+          prices: { some: { status: 'ACTIVE', amount: 0 } },
+          courses: { some: { course: { status: 'PUBLISHED' } } },
+        },
+        include: { courses: { include: { course: true } } },
+      }),
+    ]);
 
     const coursesMap = new Map<string, any>();
     for (const ent of entitlements) {
@@ -781,7 +875,8 @@ export class CatalogService {
     }
     for (const product of freeProducts) {
       for (const pc of product.courses) {
-        if (!coursesMap.has(pc.course.id)) coursesMap.set(pc.course.id, pc.course);
+        if (!coursesMap.has(pc.course.id))
+          coursesMap.set(pc.course.id, pc.course);
       }
     }
     return Array.from(coursesMap.values());
@@ -874,9 +969,7 @@ export class CatalogService {
               })
             )
               .filter((attempt: any) => {
-                const prerequisite = prerequisiteById.get(
-                  attempt.assessmentId,
-                ) as any;
+                const prerequisite = prerequisiteById.get(attempt.assessmentId);
                 return (
                   prerequisite?.passingScore === null ||
                   (attempt.score !== null &&
@@ -953,11 +1046,86 @@ export class CatalogService {
 
     const lesson = await db.lesson.findUnique({
       where: { id: lessonId },
+      include: { unit: { include: { chapter: true } } },
     });
     if (!lesson) {
       throw new NotFoundException('Lesson not found');
     }
 
-    return { lesson };
+    const gate = await db.assessment.findFirst({
+      where: {
+        lessonId,
+        type: 'END_OF_LESSON',
+        archivedAt: null,
+      },
+      include: { questions: true },
+    });
+    const gateConfig = gate
+      ? {
+          assessmentId: gate.id,
+          titleAr: gate.titleAr,
+          requiredScore: gate.passingScore,
+          questionCount: gate.questions.length,
+          published: gate.status === 'PUBLISHED',
+        }
+      : null;
+
+    const passedGate = gate
+      ? await this.isQuizGatePassed(accountId, gate.id)
+      : false;
+    const latestAttempt = gate
+      ? await db.assessmentAttempt.findFirst({
+          where: {
+            accountId,
+            assessmentId: gate.id,
+            submittedAt: { not: null },
+          },
+          orderBy: { submittedAt: 'desc' },
+          select: { score: true, submittedAt: true },
+        })
+      : null;
+    const lastScore =
+      latestAttempt?.score === null || latestAttempt?.score === undefined
+        ? null
+        : Number(latestAttempt.score);
+
+    if (isStaff) {
+      return {
+        lesson,
+        endOfLessonQuiz: gateConfig,
+      };
+    }
+
+    const siblings = await db.lesson.findMany({
+      where: { unitId: lesson.unitId, status: 'PUBLISHED' },
+      orderBy: { sort: 'asc' },
+      select: { id: true, titleAr: true, sort: true },
+    });
+    const currentIndex = siblings.findIndex(
+      (item: any) => item.id === lessonId,
+    );
+    const nextLesson =
+      currentIndex !== -1 ? (siblings[currentIndex + 1] ?? null) : null;
+
+    let nextLocked = false;
+    if (nextLesson) {
+      try {
+        await this.canAccessLesson(accountId, nextLesson.id, false);
+      } catch {
+        nextLocked = true;
+      }
+    }
+
+    return {
+      lesson,
+      endOfLessonQuiz: {
+        ...gateConfig,
+        passed: latestAttempt ? passedGate : false,
+        lastScore,
+      },
+      nextLesson: nextLesson
+        ? { id: nextLesson.id, titleAr: nextLesson.titleAr, locked: nextLocked }
+        : null,
+    };
   }
 }

@@ -10,6 +10,7 @@ import { AdminV1StudentsModule } from './students/students.module';
 import { AdminV1PaymentsModule } from './payments/payments.module';
 import { AdminV1SupportModule } from './support/support.module';
 import { AdminV1ManagementModule } from './management/management.module';
+import { AdminV1LessonQuizModule } from './lesson-quiz/lesson-quiz.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AdminV1ManagementModule } from './management/management.module';
     AdminV1PaymentsModule,
     AdminV1SupportModule,
     AdminV1ManagementModule,
+    AdminV1LessonQuizModule,
   ],
   providers: [AdminAuditService],
   exports: [AdminAuditService],

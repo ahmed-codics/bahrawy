@@ -18,6 +18,7 @@ import { fetchApi } from '../../../../../../../../lib/api';
 import { PdfUploadArea } from '../../../../components/PdfUploadArea';
 import { VideoUploadArea } from '../../../../components/VideoUploadArea';
 import type { ContentItem } from '../../../../components/types';
+import { LessonQuizSection } from './LessonQuizSection';
 
 type LessonDetail = ContentItem & {
   unit: {
@@ -184,6 +185,10 @@ export default function LessonEditorPage({
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section>
+        <LessonQuizSection lessonId={lesson.id} />
       </section>
     </div>
   );

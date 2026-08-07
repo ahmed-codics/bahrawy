@@ -102,17 +102,17 @@ export class AdminCatalogController {
   // --- Products ---
   @Get('products')
   async listProducts(@Req() req: any) {
-    const orgId = req.account.organizationId || (await this.getDefaultOrgId());
+    const orgId = req.account.organizationId || this.getDefaultOrgId();
     return this.adminCatalogService.listProducts(orgId);
   }
 
   @Post('products')
   async createProduct(@Req() req: any, @Body() data: any) {
-    const orgId = req.account.organizationId || (await this.getDefaultOrgId());
+    const orgId = req.account.organizationId || this.getDefaultOrgId();
     return this.adminCatalogService.createProduct(orgId, data);
   }
 
-  private async getDefaultOrgId() {
+  private getDefaultOrgId() {
     return 'default-org-id';
   }
 

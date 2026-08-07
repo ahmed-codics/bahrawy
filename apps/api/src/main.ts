@@ -5,10 +5,13 @@ import { AppModule } from './app.module';
 import { env } from '@bahrawy/config';
 import cookieParser from 'cookie-parser';
 import express from 'express';
+import { applyHttpSecurity } from './security/http-security';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.getHttpAdapter().getInstance().set('trust proxy', env.PROXY_TRUST);
+  const httpAdapter = app.getHttpAdapter().getInstance();
+  httpAdapter.set('trust proxy', env.PROXY_TRUST);
+  applyHttpSecurity(httpAdapter, env.NODE_ENV === 'production');
   app.enableCors({
     origin: [
       'http://localhost:3001',

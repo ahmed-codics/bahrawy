@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '../throttle/throttle.decorator';
-import { ThrottleGuard } from '../throttle/throttle.guard';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { SessionAuthGuard } from './session-auth.guard';
@@ -47,14 +46,12 @@ export class AuthController {
   }
 
   @Post('check-phone')
-  @UseGuards(ThrottleGuard)
   @Throttle(30, 900_000)
   checkPhone() {
     return { available: true };
   }
 
   @Post('register')
-  @UseGuards(ThrottleGuard)
   @Throttle(3, 3_600_000)
   async register(
     @Body() body: RegisterStudentDto,
@@ -71,7 +68,6 @@ export class AuthController {
   }
 
   @Post('activate')
-  @UseGuards(ThrottleGuard)
   @Throttle(5, 900_000)
   async activate(
     @Body() body: { phone: string; credentialCode: string; password: string },
@@ -88,7 +84,6 @@ export class AuthController {
   }
 
   @Post('login')
-  @UseGuards(ThrottleGuard)
   @Throttle(10, 900_000)
   async login(
     @Body() body: { phone: string; password: string; totpToken?: string },
@@ -114,7 +109,6 @@ export class AuthController {
   }
 
   @Post('staff-login')
-  @UseGuards(ThrottleGuard)
   @Throttle(10, 900_000)
   async staffLogin(
     @Body() body: StaffLoginDto,
@@ -203,7 +197,6 @@ export class AuthController {
   }
 
   @Post('staff/recovery-consume')
-  @UseGuards(ThrottleGuard)
   @Throttle(5, 900_000)
   async consumeRecoveryCase(
     @Body() body: { caseId: string; resetCode: string; newPasswordAr: string },

@@ -317,6 +317,10 @@ export class VideoService {
   ): Promise<{ id: string; completed: boolean; watchedSeconds: number }> {
     const isCompleted =
       durationSeconds > 0 && watchedSeconds / durationSeconds >= 0.9;
+    let canAutoComplete = isCompleted;
+    if (isCompleted) {
+      canAutoComplete = await this.canCompleteLesson(accountId, lessonId);
+    }
     const now = new Date();
     const progress = await db.lessonProgress.upsert({
       where: {
@@ -330,14 +334,14 @@ export class VideoService {
         lessonId,
         watchedSeconds,
         durationSeconds,
-        completedAt: isCompleted ? now : null,
+        completedAt: canAutoComplete ? now : null,
         lastHeartbeatAt: now,
       },
       update: {
         watchedSeconds: { set: watchedSeconds },
         durationSeconds: { set: durationSeconds },
         lastHeartbeatAt: now,
-        completedAt: isCompleted ? { set: now } : undefined,
+        completedAt: canAutoComplete ? { set: now } : undefined,
       },
     });
     return {
@@ -345,6 +349,34 @@ export class VideoService {
       completed: !!progress.completedAt,
       watchedSeconds: progress.watchedSeconds,
     };
+  }
+
+  private async canCompleteLesson(
+    accountId: string,
+    lessonId: string,
+  ): Promise<boolean> {
+    const gate = await db.assessment.findFirst({
+      where: {
+        lessonId,
+        type: 'END_OF_LESSON',
+        status: 'PUBLISHED',
+        archivedAt: null,
+      },
+      select: { id: true, passingScore: true },
+    });
+    if (!gate) return true;
+    const attempt = await db.assessmentAttempt.findFirst({
+      where: {
+        accountId,
+        assessmentId: gate.id,
+        submittedAt: { not: null },
+      },
+      orderBy: { submittedAt: 'desc' },
+      select: { score: true },
+    });
+    if (!attempt) return false;
+    if (gate.passingScore === null) return true;
+    return attempt.score !== null && Number(attempt.score) >= gate.passingScore;
   }
 
   async getResumePosition(

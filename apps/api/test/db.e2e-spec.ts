@@ -1,5 +1,4 @@
 import '@bahrawy/config';
-import { INestApplication } from '@nestjs/common';
 import { db } from '@bahrawy/db';
 
 describe('Database Integration', () => {

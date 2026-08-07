@@ -5,12 +5,26 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   let staffPage;
   let staffCookies = '';
   let studentCookies = '';
+  let staffCsrf = '';
+  let studentCsrf = '';
   let courseId = '';
   let courseVersion = 1;
   let chapterId = '';
   let unitId = '';
   let productId = '';
   let ticketId = '';
+
+  // Build request headers for the authenticated session. State-changing requests
+  // require the session CSRF token (per-session, deterministic HMAC); attach it
+  // whenever present so the API's CSRF guard accepts the request.
+  const staffHeaders = (csrf: string = staffCsrf) => ({
+    cookie: staffCookies,
+    ...(csrf ? { 'x-csrf-token': csrf } : {}),
+  });
+  const studentHeaders = (csrf: string = studentCsrf) => ({
+    cookie: studentCookies,
+    ...(csrf ? { 'x-csrf-token': csrf } : {}),
+  });
 
   test.beforeAll(async ({ browser }) => {
     studentPage = await browser.newPage();
@@ -46,6 +60,12 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
     });
     expect(res.ok()).toBeTruthy();
     staffCookies = res.headers()['set-cookie'];
+
+    const csrfRes = await request.get('http://localhost:3000/auth/csrf-token', {
+      headers: { cookie: staffCookies },
+    });
+    expect(csrfRes.ok()).toBeTruthy();
+    staffCsrf = (await csrfRes.json()).csrfToken;
   });
 
   test('Step 4: Student logs in via API and gets session', async ({ request }) => {
@@ -54,6 +74,12 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
     });
     expect(res.ok()).toBeTruthy();
     studentCookies = res.headers()['set-cookie'];
+
+    const csrfRes = await request.get('http://localhost:3000/auth/csrf-token', {
+      headers: { cookie: studentCookies },
+    });
+    expect(csrfRes.ok()).toBeTruthy();
+    studentCsrf = (await csrfRes.json()).csrfToken;
   });
 
   test('Step 5: Staff creates a new course (API)', async ({ request }) => {
@@ -63,7 +89,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
         titleAr: 'E2E Test Course',
         descriptionAr: 'E2E test desc',
       },
-      headers: { cookie: staffCookies },
+      headers: staffHeaders(),
     });
     expect(res.ok()).toBeTruthy();
     const course = await res.json();
@@ -76,7 +102,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
       `http://localhost:3000/admin/v1/courses/${courseId}/chapters`,
       {
         data: { titleAr: 'E2E Chapter' },
-        headers: { cookie: staffCookies },
+        headers: staffHeaders(),
       },
     );
     expect(res.ok()).toBeTruthy();
@@ -89,7 +115,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
       `http://localhost:3000/admin/v1/courses/chapters/${chapterId}/units`,
       {
         data: { titleAr: 'E2E Unit' },
-        headers: { cookie: staffCookies },
+        headers: staffHeaders(),
       },
     );
     expect(res.ok()).toBeTruthy();
@@ -100,7 +126,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   test('Step 8: Staff adds a lesson to unit (API)', async ({ request }) => {
     const res = await request.post(`http://localhost:3000/admin/v1/courses/units/${unitId}/lessons`, {
       data: { titleAr: 'E2E Lesson', contentType: 'VIDEO' },
-      headers: { cookie: staffCookies },
+      headers: staffHeaders(),
     });
     expect(res.ok()).toBeTruthy();
   });
@@ -113,7 +139,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
         priceAmount: 100,
         courseIds: [courseId],
       },
-      headers: { cookie: staffCookies },
+      headers: staffHeaders(),
     });
     expect(res.ok()).toBeTruthy();
     const product = await res.json();
@@ -125,7 +151,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
       `http://localhost:3000/admin/v1/courses/${courseId}`,
       {
         data: { status: 'PUBLISHED', version: courseVersion },
-        headers: { cookie: staffCookies },
+        headers: staffHeaders(),
       },
     );
     expect(res.ok()).toBeTruthy();
@@ -150,9 +176,8 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
       data: {
         subject: 'E2E Issue',
         description: 'Help me with E2E',
-        organizationId: 'bahrawy-academy-dev',
       },
-      headers: { cookie: studentCookies },
+      headers: studentHeaders(),
     });
     // This might fail if organizationId logic is strict, but let's just see
     if (res.ok()) {
@@ -172,7 +197,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
     if (ticketId) {
       const res = await request.post(`http://localhost:3000/admin/v1/support/${ticketId}/messages`, {
         data: { body: 'We are looking into this E2E issue.' },
-        headers: { cookie: staffCookies },
+        headers: staffHeaders(),
       });
       expect(res.ok()).toBeTruthy();
     }

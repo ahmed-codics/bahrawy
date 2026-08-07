@@ -188,11 +188,11 @@ export class PaymentService {
 
     const accounts = await db.account.findMany({
       where: { id: { in: orders.map((order: any) => order.accountId) } },
-      select: { 
-        id: true, 
-        kind: true, 
+      select: {
+        id: true,
+        kind: true,
         phoneEncrypted: true,
-        studentProfile: { select: { displayName: true } }
+        studentProfile: { select: { displayName: true } },
       },
     });
     const accountMap = new Map(
@@ -201,7 +201,7 @@ export class PaymentService {
 
     const products = await db.product.findMany({
       where: { id: { in: orders.map((order: any) => order.productId) } },
-      select: { id: true, titleAr: true, titleEn: true }
+      select: { id: true, titleAr: true, titleEn: true },
     });
     const productMap = new Map(
       products.map((product: any) => [product.id, product]),

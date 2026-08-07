@@ -16,15 +16,26 @@ jest.mock('@bahrawy/db', () => {
     },
     lesson: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     unit: {
       findUnique: jest.fn(),
     },
     lessonProgress: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     product: {
       findUnique: jest.fn(),
+    },
+    assessment: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    assessmentAttempt: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
     },
   };
   return {
@@ -88,6 +99,115 @@ describe('CatalogService', () => {
         service.canAccessLesson('acc-1', 'lesson-1', false),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('unlocks access when the previous gate lesson has no end-of-lesson quiz', async () => {
+      (db.lesson.findUnique as jest.Mock).mockResolvedValue({
+        id: 'lesson-2',
+        unitId: 'unit-1',
+        sort: 2,
+        status: 'PUBLISHED',
+        unit: { chapter: { courseId: 'course-1' } },
+      });
+      (db.lesson.findMany as jest.Mock).mockResolvedValue([
+        { id: 'lesson-1', sort: 1 },
+        { id: 'lesson-2', sort: 2 },
+      ]);
+      (db.assessment.findMany as jest.Mock).mockResolvedValue([]);
+      jest.spyOn(service, 'getUnitAccess').mockResolvedValue({
+        hasAccess: true,
+        hasEntitlement: true,
+        reason: 'LESSON',
+        productId: 'course-1',
+      });
+      (service as any).arePrerequisitesSatisfied = jest
+        .fn()
+        .mockResolvedValue(true);
+
+      await expect(
+        service.canAccessLesson('acc-1', 'lesson-2', false),
+      ).resolves.toBe(true);
+    });
+
+    it('locks the lesson (LESSON_LOCKED) when the previous lesson quiz is not passed', async () => {
+      (db.lesson.findUnique as jest.Mock).mockResolvedValue({
+        id: 'lesson-2',
+        unitId: 'unit-1',
+        sort: 2,
+        status: 'PUBLISHED',
+        unit: { chapter: { courseId: 'course-1' } },
+      });
+      (db.lesson.findMany as jest.Mock).mockResolvedValue([
+        { id: 'lesson-1', sort: 1 },
+        { id: 'lesson-2', sort: 2 },
+      ]);
+      (db.assessment.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'gate-1',
+          lessonId: 'lesson-1',
+          type: 'END_OF_LESSON',
+          status: 'PUBLISHED',
+          archivedAt: null,
+          passingScore: 60,
+        },
+      ]);
+      (service as any).arePrerequisitesSatisfied = jest
+        .fn()
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getUnitAccess').mockResolvedValue({
+        hasAccess: true,
+        hasEntitlement: true,
+        reason: 'LESSON',
+        productId: 'course-1',
+      });
+      (db.assessmentAttempt.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.canAccessLesson('acc-1', 'lesson-2', false),
+      ).rejects.toMatchObject({ response: { code: 'LESSON_LOCKED' } });
+    });
+
+    it('opens the lesson when the previous lesson quiz was passed', async () => {
+      (db.lesson.findUnique as jest.Mock).mockResolvedValue({
+        id: 'lesson-2',
+        unitId: 'unit-1',
+        sort: 2,
+        status: 'PUBLISHED',
+        unit: { chapter: { courseId: 'course-1' } },
+      });
+      (db.lesson.findMany as jest.Mock).mockResolvedValue([
+        { id: 'lesson-1', sort: 1 },
+        { id: 'lesson-2', sort: 2 },
+      ]);
+      (db.assessment.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'gate-1',
+          lessonId: 'lesson-1',
+          type: 'END_OF_LESSON',
+          status: 'PUBLISHED',
+          archivedAt: null,
+          passingScore: 60,
+        },
+      ]);
+      (service as any).arePrerequisitesSatisfied = jest
+        .fn()
+        .mockResolvedValue(true);
+      jest.spyOn(service, 'getUnitAccess').mockResolvedValue({
+        hasAccess: true,
+        hasEntitlement: true,
+        reason: 'LESSON',
+        productId: 'course-1',
+      });
+      (db.assessmentAttempt.findFirst as jest.Mock).mockResolvedValue({
+        score: 80,
+      });
+      (db.assessment.findUnique as jest.Mock).mockResolvedValue({
+        passingScore: 60,
+      });
+
+      await expect(
+        service.canAccessLesson('acc-1', 'lesson-2', false),
+      ).resolves.toBe(true);
+    });
   });
 
   describe('getUnitDetail', () => {
@@ -110,9 +230,12 @@ describe('CatalogService', () => {
         productEntries: [],
       });
       (db.lessonProgress.findMany as jest.Mock).mockResolvedValue([]);
-      jest
-        .spyOn(service, 'getUnitAccess')
-        .mockResolvedValue({ hasAccess: true, reason: 'LESSON' } as never);
+      jest.spyOn(service, 'getUnitAccess').mockResolvedValue({
+        hasAccess: true,
+        hasEntitlement: true,
+        reason: 'LESSON',
+        productId: 'course-1',
+      });
 
       const result = await service.getUnitDetail('unit-1', 'acc-1');
 

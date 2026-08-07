@@ -31,27 +31,29 @@ export class AuditInterceptor implements NestInterceptor {
     }
 
     return next.handle().pipe(
-      tap(async (response) => {
-        try {
-          await db.auditEvent.create({
-            data: {
-              organizationId: account.organizationId,
-              actorType: 'STAFF',
-              actorId: account.id,
-              action: `${method} ${url}`,
-              targetType: 'API_RESPONSE',
-              targetId: 'UNKNOWN', // Hard to determine generically without conventions
-              before: {},
-              after: this.auditService.redactSensitive({
-                requestBody: body,
-                response,
-              }) as Prisma.InputJsonValue,
-              reason: 'Admin API Mutation',
-            },
-          });
-        } catch (e) {
-          this.logger.error('Failed to log audit event', e);
-        }
+      tap((response) => {
+        void (async () => {
+          try {
+            await db.auditEvent.create({
+              data: {
+                organizationId: account.organizationId,
+                actorType: 'STAFF',
+                actorId: account.id,
+                action: `${method} ${url}`,
+                targetType: 'API_RESPONSE',
+                targetId: 'UNKNOWN', // Hard to determine generically without conventions
+                before: {},
+                after: this.auditService.redactSensitive({
+                  requestBody: body,
+                  response,
+                }) as Prisma.InputJsonValue,
+                reason: 'Admin API Mutation',
+              },
+            });
+          } catch (e) {
+            this.logger.error('Failed to log audit event', e);
+          }
+        })();
       }),
     );
   }

@@ -4,9 +4,7 @@ import { db } from '@bahrawy/db';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const jwks = createRemoteJWKSet(
-  new URL(
-    `https://${env.CLOUDFLARE_ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`,
-  ),
+  new URL(`https://${env.CLOUDFLARE_ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`),
 );
 
 @Injectable()

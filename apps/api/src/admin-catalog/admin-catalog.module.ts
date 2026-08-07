@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { AdminCatalogController, StaffCatalogController } from './admin-catalog.controller';
+import {
+  AdminCatalogController,
+  StaffCatalogController,
+} from './admin-catalog.controller';
 import { AdminCatalogService } from './admin-catalog.service';
 
 @Module({

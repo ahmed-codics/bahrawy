@@ -10,6 +10,8 @@ import {
   LockKeyhole,
   PlayCircle,
   ShoppingBag,
+  Trophy,
+  XCircle,
 } from 'lucide-react';
 import {
   Badge,
@@ -36,6 +38,14 @@ type Lesson = {
   contentUrl?: string | null;
   attachedPdfUrl?: string | null;
 };
+type EndOfLessonQuiz = {
+  assessmentId: string | null;
+  requiredScore: number | null;
+  questionCount: number;
+  passed: boolean;
+  lastScore: number | null;
+} | null;
+type NextLesson = { id: string; titleAr: string; locked: boolean } | null;
 type Preview = {
   titleAr: string;
   contentType: string;
@@ -51,10 +61,13 @@ export default function LessonDetailPage({
   const { id, lessonId } = use(params);
   const router = useRouter();
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [quiz, setQuiz] = useState<EndOfLessonQuiz>(null);
+  const [nextLesson, setNextLesson] = useState<NextLesson>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [playback, setPlayback] = useState<VideoPlayback | null>(null);
   const [resumePosition, setResumePosition] = useState(0);
   const [accessError, setAccessError] = useState('');
+  const [locked, setLocked] = useState<{ titleAr?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const lastReported = useRef(0);
 
@@ -63,6 +76,8 @@ export default function LessonDetailPage({
       .then(async (response) => {
         const current = response.data.lesson as Lesson;
         setLesson(current);
+        setQuiz(response.data.endOfLessonQuiz ?? null);
+        setNextLesson(response.data.nextLesson ?? null);
         if (current.contentType === 'VIDEO') {
           const [video, resume] = await Promise.all([
             fetchApi(`/video/${lessonId}/hls`),
@@ -85,12 +100,29 @@ export default function LessonDetailPage({
       .catch(async (requestError) => {
         const message =
           requestError instanceof Error ? requestError.message : '';
-        if (
-          /device|fingerprint|جهاز/i.test(message)
-        ) {
+        if (/device|fingerprint|جهاز/i.test(message)) {
           setAccessError(
             'وصل هذا الحساب إلى الحد الأقصى للأجهزة. أعد تحميل الصفحة بعد إعادة ضبط الأجهزة من الإدارة.',
           );
+          return;
+        }
+        if (/quiz|اختبار|LESSON_LOCKED/i.test(message)) {
+          setLocked({});
+          try {
+            const response = await fetchApi(`/catalog/courses/${id}`);
+            for (const chapter of response.data.course.chapters || []) {
+              for (const unit of chapter.units || []) {
+                const item = (unit.lessons || []).find(
+                  (entry: Lesson) => entry.id === lessonId,
+                );
+                if (item) {
+                  setLocked({ titleAr: item.titleAr });
+                }
+              }
+            }
+          } catch {
+            /* keep generic locked state */
+          }
           return;
         }
         try {
@@ -227,12 +259,31 @@ export default function LessonDetailPage({
               يُحفظ تقدمك تلقائياً أثناء المذاكرة، ويمكنك العودة للدرس في أي وقت.
             </p>
           </div>
+          {quiz && quiz.assessmentId && (
+            <EndOfLessonQuizSection
+              quiz={
+                quiz as unknown as NonNullable<EndOfLessonQuiz> & {
+                  assessmentId: string;
+                }
+              }
+              nextLesson={nextLesson}
+              onStart={() => router.push(`/student/assessments/${quiz.assessmentId!}`)}
+              onGoNext={() =>
+                nextLesson && router.push(`/student/courses/${id}/lesson/${nextLesson.id}`)
+              }
+            />
+          )}
         </>
       ) : accessError ? (
         <ErrorState
           title="تعذر فتح الدرس على هذا الجهاز"
           description={accessError}
           onRetry={() => window.location.reload()}
+        />
+      ) : locked ? (
+        <QuizLockedLesson
+          titleAr={locked.titleAr}
+          onBack={() => router.push(`/student/courses/${id}`)}
         />
       ) : preview ? (
         <LockedLesson
@@ -295,6 +346,107 @@ function LockedLesson({
           خيارات الكورس والباقة
         </Button>
       </div>
+    </section>
+  );
+}
+
+function EndOfLessonQuizSection({
+  quiz,
+  nextLesson,
+  onStart,
+  onGoNext,
+}: {
+  quiz: { assessmentId: string; requiredScore: number | null; questionCount: number; passed: boolean; lastScore: number | null };
+  nextLesson: NextLesson;
+  onStart: () => void;
+  onGoNext: () => void;
+}) {
+  const passed = quiz.passed;
+  return (
+    <section
+      className={`relative overflow-hidden rounded-[1.75rem] border p-6 sm:p-8 ${
+        passed
+          ? 'border-success/30 bg-gradient-to-br from-success/10 to-transparent'
+          : 'border-brand-200/70 bg-gradient-to-br from-brand-50/70 to-transparent'
+      }`}
+    >
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <span
+            className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${
+              passed ? 'bg-success/15 text-success' : 'bg-brand-100 text-brand-700'
+            }`}
+          >
+            {passed ? <Trophy className="size-6" /> : <XCircle className="size-6" />}
+          </span>
+          <div>
+            <p className="text-sm font-black text-brand-700 dark:text-brand-300">
+              اختبار نهاية الدرس
+            </p>
+            <h3 className="ba-heading mt-1 text-2xl">
+              {passed ? 'تم اجتياز الاختبار 🎉' : 'أكمل اختبار نهاية الدرس'}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-text-muted">
+              {passed
+                ? 'يمكنك الآن الانتقال للدرس التالي.'
+                : `${quiz.questionCount} سؤال · مطلوب اجتياز ${quiz.requiredScore ?? 0} درجة للانتقال للدرس التالي.`}
+            </p>
+            {!passed && quiz.lastScore !== null && (
+              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-error/10 px-3 py-1 text-xs font-bold text-error">
+                آخر نتيجة: {quiz.lastScore} — جرّب مرة أخرى لتحقيق درجة النجاح.
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:min-w-44">
+          {passed ? (
+            <>
+              <Button
+                variant="primary"
+                onClick={onGoNext}
+                disabled={!nextLesson || nextLesson.locked}
+              >
+                {nextLesson ? 'الانتقال للدرس التالي' : 'انتهت دروس هذه الوحدة'}
+              </Button>
+              <Button variant="outline" onClick={onStart}>
+                راجع إجاباتك
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" leadingIcon={<PlayCircle className="size-4" />} onClick={onStart}>
+              ابدأ الاختبار
+            </Button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuizLockedLesson({
+  titleAr,
+  onBack,
+}: {
+  titleAr?: string;
+  onBack: () => void;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-[2rem] border border-brand-200 bg-[radial-gradient(circle_at_85%_10%,rgba(56,189,248,.15),transparent_20rem),linear-gradient(135deg,#ffffff,#f1f5f9)] p-8 text-center shadow-[0_18px_55px_rgb(9_35_63/0.08)] sm:p-11">
+      <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 shadow-sm">
+        <LockKeyhole className="size-7" />
+      </div>
+      <p className="mt-6 text-sm font-bold text-brand-700">الدرس مقفل</p>
+      <h2 className="ba-heading mt-2 text-3xl">
+        أكمل اختبار نهاية الدرس السابق أولاً
+      </h2>
+      <p className="mx-auto mt-3 max-w-xl leading-8 text-text-muted">
+        {titleAr ? `للوصول إلى " ${titleAr} "` : 'للوصول إلى هذا الدرس'}{' '}
+        يجب أن تجتاز اختبار نهاية الدرس الذي يسبقه، وتحقق درجة النجاح لفتحه
+        تلقائياً.
+      </p>
+      <Button className="mt-7" variant="primary" onClick={onBack}>
+        العودة لدروس الكورس
+      </Button>
     </section>
   );
 }

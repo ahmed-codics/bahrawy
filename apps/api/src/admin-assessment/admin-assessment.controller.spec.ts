@@ -30,7 +30,9 @@ describe('AdminAssessmentController', () => {
       ],
     }).compile();
 
-    controller = module.get<AdminAssessmentController>(AdminAssessmentController);
+    controller = module.get<AdminAssessmentController>(
+      AdminAssessmentController,
+    );
   });
 
   it('should be defined', () => {

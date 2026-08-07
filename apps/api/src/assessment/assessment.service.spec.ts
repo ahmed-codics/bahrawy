@@ -21,6 +21,9 @@ jest.mock('@bahrawy/db', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    lessonProgress: {
+      upsert: jest.fn(),
+    },
   };
   return { db: mockDbClient };
 });
@@ -173,6 +176,297 @@ describe('AssessmentService', () => {
           'q-1': 'option-a',
         }),
       ).resolves.toEqual({ id: 'att-1' });
+    });
+    describe('submitAttempt (end-of-lesson gate)', () => {
+      it('marks the lesson completed in lessonProgress when a gate quiz is passed', async () => {
+        const questions = [
+          {
+            questionId: 'q-1',
+            question: {
+              id: 'q-1',
+              points: 1,
+              correctOptionId: 'option-a',
+              options: [
+                { id: 'option-a', text: 'a' },
+                { id: 'option-b', text: 'b' },
+              ],
+            },
+          },
+        ];
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-1',
+          accountId: 'acc-1',
+          submittedAt: null,
+          autosavedAnswers: { 'q-1': 'option-a' },
+          assessment: {
+            id: 'assess-1',
+            type: 'END_OF_LESSON',
+            lessonId: 'lesson-1',
+            passingScore: 60,
+            resultReleaseRule: 'IMMEDIATE',
+            questions,
+          },
+        });
+        (db.assessmentAttempt.update as jest.Mock).mockResolvedValue({
+          id: 'att-1',
+          accountId: 'acc-1',
+          submittedAt: new Date(),
+          score: 100,
+          resultsReleased: true,
+        });
+        (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(1);
+        (db.lessonProgress.upsert as jest.Mock).mockResolvedValue({});
+
+        const result = await service.submitAttempt('acc-1', 'att-1');
+
+        expect(result.passed).toBe(true);
+        expect(db.lessonProgress.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              accountId_lessonId: { accountId: 'acc-1', lessonId: 'lesson-1' },
+            },
+          }),
+        );
+      });
+
+      it('does not complete the lesson when a gate quiz is failed', async () => {
+        const assessment = {
+          id: 'assess-2',
+          type: 'END_OF_LESSON',
+          lessonId: 'lesson-1',
+          passingScore: 60,
+          resultReleaseRule: 'IMMEDIATE',
+          questions: [
+            {
+              questionId: 'q-1',
+              question: {
+                points: 1,
+                correctOptionId: 'option-a',
+                options: [{ id: 'option-a' }, { id: 'option-b' }],
+              },
+            },
+          ],
+        };
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-2',
+          accountId: 'acc-1',
+          submittedAt: null,
+          autosavedAnswers: { 'q-1': 'option-b' },
+          assessment,
+        });
+        (db.assessmentAttempt.update as jest.Mock).mockResolvedValue({
+          id: 'att-2',
+          accountId: 'acc-1',
+          submittedAt: new Date(),
+          score: 0,
+          resultsReleased: true,
+        });
+        (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(1);
+
+        await service.submitAttempt('acc-1', 'att-2');
+
+        expect(db.lessonProgress.upsert).not.toHaveBeenCalled();
+      });
+
+      it('hides correct options until results are released', async () => {
+        const questions = [
+          {
+            questionId: 'q-1',
+            question: {
+              points: 1,
+              correctOptionId: 'option-a',
+              explanation: 'x',
+              options: [{ id: 'option-a' }, { id: 'option-b' }],
+            },
+          },
+        ];
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-3',
+          accountId: 'acc-1',
+          submittedAt: null,
+          autosavedAnswers: { 'q-1': 'option-a' },
+          assessment: {
+            id: 'assess-3',
+            type: 'STANDALONE',
+            lessonId: null,
+            passingScore: null,
+            resultReleaseRule: 'LATER',
+            questions,
+          },
+        });
+        (db.assessmentAttempt.update as jest.Mock).mockResolvedValue({
+          id: 'att-3',
+          accountId: 'acc-1',
+          submittedAt: new Date(),
+          score: 100,
+          resultsReleased: false,
+        });
+        (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(1);
+
+        const result = await service.submitAttempt('acc-1', 'att-3');
+
+        expect(
+          result.assessment.questions[0].question.explanation,
+        ).toBeUndefined();
+      });
+
+      it('releases the answer key when resultReleaseRule is IMMEDIATE', async () => {
+        const questions = [
+          {
+            questionId: 'q-1',
+            question: {
+              points: 1,
+              correctOptionId: 'option-a',
+              explanation: 'ex-a',
+              options: [
+                { id: 'option-a', text: 'a' },
+                { id: 'option-b', text: 'b' },
+              ],
+            },
+          },
+        ];
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-imm',
+          accountId: 'acc-1',
+          submittedAt: null,
+          autosavedAnswers: { 'q-1': 'option-a' },
+          assessment: {
+            id: 'assess-imm',
+            type: 'STANDALONE',
+            lessonId: null,
+            passingScore: null,
+            resultReleaseRule: 'IMMEDIATE',
+            questions,
+          },
+        });
+        (db.assessmentAttempt.update as jest.Mock).mockResolvedValue({
+          id: 'att-imm',
+          accountId: 'acc-1',
+          submittedAt: new Date(),
+          score: 100,
+          resultsReleased: true,
+        });
+        (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(1);
+
+        const result = await service.submitAttempt('acc-1', 'att-imm');
+
+        expect(result.assessment.questions[0].question.correctOptionId).toBe(
+          'option-a',
+        );
+        expect(result.assessment.questions[0].question.explanation).toBe(
+          'ex-a',
+        );
+      });
+
+      it('does not release the correct option when result release is deferred', async () => {
+        const questions = [
+          {
+            questionId: 'q-1',
+            question: {
+              points: 1,
+              correctOptionId: 'option-a',
+              explanation: 'ex-a',
+              options: [
+                { id: 'option-a', text: 'a' },
+                { id: 'option-b', text: 'b' },
+              ],
+            },
+          },
+        ];
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-def',
+          accountId: 'acc-1',
+          submittedAt: null,
+          autosavedAnswers: { 'q-1': 'option-b' },
+          assessment: {
+            id: 'assess-def',
+            type: 'STANDALONE',
+            lessonId: null,
+            passingScore: null,
+            resultReleaseRule: 'LATER',
+            questions,
+          },
+        });
+        (db.assessmentAttempt.update as jest.Mock).mockResolvedValue({
+          id: 'att-def',
+          accountId: 'acc-1',
+          submittedAt: new Date(),
+          score: 0,
+          resultsReleased: false,
+        });
+        (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(1);
+
+        const result = await service.submitAttempt('acc-1', 'att-def');
+
+        expect(
+          result.assessment.questions[0].question.correctOptionId,
+        ).toBeUndefined();
+        expect(
+          result.assessment.questions[0].question.explanation,
+        ).toBeUndefined();
+      });
+
+      it('throws NotFound when a student submits another student attempt', async () => {
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-owned-by-other',
+          accountId: 'other-student',
+          submittedAt: null,
+          autosavedAnswers: {},
+          assessment: { id: 'assess-x' },
+        });
+
+        await expect(
+          service.submitAttempt('acc-1', 'att-owned-by-other'),
+        ).rejects.toThrow(NotFoundException);
+        expect(db.assessmentAttempt.update).not.toHaveBeenCalled();
+      });
+
+      it('throws NotFound when the attempt does not exist', async () => {
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue(null);
+
+        await expect(
+          service.submitAttempt('acc-1', 'does-not-exist'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('returns the stored outcome when the attempt was already submitted (no double credit)', async () => {
+        const questions = [
+          {
+            questionId: 'q-1',
+            question: {
+              points: 1,
+              correctOptionId: 'option-a',
+              explanation: 'ex-a',
+              options: [{ id: 'option-a' }, { id: 'option-b' }],
+            },
+          },
+        ];
+        (db.assessmentAttempt.findUnique as jest.Mock).mockResolvedValue({
+          id: 'att-done',
+          accountId: 'acc-1',
+          submittedAt: new Date(),
+          score: 100,
+          resultsReleased: false,
+          autosavedAnswers: { 'q-1': 'option-a' },
+          assessment: {
+            id: 'assess-done',
+            type: 'END_OF_LESSON',
+            lessonId: 'lesson-1',
+            passingScore: null,
+            resultReleaseRule: 'LATER',
+            questions,
+          },
+        });
+        (db.assessmentAttempt.count as jest.Mock).mockResolvedValue(1);
+
+        const result = await service.submitAttempt('acc-1', 'att-done');
+
+        expect(
+          result.assessment.questions[0].question.correctOptionId,
+        ).toBeUndefined();
+        expect(db.assessmentAttempt.update).not.toHaveBeenCalled();
+        expect(db.lessonProgress.upsert).not.toHaveBeenCalled();
+      });
     });
   });
 });

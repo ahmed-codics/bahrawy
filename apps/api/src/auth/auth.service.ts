@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { db, Prisma } from '@bahrawy/db';
 import { SecurityService } from '../security/security.service';
@@ -222,6 +223,7 @@ export class AuthService {
         data: {
           passwordHash,
           mustChangePassword: false,
+          status: 'ACTIVE',
           version: { increment: 1 },
         },
       });
@@ -371,6 +373,19 @@ export class AuthService {
       throw new UnauthorizedException(invalidCredentialsMessage);
     }
 
+    // Enforce account status: suspended/inactive/pending accounts must not
+    // be able to authenticate or obtain a new session. Verified password first
+    // (above) so the response is indistinguishable from a bad credential.
+    if (account.status !== 'ACTIVE') {
+      await this.logSecurityEvent(
+        account.id,
+        phoneHmac,
+        'LOGIN',
+        'FAILED_ACCOUNT_INACTIVE',
+      );
+      throw new UnauthorizedException(invalidCredentialsMessage);
+    }
+
     // Staff TOTP verification if active
     if (account.kind === 'STAFF') {
       const factor = account.totpFactor;
@@ -484,6 +499,17 @@ export class AuthService {
         data: { revokedAt: now, revokedReason: 'EXPIRED' },
       });
       throw new UnauthorizedException('Session has expired');
+    }
+
+    // Suspended/inactive accounts must not be able to keep using existing
+    // sessions. Their sessions are revoked so a later re-activation cannot
+    // resurrect a stale authenticated context.
+    if (session.account.status !== 'ACTIVE') {
+      await db.authSession.update({
+        where: { id: session.id },
+        data: { revokedAt: now, revokedReason: 'ACCOUNT_INACTIVE' },
+      });
+      throw new UnauthorizedException('Account is not active');
     }
 
     // Sliding expiry does not need a database write on every API request.
@@ -602,11 +628,28 @@ export class AuthService {
     reason: string,
     checklist: any,
   ) {
+    const initiator = await db.account.findUnique({
+      where: { id: initiatorStaffId },
+      select: { organizationId: true },
+    });
+    if (!initiator) {
+      throw new BadRequestException('Initiating staff account not found');
+    }
+
     const target = await db.account.findUnique({
       where: { id: targetAccountId },
     });
     if (!target) {
       throw new BadRequestException('Target account not found');
+    }
+
+    // Tenant isolation: a staff member may only reset passwords for accounts
+    // within their own organization. Without this, a privileged staff member
+    // could take over accounts in any other organization.
+    if (target.organizationId !== initiator.organizationId) {
+      throw new ForbiddenException(
+        'Cannot reset password for an account in another organization',
+      );
     }
 
     const plainCredential = this.securityService

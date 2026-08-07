@@ -22,6 +22,12 @@ jest.mock('@bahrawy/db', () => {
       findUnique: jest.fn(),
       upsert: jest.fn(),
     },
+    assessment: {
+      findFirst: jest.fn(),
+    },
+    assessmentAttempt: {
+      findFirst: jest.fn(),
+    },
   };
   return {
     db: mockDbClient,
@@ -189,6 +195,71 @@ describe('VideoService', () => {
         100,
       );
       expect(result.completed).toBe(false);
+    });
+
+    it('does not auto-complete at 90% when the lesson gate quiz is not passed', async () => {
+      (db.assessment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'gate-1',
+        passingScore: 60,
+      });
+      (db.assessmentAttempt.findFirst as jest.Mock).mockResolvedValue(null);
+      (db.lessonProgress.upsert as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({
+          id: 'prog-1',
+          watchedSeconds: 90,
+          completedAt: args.update?.completedAt
+            ? (args.update.completedAt as { set: Date }).set
+            : null,
+        }),
+      );
+
+      const result = await service.updateWatchProgress(
+        'acc-1',
+        'lesson-1',
+        90,
+        100,
+      );
+      expect(result.completed).toBe(false);
+    });
+
+    it('completes at 90% when the lesson gate quiz was passed', async () => {
+      (db.assessment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'gate-1',
+        passingScore: 60,
+      });
+      (db.assessmentAttempt.findFirst as jest.Mock).mockResolvedValue({
+        score: 80,
+      });
+      (db.lessonProgress.upsert as jest.Mock).mockResolvedValue({
+        id: 'prog-1',
+        watchedSeconds: 90,
+        completedAt: new Date(),
+      });
+
+      const result = await service.updateWatchProgress(
+        'acc-1',
+        'lesson-1',
+        90,
+        100,
+      );
+      expect(result.completed).toBe(true);
+    });
+
+    it('auto-completes at 90% when the lesson has no gate quiz', async () => {
+      (db.assessment.findFirst as jest.Mock).mockResolvedValue(null);
+      (db.lessonProgress.upsert as jest.Mock).mockResolvedValue({
+        id: 'prog-1',
+        watchedSeconds: 90,
+        completedAt: new Date(),
+      });
+
+      const result = await service.updateWatchProgress(
+        'acc-1',
+        'lesson-1',
+        90,
+        100,
+      );
+      expect(result.completed).toBe(true);
     });
   });
 });

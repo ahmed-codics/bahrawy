@@ -112,7 +112,9 @@ export class SecurityService {
       );
     }
     if (this.isCommonPassword(password)) {
-      throw new BadRequestException('Password is too common and easily guessed');
+      throw new BadRequestException(
+        'Password is too common and easily guessed',
+      );
     }
     return argon2.hash(password, {
       type: argon2.argon2id,

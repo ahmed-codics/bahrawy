@@ -24,6 +24,10 @@ import { CsrfModule } from './csrf/csrf.module';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './rbac/audit.interceptor';
 import { CsrfGuard } from './csrf/csrf.guard';
+import {
+  ThrottleGuard,
+  GLOBAL_THROTTLE_CONFIG,
+} from './throttle/throttle.guard';
 
 @Module({
   imports: [
@@ -50,6 +54,14 @@ import { CsrfGuard } from './csrf/csrf.guard';
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: GLOBAL_THROTTLE_CONFIG,
+      useValue: { limit: 200, windowMs: 60_000 },
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottleGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: CsrfGuard,

@@ -253,9 +253,15 @@ export class AssessmentService {
               ...entry,
               question: {
                 ...entry.question,
-                options: normalizeVisibleQuestionOptions(entry.question.options),
-                correctOptionId: attempt.resultsReleased ? entry.question.correctOptionId : undefined,
-                explanation: attempt.resultsReleased ? entry.question.explanation : undefined,
+                options: normalizeVisibleQuestionOptions(
+                  entry.question.options,
+                ),
+                correctOptionId: attempt.resultsReleased
+                  ? entry.question.correctOptionId
+                  : undefined,
+                explanation: attempt.resultsReleased
+                  ? entry.question.explanation
+                  : undefined,
               },
             }),
           ),
@@ -296,6 +302,7 @@ export class AssessmentService {
       submitted as Record<string, any>,
       attemptsUsed,
     );
+    await this.maybeCompleteLesson(accountId, attempt.assessment, outcome);
     return {
       ...outcome,
       assessment: {
@@ -306,13 +313,43 @@ export class AssessmentService {
             question: {
               ...entry.question,
               options: normalizeVisibleQuestionOptions(entry.question.options),
-              correctOptionId: resultsReleased ? entry.question.correctOptionId : undefined,
-              explanation: resultsReleased ? entry.question.explanation : undefined,
+              correctOptionId: resultsReleased
+                ? entry.question.correctOptionId
+                : undefined,
+              explanation: resultsReleased
+                ? entry.question.explanation
+                : undefined,
             },
           }),
         ),
       },
     };
+  }
+
+  private async maybeCompleteLesson(
+    accountId: string,
+    assessment: any,
+    outcome: any,
+  ) {
+    if (assessment.type !== 'END_OF_LESSON' || !assessment.lessonId) {
+      return;
+    }
+    if (!outcome.passed) return;
+    await db.lessonProgress.upsert({
+      where: {
+        accountId_lessonId: { accountId, lessonId: assessment.lessonId },
+      },
+      create: {
+        accountId,
+        lessonId: assessment.lessonId,
+        watchedSeconds: 0,
+        durationSeconds: 0,
+        completedAt: new Date(),
+      },
+      update: {
+        completedAt: new Date(),
+      },
+    });
   }
 
   async listAssessments(accountId: string, courseId: string): Promise<any[]> {
@@ -409,8 +446,12 @@ export class AssessmentService {
             question: {
               ...entry.question,
               options: normalizeVisibleQuestionOptions(entry.question.options),
-              correctOptionId: attempt.resultsReleased ? entry.question.correctOptionId : undefined,
-              explanation: attempt.resultsReleased ? entry.question.explanation : undefined,
+              correctOptionId: attempt.resultsReleased
+                ? entry.question.correctOptionId
+                : undefined,
+              explanation: attempt.resultsReleased
+                ? entry.question.explanation
+                : undefined,
             },
           }),
         ),

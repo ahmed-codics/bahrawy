@@ -25,12 +25,14 @@ export class SupportController {
   @Post()
   async createTicket(
     @Req() req: any,
-    @Body()
-    body: { subject: string; description: string; organizationId?: string },
+    @Body() body: { subject: string; description: string },
   ) {
+    // Tenant is derived exclusively from the authenticated account. Any
+    // organizationId provided by the client is deliberately ignored so a
+    // student cannot file a ticket into another organization's dataset.
     const data = await this.supportService.createTicket(
       req.account.id,
-      body.organizationId || req.account.organizationId,
+      req.account.organizationId,
       body.subject,
       body.description,
     );
