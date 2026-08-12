@@ -22,6 +22,7 @@ import { AdminApiResponseInterceptor } from '../common/interceptors/admin-respon
 import {
   CreateStudentDto,
   GrantEntitlementDto,
+  ListStudentsQueryDto,
   ReasonDto,
   StudentStatusDto,
   UpdateEntitlementDto,
@@ -43,21 +44,14 @@ export class AdminV1StudentsController {
   constructor(private readonly students: AdminV1StudentsService) {}
 
   @Get()
-  list(
-    @Req() request: AdminRequest,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
-    @Query('gradeId') gradeId?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  list(@Req() request: AdminRequest, @Query() query: ListStudentsQueryDto) {
     return this.students.list(
       request.account.organizationId,
-      search,
-      status,
-      gradeId,
-      Number(page) || 1,
-      Number(pageSize) || 25,
+      query.search,
+      query.status,
+      query.gradeId,
+      query.page ?? 1,
+      query.pageSize ?? 25,
     );
   }
 

@@ -2,7 +2,7 @@
 
 import { FormEvent, use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, FileText, Plus, Video } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, FileText, Plus, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   Badge,
@@ -44,9 +44,7 @@ export default function UnitEditorPage({
       const response = await fetchApi(`/admin/v1/courses/units/${unitId}`);
       setUnit(response.data as UnitDetail);
     } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : 'تعذر تحميل الوحدة',
-      );
+      setError(requestError instanceof Error ? requestError.message : 'تعذر تحميل الوحدة');
     }
   }, [unitId]);
 
@@ -59,26 +57,37 @@ export default function UnitEditorPage({
     const values = Object.fromEntries(new FormData(event.currentTarget));
     setSaving(true);
     try {
-      const response = await fetchApi(
-        `/admin/v1/courses/units/${unitId}/lessons`,
-        {
+      const contentType = String(values.contentType || 'VIDEO');
+      const response = await fetchApi(`/admin/v1/courses/units/${unitId}/lessons`, {
+        method: 'POST',
+        body: JSON.stringify({
+          titleAr: String(values.titleAr).trim(),
+          titleEn: String(values.titleEn || '').trim() || undefined,
+          contentType,
+          requiresPreviousLessonPass: Boolean(values.requiresPreviousLessonPass),
+        }),
+      });
+      const lessonId = response.data.id;
+      if (contentType === 'EXAM') {
+        const assessmentResponse = await fetchApi(`/admin/v1/assessments/lessons/${lessonId}`, {
           method: 'POST',
           body: JSON.stringify({
-            titleAr: String(values.titleAr).trim(),
-            titleEn: String(values.titleEn || '').trim() || undefined,
-            contentType: values.contentType,
+            titleAr: String(values.titleAr).trim() || 'امتحان',
+            type: 'QUIZ',
+            durationMinutes: 30,
+            shuffleQuestions: true,
+            resultReleaseRule: 'MANUAL',
           }),
-        },
-      );
+        });
+        setCreateOpen(false);
+        router.push(`/dashboard/courses/${courseId}/assessments/${assessmentResponse.data.id}`);
+        return;
+      }
       toast.success('تم إنشاء الدرس كمسودة');
       setCreateOpen(false);
-      router.push(
-        `/dashboard/courses/${courseId}/units/${unitId}/lessons/${response.data.id}`,
-      );
+      router.push(`/dashboard/courses/${courseId}/units/${unitId}/lessons/${lessonId}`);
     } catch (requestError) {
-      toast.error(
-        requestError instanceof Error ? requestError.message : 'تعذر إنشاء الدرس',
-      );
+      toast.error(requestError instanceof Error ? requestError.message : 'تعذر إنشاء الدرس');
     } finally {
       setSaving(false);
     }
@@ -126,10 +135,7 @@ export default function UnitEditorPage({
       <section className="grid gap-4 sm:grid-cols-3">
         <Metric label="الدروس" value={unit.lessons.length} />
         <Metric label="الاختبارات" value={unit.assessments.length} />
-        <Metric
-          label="المتطلب السابق"
-          value={unit.prerequisiteAssessment ? 'محدد' : 'غير محدد'}
-        />
+        <Metric label="المتطلب السابق" value={unit.prerequisiteAssessment ? 'محدد' : 'غير محدد'} />
       </section>
 
       <Card>
@@ -149,9 +155,13 @@ export default function UnitEditorPage({
                   lesson={lesson}
                   index={index + 1}
                   onOpen={() =>
-                    router.push(
-                      `/dashboard/courses/${courseId}/units/${unitId}/lessons/${lesson.id}`,
-                    )
+                    lesson.contentType === 'EXAM' && lesson.assessments?.[0]?.id
+                      ? router.push(
+                          `/dashboard/courses/${courseId}/assessments/${lesson.assessments[0].id}`,
+                        )
+                      : router.push(
+                          `/dashboard/courses/${courseId}/units/${unitId}/lessons/${lesson.id}`,
+                        )
                   }
                 />
               ))}
@@ -181,18 +191,32 @@ export default function UnitEditorPage({
       >
         <form id="create-unit-lesson" className="space-y-4" onSubmit={createLesson}>
           <Input name="titleAr" label="اسم الدرس بالعربية" required />
-          <Input
-            name="titleEn"
-            label="اسم الدرس بالإنجليزية"
-            directionMode="ltr"
-          />
+          <Input name="titleEn" label="اسم الدرس بالإنجليزية" directionMode="ltr" />
           <Select name="contentType" label="نوع المحتوى" defaultValue="VIDEO">
             <option value="VIDEO">فيديو</option>
             <option value="PDF">ملف PDF</option>
             <option value="TEXT">محتوى نصي</option>
+            <option value="EXAM">امتحان</option>
           </Select>
+          <div className="space-y-3 rounded-2xl border border-border bg-canvas/50 p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-interactive"
+                name="requiresPreviousLessonPass"
+              />
+              <span className="text-sm font-semibold">
+                قفل الدرس حتى اجتياز اختبار الدرس السابق
+              </span>
+            </label>
+            <p className="text-xs leading-6 text-ink-3">
+              عند التفعيل لن يستطيع الطالب فتح هذا الدرس إلا بعد اجتياز اختبار الدرس السابق. عند
+              إيقاف التفعيل يُفتح الدرس للطالب بشكل طبيعي.
+            </p>
+          </div>
           <p className="rounded-xl bg-surface-2 p-3 text-sm text-ink-3">
-            يبدأ الدرس كمسودة. ستضيف الملف أو رابط الفيديو في شاشة الدرس التالية.
+            يبدأ الدرس كمسودة. ستضيف الملف أو رابط الفيديو في شاشة الدرس التالية. عند اختيار
+            «امتحان» ستفتح لوحة الامتحان مباشرة لإضافة الموقت والأسئلة.
           </p>
         </form>
       </Drawer>
@@ -230,6 +254,8 @@ function LessonRow({
       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-ink-3">
         {lesson.contentType === 'VIDEO' ? (
           <Video className="size-5" />
+        ) : lesson.contentType === 'EXAM' ? (
+          <ClipboardCheck className="size-5" />
         ) : (
           <FileText className="size-5" />
         )}
@@ -237,7 +263,7 @@ function LessonRow({
       <span className="min-w-0 flex-1">
         <strong className="block truncate">{lesson.titleAr}</strong>
         <span className="mt-1 block text-xs text-ink-3">
-          {lesson.contentType} · {lesson.status}
+          {lesson.contentType === 'EXAM' ? 'امتحان' : lesson.contentType} · {lesson.status}
         </span>
       </span>
       <ArrowLeft className="size-5 text-ink-3 transition group-hover:-translate-x-1" />

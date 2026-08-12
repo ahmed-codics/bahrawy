@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Marhey, Tajawal } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'react-hot-toast';
@@ -27,11 +28,16 @@ export const metadata: Metadata = {
     'Staff portal for managing Bahrawy Academy content, students, and payments.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The proxy.ts generates a per-request nonce and forwards it via x-nonce.
+  // Reading it here opts the app into dynamic rendering so Next.js can apply
+  // the nonce to framework/inline scripts under the CSP.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html
       lang="ar"
@@ -41,7 +47,12 @@ export default function RootLayout({
       className={`${tajawal.variable} ${marhey.variable}`}
     >
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          nonce={nonce}
+        >
           {children}
           <Toaster
             position="bottom-center"

@@ -17,9 +17,14 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Badge, Button, EmptyState, PageSkeleton } from '@bahrawy/ui';
+import { PriceTag } from '../../../../components/PriceTag';
 import { API_BASE, fetchApi } from '../../../../lib/api';
 
-type Price = { amount: number | string; currency?: string };
+type Price = {
+  amount: number | string;
+  originalAmount?: number | string | null;
+  currency?: string;
+};
 type Product = {
   id: string;
   titleAr: string;
@@ -31,8 +36,17 @@ type Lesson = {
   id: string;
   titleAr: string;
   available?: boolean;
+  locked?: boolean;
+  gate?: { requiredAssessmentId?: string; requiredScore?: number | null } | null;
   access?: { hasAccess: boolean; hasEntitlement?: boolean; reason?: string };
-  lessons?: { id: string; titleAr: string; contentType: string; durationSeconds?: number }[];
+  lessons?: {
+    id: string;
+    titleAr: string;
+    contentType: string;
+    durationSeconds?: number;
+    locked?: boolean;
+    gate?: { requiredAssessmentId?: string; requiredScore?: number | null } | null;
+  }[];
   purchaseProduct?: Product | null;
   prerequisiteAssessment?: { titleAr: string } | null;
 };
@@ -45,13 +59,8 @@ type Course = {
   chapters?: Chapter[];
 };
 
-function money(product?: Product | null) {
-  const price = product?.prices?.[0];
-  return price && Number(price.amount) === 0
-    ? 'مجاني'
-    : price
-      ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
-    : null;
+function money(product?: Product | null): Price | null {
+  return product?.prices?.[0] ?? null;
 }
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -212,6 +221,7 @@ function LessonCard({
   const price = money(lesson.purchaseProduct);
   const duration =
     lesson.lessons?.reduce((total, material) => total + (material.durationSeconds || 0), 0) || 0;
+  const lockedCount = lesson.lessons?.filter((material) => material.locked).length || 0;
   return (
     <article className="student-course-card flex h-full flex-col">
       <button
@@ -259,6 +269,12 @@ function LessonCard({
             </span>
           )}
         </div>
+        {lockedCount > 0 && owned && (
+          <p className="mt-3 inline-flex items-center gap-1 text-xs font-bold leading-5 text-error">
+            <LockKeyhole className="size-3.5" /> 🔒 مغلق حتى اجتياز اختبار الدرس السابق
+            {lockedCount > 1 ? ` (${lockedCount} دروس)` : ''}
+          </p>
+        )}
         {lesson.available === false && (
           <p className="mt-3 text-xs font-bold text-warning">
             أكمل {lesson.prerequisiteAssessment?.titleAr} أولاً
@@ -271,7 +287,7 @@ function LessonCard({
                 {owned ? 'حالة الوصول' : 'سعر الدرس'}
               </p>
               <p className="ba-number mt-1 text-xl font-black">
-                {owned ? 'مفتوح في حسابك' : price || 'غير محدد بعد'}
+                {owned ? 'مفتوح في حسابك' : price ? <PriceTag price={price} /> : 'غير محدد بعد'}
               </p>
             </div>
             {owned ? (
@@ -329,7 +345,9 @@ function PurchaseChoice({
         <p className="mt-1 text-sm text-text-muted">{description}</p>
       </div>
       <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
-        <strong className="ba-number whitespace-nowrap text-xl">{money(product) || '—'}</strong>
+        <strong className="ba-number whitespace-nowrap text-xl">
+          <PriceTag price={product?.prices?.[0]} />
+        </strong>
         <Button variant={featured ? 'accent' : 'primary'} onClick={onBuy}>
           اشترِ الآن
         </Button>

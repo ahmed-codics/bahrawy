@@ -134,9 +134,16 @@ export class AdminV1StudentsService {
       } catch {
         // Legacy value cannot be read.
       }
-      const { parentPhoneEncrypted: _pp, ...rest } = student;
+      const { parentPhoneEncrypted: _pp, account, ...rest } = student;
+      const {
+        phoneEncrypted: _pe,
+        emailEncrypted: _ee,
+        ...safeAccount
+      } = account;
       void _pp;
-      return { ...rest, phone, parentPhone, email };
+      void _pe;
+      void _ee;
+      return { ...rest, account: safeAccount, phone, parentPhone, email };
     });
     return {
       students: withContacts,
@@ -152,19 +159,64 @@ export class AdminV1StudentsService {
   async detail(organizationId: string, studentId: string) {
     const student = await db.studentProfile.findFirst({
       where: { id: studentId, account: { organizationId, deletedAt: null } },
-      include: {
-        grade: true,
+      select: {
+        id: true,
+        studentNumber: true,
+        displayName: true,
+        firstName: true,
+        secondName: true,
+        thirdName: true,
+        lastName: true,
+        schoolName: true,
+        gender: true,
+        city: true,
+        accountId: true,
+        parentPhoneEncrypted: true,
+        motherPhoneEncrypted: true,
+        grade: { select: { id: true, nameAr: true } },
         account: {
-          include: {
-            devices: { orderBy: { lastUsedAt: 'desc' } },
-            authSessions: { orderBy: { lastSeenAt: 'desc' }, take: 20 },
+          select: {
+            id: true,
+            status: true,
+            version: true,
+            createdAt: true,
+            updatedAt: true,
+            phoneEncrypted: true,
+            emailEncrypted: true,
+            devices: {
+              select: {
+                id: true,
+                label: true,
+                deviceFingerprint: true,
+                createdAt: true,
+                lastUsedAt: true,
+              },
+              orderBy: { lastUsedAt: 'desc' },
+            },
+            authSessions: {
+              select: {
+                id: true,
+                createdAt: true,
+                lastSeenAt: true,
+                revokedAt: true,
+                revokedReason: true,
+                ipAddress: true,
+                userAgent: true,
+              },
+              orderBy: { lastSeenAt: 'desc' },
+              take: 20,
+            },
             entitlements: {
-              orderBy: { createdAt: 'desc' },
-              include: {
+              select: {
+                id: true,
+                status: true,
+                grantedAt: true,
+                expiresAt: true,
                 product: {
-                  include: { courses: { include: { course: true } } },
+                  select: { id: true, titleAr: true, code: true, status: true },
                 },
               },
+              orderBy: { createdAt: 'desc' },
             },
           },
         },
@@ -200,16 +252,24 @@ export class AdminV1StudentsService {
     } catch {
       // Older profiles may not have valid parent contact data.
     }
-    const publicStudent = Object.fromEntries(
-      Object.entries(student).filter(
-        ([key]) =>
-          key !== 'parentPhoneEncrypted' &&
-          key !== 'parentPhoneHmac' &&
-          key !== 'motherPhoneEncrypted',
-      ),
-    );
+    const {
+      parentPhoneEncrypted: _ppe,
+      motherPhoneEncrypted: _mpe,
+      account,
+      ...publicStudent
+    } = student;
+    const {
+      phoneEncrypted: _pe,
+      emailEncrypted: _ee,
+      ...publicAccount
+    } = account;
+    void _ppe;
+    void _mpe;
+    void _pe;
+    void _ee;
     return {
       ...publicStudent,
+      account: publicAccount,
       phone,
       parentPhone,
       motherPhone,
@@ -268,7 +328,13 @@ export class AdminV1StudentsService {
       },
     });
     return {
-      student: account.studentProfile,
+      student: {
+        id: account.studentProfile?.id,
+        studentNumber: account.studentProfile?.studentNumber,
+        displayName: account.studentProfile?.displayName,
+        gradeId: account.studentProfile?.gradeId,
+        accountId: account.studentProfile?.accountId,
+      },
       accountId: account.id,
       temporaryPassword,
     };
@@ -307,7 +373,7 @@ export class AdminV1StudentsService {
       after: { status: updated.status },
       reason: input.reason,
     });
-    return updated;
+    return { id: updated.id, status: updated.status, version: updated.version };
   }
 
   async updateProfile(
@@ -430,7 +496,20 @@ export class AdminV1StudentsService {
       after: updated,
       reason: input.reason,
     });
-    return updated;
+    return {
+      id: updated.id,
+      studentNumber: updated.studentNumber,
+      displayName: updated.displayName,
+      firstName: updated.firstName,
+      secondName: updated.secondName,
+      thirdName: updated.thirdName,
+      lastName: updated.lastName,
+      gradeId: updated.gradeId,
+      schoolName: updated.schoolName,
+      city: updated.city,
+      gender: updated.gender,
+      updatedAt: updated.updatedAt,
+    };
   }
 
   async deletionImpact(
@@ -534,7 +613,12 @@ export class AdminV1StudentsService {
       after: updated,
       reason: input.reason,
     });
-    return updated;
+    return {
+      id: updated.id,
+      status: updated.status,
+      archivedAt: updated.archivedAt,
+      version: updated.version,
+    };
   }
 
   async revokeDevice(

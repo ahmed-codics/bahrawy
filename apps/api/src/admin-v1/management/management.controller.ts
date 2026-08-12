@@ -20,6 +20,8 @@ import { AdminApiErrorFilter } from '../common/filters/admin-error.filter';
 import { AdminApiResponseInterceptor } from '../common/interceptors/admin-response.interceptor';
 import {
   CreateStaffDto,
+  ListAuditQueryDto,
+  ListStaffQueryDto,
   UpdateOrganizationDto,
   UpdateStaffDto,
 } from './management.dto';
@@ -39,19 +41,13 @@ export class AdminV1ManagementController {
   constructor(private readonly management: AdminV1ManagementService) {}
 
   @Get('staff')
-  staff(
-    @Req() request: AdminRequest,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  staff(@Req() request: AdminRequest, @Query() query: ListStaffQueryDto) {
     return this.management.staff(
       request.account.organizationId,
-      search,
-      status,
-      Number(page) || 1,
-      Number(pageSize) || 25,
+      query.search,
+      query.status,
+      query.page ?? 1,
+      query.pageSize ?? 25,
     );
   }
 
@@ -101,21 +97,14 @@ export class AdminV1ManagementController {
   }
 
   @Get('audit')
-  audit(
-    @Req() request: AdminRequest,
-    @Query('action') action?: string,
-    @Query('actorId') actorId?: string,
-    @Query('targetType') targetType?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  audit(@Req() request: AdminRequest, @Query() query: ListAuditQueryDto) {
     return this.management.auditEvents(
       request.account.organizationId,
-      action,
-      actorId,
-      targetType,
-      Number(page) || 1,
-      Number(pageSize) || 50,
+      query.action,
+      query.actorId,
+      query.targetType,
+      query.page ?? 1,
+      query.pageSize ?? 50,
     );
   }
 

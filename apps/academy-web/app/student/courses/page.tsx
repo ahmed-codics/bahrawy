@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Badge, Button, EmptyState, PageSkeleton, ProgressBar } from '@bahrawy/ui';
+import { PriceTag } from '../../../components/PriceTag';
 import { API_BASE, fetchApi } from '../../../lib/api';
 
 type Course = {
@@ -225,11 +226,7 @@ function CourseCard({
             <div>
               <p className="text-xs font-bold text-text-muted">يبدأ من</p>
               <p className="ba-number mt-1 text-xl font-black">
-                {price && Number(price.amount) === 0
-                  ? 'مجاني'
-                  : price
-                    ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
-                  : 'شاهد الخيارات'}
+                {price ? <PriceTag price={price} /> : 'شاهد الخيارات'}
               </p>
             </div>
             <LockKeyhole className="size-5 text-text-muted" />

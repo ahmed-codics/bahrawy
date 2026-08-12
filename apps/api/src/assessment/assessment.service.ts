@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { db } from '@bahrawy/db';
 import { CatalogService } from '../catalog/catalog.service';
+import { ExamSessionService } from '../exam-session/exam-session.service';
 
 type VisibleQuestionOption = {
   id: string;
@@ -51,6 +52,11 @@ function normalizeVisibleQuestionOptions(
   return [];
 }
 
+/**
+ * Outstanding one-time grant (admin unlock) available for this student beyond
+ * the configured maxAttempts. Each grant reserves exactly one fresh attempt.
+ */
+
 function buildAttemptOutcome(
   assessment: {
     passingScore: number | null;
@@ -58,6 +64,7 @@ function buildAttemptOutcome(
   },
   attempt: Record<string, any>,
   attemptsUsed: number,
+  grantedAttempts = 0,
 ) {
   const score = attempt.score === null ? null : Number(attempt.score);
   const passed =
@@ -74,13 +81,29 @@ function buildAttemptOutcome(
     attemptsRemaining:
       assessment.maxAttempts === null
         ? null
-        : Math.max(0, assessment.maxAttempts - attemptsUsed),
+        : Math.max(0, assessment.maxAttempts - attemptsUsed + grantedAttempts),
+    grantedAttempts,
   };
 }
 
 @Injectable()
 export class AssessmentService {
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(
+    private readonly catalogService: CatalogService,
+    private readonly examSessionService: ExamSessionService,
+  ) {}
+
+  /**
+   * Outstanding one-time grants (admin unlock) available for this student
+   * beyond the configured maxAttempts. Each grant reserves exactly one fresh
+   * attempt and never deletes the previous FAILED attempt history.
+   */
+  private async countGrantedAttempts(
+    accountId: string,
+    assessmentId: string,
+  ): Promise<number> {
+    return this.examSessionService.availableGrants(accountId, assessmentId);
+  }
 
   async startAttempt(
     accountId: string,
@@ -96,6 +119,9 @@ export class AssessmentService {
     }
     if (assessment.status !== 'PUBLISHED') {
       throw new ForbiddenException('Assessment is not published');
+    }
+    if (assessment.lessonId) {
+      await this.catalogService.canAccessLesson(accountId, assessment.lessonId);
     }
     const unitAccess = assessment.unitId
       ? await this.catalogService.getUnitAccess(accountId, assessment.unitId)
@@ -120,6 +146,11 @@ export class AssessmentService {
         message: 'You are not enrolled in the course for this assessment.',
       });
     }
+    const durationMinutes = assessment.durationMinutes ?? 0;
+    const session = await this.examSessionService.prepareStart(
+      accountId,
+      assessmentId,
+    );
     const now = new Date();
     const activeAttempt = await db.assessmentAttempt.findFirst({
       where: {
@@ -130,6 +161,17 @@ export class AssessmentService {
       },
     });
     if (activeAttempt) {
+      if (activeAttempt.examSessionId) {
+        await this.examSessionService.enforceForAttempt(
+          accountId,
+          activeAttempt,
+        );
+      } else if (session) {
+        await db.assessmentAttempt.update({
+          where: { id: activeAttempt.id },
+          data: { examSessionId: session.id },
+        });
+      }
       return activeAttempt;
     }
 
@@ -155,9 +197,14 @@ export class AssessmentService {
     if (!newAttempt && submittedAttempts[0]) {
       return submittedAttempts[0];
     }
+    const grantedAttempts = await this.countGrantedAttempts(
+      accountId,
+      assessmentId,
+    );
     if (
       assessment.maxAttempts !== null &&
-      submittedAttempts.length >= assessment.maxAttempts
+      submittedAttempts.length >= assessment.maxAttempts &&
+      grantedAttempts <= 0
     ) {
       throw new ForbiddenException({
         code: 'ASSESSMENT_ATTEMPT_LIMIT_REACHED',
@@ -173,15 +220,43 @@ export class AssessmentService {
       assessment.durationMinutes > 0
         ? new Date(startedAt.getTime() + assessment.durationMinutes * 60 * 1000)
         : null;
-    return db.assessmentAttempt.create({
+    let attemptSession = session;
+    if (!attemptSession) {
+      attemptSession = await this.examSessionService.create(
+        accountId,
+        assessmentId,
+        durationMinutes,
+      );
+    } else {
+      attemptSession = await this.examSessionService.attachAttempt(
+        accountId,
+        assessmentId,
+        attemptSession.id,
+      );
+    }
+    const unlockedByAdmin =
+      grantedAttempts > 0 && assessment.maxAttempts !== null;
+    const attempt = await db.assessmentAttempt.create({
       data: {
         assessmentId,
         accountId,
         startedAt,
         expiresAt,
         autosavedAnswers: {},
+        examSessionId: attemptSession.id,
       },
     });
+    if (unlockedByAdmin) {
+      await this.examSessionService.consumeGrant(
+        accountId,
+        assessmentId,
+        attempt.id,
+      );
+    }
+    return {
+      ...attempt,
+      unlockedByAdmin,
+    };
   }
 
   async autosaveAnswers(
@@ -195,6 +270,7 @@ export class AssessmentService {
     if (!attempt || attempt.accountId !== accountId) {
       throw new NotFoundException('Attempt not found');
     }
+    await this.examSessionService.enforceForAttempt(accountId, attempt);
     if (attempt.submittedAt) {
       throw new BadRequestException({
         code: 'ATTEMPT_SUBMITTED',
@@ -239,10 +315,15 @@ export class AssessmentService {
           submittedAt: { not: null },
         },
       });
+      const grantedAttempts = await this.countGrantedAttempts(
+        accountId,
+        attempt.assessmentId,
+      );
       const outcome = buildAttemptOutcome(
         attempt.assessment,
         attempt as Record<string, any>,
         attemptsUsed,
+        grantedAttempts,
       );
       return {
         ...outcome,
@@ -268,6 +349,7 @@ export class AssessmentService {
         },
       };
     }
+    await this.examSessionService.enforceForSubmit(accountId, attempt);
     let totalPoints = 0;
     let earnedPoints = 0;
     const answers = (attempt.autosavedAnswers as Record<string, string>) || {};
@@ -290,6 +372,9 @@ export class AssessmentService {
         resultsReleased,
       },
     });
+    if (attempt.examSessionId) {
+      await this.examSessionService.markSubmitted(attempt.examSessionId);
+    }
     const attemptsUsed = await db.assessmentAttempt.count({
       where: {
         accountId,
@@ -297,10 +382,15 @@ export class AssessmentService {
         submittedAt: { not: null },
       },
     });
+    const grantedAttempts = await this.countGrantedAttempts(
+      accountId,
+      attempt.assessmentId,
+    );
     const outcome = buildAttemptOutcome(
       attempt.assessment,
       submitted as Record<string, any>,
       attemptsUsed,
+      grantedAttempts,
     );
     await this.maybeCompleteLesson(accountId, attempt.assessment, outcome);
     return {
@@ -331,7 +421,7 @@ export class AssessmentService {
     assessment: any,
     outcome: any,
   ) {
-    if (assessment.type !== 'END_OF_LESSON' || !assessment.lessonId) {
+    if (!assessment.lessonId) {
       return;
     }
     if (!outcome.passed) return;
@@ -424,6 +514,9 @@ export class AssessmentService {
     if (!attempt || attempt.accountId !== accountId) {
       throw new NotFoundException('Attempt not found');
     }
+    if (attempt.examSessionId && !attempt.submittedAt) {
+      await this.examSessionService.enforceForAttempt(accountId, attempt);
+    }
     const attemptsUsed = await db.assessmentAttempt.count({
       where: {
         accountId,
@@ -431,10 +524,15 @@ export class AssessmentService {
         submittedAt: { not: null },
       },
     });
+    const grantedAttempts = await this.countGrantedAttempts(
+      accountId,
+      attempt.assessmentId,
+    );
     const outcome = buildAttemptOutcome(
       attempt.assessment,
       attempt as Record<string, any>,
       attemptsUsed,
+      grantedAttempts,
     );
     return {
       ...outcome,

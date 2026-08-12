@@ -23,7 +23,8 @@ import {
   ProviderVideoPlayer,
   VideoPlayback,
 } from '@bahrawy/ui';
-import { API_BASE, fetchApi } from '../../../../../../lib/api';
+import { PriceTag } from '../../../../../../components/PriceTag';
+import { API_BASE, ApiError, fetchApi } from '../../../../../../lib/api';
 
 type Product = {
   id: string;
@@ -98,6 +99,7 @@ export default function LessonDetailPage({
         }
       })
       .catch(async (requestError) => {
+        const code = requestError instanceof ApiError ? requestError.code : undefined;
         const message =
           requestError instanceof Error ? requestError.message : '';
         if (/device|fingerprint|جهاز/i.test(message)) {
@@ -106,7 +108,7 @@ export default function LessonDetailPage({
           );
           return;
         }
-        if (/quiz|اختبار|LESSON_LOCKED/i.test(message)) {
+        if (code === 'LESSON_LOCKED' || /quiz|اختبار|LESSON_LOCKED/i.test(message)) {
           setLocked({});
           try {
             const response = await fetchApi(`/catalog/courses/${id}`);
@@ -337,9 +339,7 @@ function LockedLesson({
             onClick={onBuy}
           >
             شراء هذا الدرس ·{' '}
-            {cost
-              ? `${Number(cost.amount).toLocaleString('ar-EG')} ${cost.currency || 'EGP'}`
-              : 'اشترك الآن'}
+            {cost ? <PriceTag price={cost} /> : 'اشترك الآن'}
           </Button>
         )}
         <Button variant="outline" onClick={onCourse}>
@@ -381,19 +381,25 @@ function EndOfLessonQuizSection({
           </span>
           <div>
             <p className="text-sm font-black text-brand-700 dark:text-brand-300">
-              اختبار نهاية الدرس
+              امتحان
             </p>
             <h3 className="ba-heading mt-1 text-2xl">
-              {passed ? 'تم اجتياز الاختبار 🎉' : 'أكمل اختبار نهاية الدرس'}
+              {passed
+                ? 'تم اجتياز الامتحان 🎉'
+                : quiz.lastScore !== null
+                  ? 'لم تجتز الاختبار'
+                  : 'أكمل امتحان الدرس'}
             </h3>
             <p className="mt-1 text-sm leading-6 text-text-muted">
               {passed
                 ? 'يمكنك الآن الانتقال للدرس التالي.'
-                : `${quiz.questionCount} سؤال · مطلوب اجتياز ${quiz.requiredScore ?? 0} درجة للانتقال للدرس التالي.`}
+                : quiz.lastScore !== null
+                  ? 'أعد الاختبار لمحاولة فتح الدرس التالي.'
+                  : `${quiz.questionCount} سؤال · مطلوب اجتياز ${quiz.requiredScore ?? 0} درجة للانتقال للدرس التالي.`}
             </p>
             {!passed && quiz.lastScore !== null && (
               <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-error/10 px-3 py-1 text-xs font-bold text-error">
-                آخر نتيجة: {quiz.lastScore} — جرّب مرة أخرى لتحقيق درجة النجاح.
+                آخر نتيجة: {quiz.lastScore} — الحد الأدنى {quiz.requiredScore ?? 0} درجة.
               </p>
             )}
           </div>
@@ -413,8 +419,12 @@ function EndOfLessonQuizSection({
               </Button>
             </>
           ) : (
-            <Button variant="primary" leadingIcon={<PlayCircle className="size-4" />} onClick={onStart}>
-              ابدأ الاختبار
+            <Button
+              variant="primary"
+              leadingIcon={<PlayCircle className="size-4" />}
+              onClick={onStart}
+            >
+              {quiz.lastScore !== null ? 'أعد الاختبار' : 'ابدأ الاختبار'}
             </Button>
           )}
         </div>
@@ -437,12 +447,11 @@ function QuizLockedLesson({
       </div>
       <p className="mt-6 text-sm font-bold text-brand-700">الدرس مقفل</p>
       <h2 className="ba-heading mt-2 text-3xl">
-        أكمل اختبار نهاية الدرس السابق أولاً
+        أكمل امتحان الدرس السابق أولاً
       </h2>
       <p className="mx-auto mt-3 max-w-xl leading-8 text-text-muted">
         {titleAr ? `للوصول إلى " ${titleAr} "` : 'للوصول إلى هذا الدرس'}{' '}
-        يجب أن تجتاز اختبار نهاية الدرس الذي يسبقه، وتحقق درجة النجاح لفتحه
-        تلقائياً.
+        يجب أن تجتاز امتحان الدرس الذي يسبقه، وتحقق درجة النجاح لفتحه تلقائياً.
       </p>
       <Button className="mt-7" variant="primary" onClick={onBack}>
         العودة لدروس الكورس

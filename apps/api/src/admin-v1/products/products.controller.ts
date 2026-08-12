@@ -20,6 +20,7 @@ import { RequireAdminPermission } from '../common/decorators/require-permission.
 import { AdminApiErrorFilter } from '../common/filters/admin-error.filter';
 import { AdminApiResponseInterceptor } from '../common/interceptors/admin-response.interceptor';
 import {
+  ListProductsQueryDto,
   ProductInputDto,
   UpdateProductDto,
   UpsertCommerceDto,
@@ -43,21 +44,14 @@ export class AdminV1ProductsController {
   constructor(private readonly productsService: AdminV1ProductsService) {}
 
   @Get()
-  list(
-    @Req() request: AdminRequest,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
-    @Query('gradeId') gradeId?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  list(@Req() request: AdminRequest, @Query() query: ListProductsQueryDto) {
     return this.productsService.list(
       request.account.organizationId,
-      search,
-      status,
-      gradeId,
-      Number(page) || 1,
-      Number(pageSize) || 24,
+      query.search,
+      query.status,
+      query.gradeId,
+      query.page ?? 1,
+      query.pageSize ?? 24,
     );
   }
 

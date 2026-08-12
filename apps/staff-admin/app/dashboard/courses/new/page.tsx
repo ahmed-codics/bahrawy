@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -29,17 +29,30 @@ export default function NewCoursePage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isFree, setIsFree] = useState(false);
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
     void fetchApi<AdminApiResponse<Academic>>('/admin/v1/academic', {
       signal: controller.signal,
-    }).then((response) => setAcademic(response.data));
+    })
+      .then((response) => setAcademic(response.data))
+      .catch(() => {
+        // Abort fires after unmount/navigation during the request. Ignore it
+        // so it does not surface as a false "فشل إنشاء الكورس" toast.
+        if (!controller.signal.aborted) {
+          toast.error('تعذر تحميل البيانات الأكاديمية');
+        }
+      });
     return () => controller.abort();
   }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // A synchronous ref guard (not state) so rapid double submits can never
+    // create a duplicate course.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     const values = Object.fromEntries(new FormData(event.currentTarget));
     setSaving(true);
     try {
@@ -80,6 +93,11 @@ export default function NewCoursePage() {
               String(values.descriptionAr || '').trim() || undefined,
             coverImageUrl,
             priceAmount: isFree ? 0 : Number(priceText),
+            originalAmount: isFree
+              ? undefined
+              : String(values.originalAmount || '').trim()
+                ? Number(values.originalAmount)
+                : undefined,
             currency: 'EGP',
           }),
         });
@@ -89,6 +107,7 @@ export default function NewCoursePage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'تعذر إنشاء الكورس');
     } finally {
+      submittingRef.current = false;
       setSaving(false);
     }
   };
@@ -195,7 +214,16 @@ export default function NewCoursePage() {
                 type="number"
                 min="0"
                 step="1"
-                label="السعر بالجنيه"
+                label="السعر النهائي بالجنيه"
+                disabled={isFree}
+              />
+              <Input
+                name="originalAmount"
+                type="number"
+                min="0"
+                step="1"
+                label="السعر الأصلي قبل الخصم (اختياري)"
+                placeholder="مثال: 600"
                 disabled={isFree}
               />
               <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border px-4 text-sm font-bold">

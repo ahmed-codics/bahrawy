@@ -11,6 +11,10 @@ import { AdminV1PaymentsModule } from './payments/payments.module';
 import { AdminV1SupportModule } from './support/support.module';
 import { AdminV1ManagementModule } from './management/management.module';
 import { AdminV1LessonQuizModule } from './lesson-quiz/lesson-quiz.module';
+import { AdminV1ExamResultsModule } from './exam-results/exam-results.module';
+import { AdminV1ExamViolationsModule } from './exam-violations/exam-violations.module';
+import { AdminV1StudentProgressModule } from './student-progress/student-progress.module';
+import { AdminV1DeviceLockModule } from './device-lock/device-lock.module';
 
 @Module({
   imports: [
@@ -25,6 +29,10 @@ import { AdminV1LessonQuizModule } from './lesson-quiz/lesson-quiz.module';
     AdminV1SupportModule,
     AdminV1ManagementModule,
     AdminV1LessonQuizModule,
+    AdminV1ExamResultsModule,
+    AdminV1ExamViolationsModule,
+    AdminV1StudentProgressModule,
+    AdminV1DeviceLockModule,
   ],
   providers: [AdminAuditService],
   exports: [AdminAuditService],

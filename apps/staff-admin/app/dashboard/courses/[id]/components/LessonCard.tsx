@@ -38,6 +38,9 @@ export function LessonCard({
   const [priceAmount, setPriceAmount] = useState(
     String(unit.lessonProduct?.prices?.[0]?.amount ?? ''),
   );
+  const [originalAmount, setOriginalAmount] = useState(
+    String(unit.lessonProduct?.prices?.[0]?.originalAmount ?? ''),
+  );
   const [isFree, setIsFree] = useState(
     Number(unit.lessonProduct?.prices?.[0]?.amount ?? -1) === 0,
   );
@@ -51,6 +54,9 @@ export function LessonCard({
 
   useEffect(() => {
     setPriceAmount(String(unit.lessonProduct?.prices?.[0]?.amount ?? ''));
+    setOriginalAmount(
+      String(unit.lessonProduct?.prices?.[0]?.originalAmount ?? ''),
+    );
     setIsFree(Number(unit.lessonProduct?.prices?.[0]?.amount ?? -1) === 0);
   }, [unit.lessonProduct]);
 
@@ -78,6 +84,11 @@ export function LessonCard({
         body: JSON.stringify({
           titleAr: unit.titleAr,
           priceAmount: parsedPrice,
+          originalAmount: isFree
+            ? undefined
+            : originalAmount.trim() === ''
+              ? undefined
+              : Number(originalAmount),
           coverImageUrl,
           version: unit.lessonProduct?.version,
         }),
@@ -290,7 +301,7 @@ export function LessonCard({
         </div>
       </div>
 
-      <div className="grid gap-4 rounded-xl border border-brand-200/70 bg-brand-50/50 p-4 dark:border-brand-900 dark:bg-brand-950/20 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+      <div className="grid gap-4 rounded-xl border border-brand-200/70 bg-brand-50/50 p-4 dark:border-brand-900 dark:bg-brand-950/20 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
         <label className="block">
           <span className="mb-2 block text-sm font-bold text-primary">سعر شراء الدرس منفرداً</span>
           <div className="relative">
@@ -301,6 +312,24 @@ export function LessonCard({
               value={priceAmount}
               onChange={(event) => setPriceAmount(event.target.value)}
               placeholder="مثال: 100"
+              disabled={isFree}
+              className="h-11 w-full rounded-lg border border-border-default bg-surface px-3 pl-14 text-sm font-semibold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
+            />
+            <span className="absolute left-3 top-3 text-xs font-bold text-text-muted">EGP</span>
+          </div>
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-bold text-primary">
+            السعر الأصلي قبل الخصم (اختياري)
+          </span>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={originalAmount}
+              onChange={(event) => setOriginalAmount(event.target.value)}
+              placeholder="مثال: 130"
               disabled={isFree}
               className="h-11 w-full rounded-lg border border-border-default bg-surface px-3 pl-14 text-sm font-semibold outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
             />

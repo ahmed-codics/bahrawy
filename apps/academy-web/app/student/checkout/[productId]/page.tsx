@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Badge, Button, ErrorState, PageSkeleton } from '@bahrawy/ui';
 import type { ProductDTO } from '@bahrawy/types';
+import { PriceTag } from '../../../../components/PriceTag';
 import { fetchApi } from '../../../../lib/api';
 
 export default function CheckoutPage({ params }: { params: Promise<{ productId: string }> }) {
@@ -155,8 +156,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
             <div className="my-5 h-px bg-border-default" />
             <p className="text-sm font-bold text-text-muted">المبلغ المطلوب</p>
             <p className="ba-number mt-1 text-4xl font-black">
-              {price ? Number(price.amount).toLocaleString('ar-EG') : '—'}{' '}
-              <span className="font-sans text-sm">{price?.currency || 'EGP'}</span>
+              <PriceTag price={price} />
             </p>
             <div className="mt-6 flex gap-2 text-xs leading-6 text-text-muted">
               <LockKeyhole className="mt-1 size-4 shrink-0 text-brand-600" />

@@ -24,7 +24,10 @@ describe('StorageController public covers', () => {
     getApprovedObject: jest.fn(),
   };
   const clamAvService = {};
-  const catalogService = { getUnitAccess: jest.fn() };
+  const catalogService = {
+    getUnitAccess: jest.fn(),
+    canAccessLesson: jest.fn(),
+  };
   const response = {
     setHeader: jest.fn(),
   } as unknown as Response;
@@ -102,8 +105,8 @@ describe('StorageController public covers', () => {
       originalName: 'lesson.pdf',
     });
     (db.$transaction as jest.Mock).mockResolvedValue([0, 0]);
-    (db.lesson.findFirst as jest.Mock).mockResolvedValue({ unitId: 'unit-1' });
-    catalogService.getUnitAccess.mockResolvedValue({ hasAccess: true });
+    (db.lesson.findFirst as jest.Mock).mockResolvedValue({ id: 'lesson-1' });
+    catalogService.canAccessLesson.mockResolvedValue(true);
 
     await controller.getStoredObject(
       {
@@ -117,9 +120,9 @@ describe('StorageController public covers', () => {
       response,
     );
 
-    expect(catalogService.getUnitAccess).toHaveBeenCalledWith(
+    expect(catalogService.canAccessLesson).toHaveBeenCalledWith(
       'student-1',
-      'unit-1',
+      'lesson-1',
     );
     expect(response.setHeader).toHaveBeenCalledWith(
       'Content-Type',

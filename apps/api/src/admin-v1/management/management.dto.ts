@@ -9,6 +9,31 @@ import {
   IsOptional,
   IsEmail,
 } from 'class-validator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
+
+export class ListStaffQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class ListAuditQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  action?: string;
+
+  @IsOptional()
+  @IsString()
+  actorId?: string;
+
+  @IsOptional()
+  @IsString()
+  targetType?: string;
+}
 
 export class CreateStaffDto {
   @IsString()

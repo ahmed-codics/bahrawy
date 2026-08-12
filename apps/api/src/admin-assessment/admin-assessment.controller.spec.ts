@@ -3,6 +3,7 @@ import { AdminAssessmentController } from './admin-assessment.controller';
 import { AdminAssessmentService } from './admin-assessment.service';
 import { AuthService } from '../auth/auth.service';
 import { RbacService } from '../rbac/rbac.service';
+import { DeviceLeaseService } from '../device-lease/device-lease.service';
 
 describe('AdminAssessmentController', () => {
   let controller: AdminAssessmentController;
@@ -19,6 +20,12 @@ describe('AdminAssessmentController', () => {
           provide: AuthService,
           useValue: {
             validateSession: jest.fn(),
+          },
+        },
+        {
+          provide: DeviceLeaseService,
+          useValue: {
+            blockAccountForDevice: jest.fn(),
           },
         },
         {

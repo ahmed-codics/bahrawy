@@ -31,6 +31,7 @@ type Product = {
   prices: {
     id: string;
     amount: number | string;
+    originalAmount?: number | string | null;
     currency: string;
     status: string;
     createdAt: string;
@@ -119,7 +120,10 @@ export default function ProductDetailsPage({
             activePrice
               ? Number(activePrice.amount) === 0
                 ? 'مجاني'
-                : `${activePrice.amount} ${activePrice.currency}`
+                : activePrice.originalAmount &&
+                    Number(activePrice.originalAmount) > Number(activePrice.amount)
+                  ? `${activePrice.originalAmount} → ${activePrice.amount} ${activePrice.currency}`
+                  : `${activePrice.amount} ${activePrice.currency}`
               : 'غير محدد'
           }
         />
@@ -192,7 +196,13 @@ export default function ProductDetailsPage({
             <div className="space-y-3">
               {product.prices.map((price) => (
                 <div key={price.id} className="flex items-center justify-between gap-3 text-sm">
-                  <span>{price.amount} {price.currency}</span>
+                  <span>
+                    {price.originalAmount &&
+                    Number(price.originalAmount) > Number(price.amount)
+                      ? <s>{price.originalAmount}</s>
+                      : null}{' '}
+                    {price.amount} {price.currency}
+                  </span>
                   <Badge tone={price.status === 'ACTIVE' ? 'success' : 'neutral'}>
                     {price.status === 'ACTIVE' ? 'حالي' : 'متقاعد'}
                   </Badge>

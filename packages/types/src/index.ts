@@ -40,6 +40,7 @@ export type ProductDTO = {
 export type ProductPriceDTO = {
   id: string;
   amount: number;
+  originalAmount?: number | null;
   currency: string;
 };
 

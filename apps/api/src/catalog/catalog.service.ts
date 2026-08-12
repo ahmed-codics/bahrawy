@@ -302,8 +302,37 @@ export class CatalogService {
         message: 'Course prerequisites have not been met.',
       });
     }
-    await this.enforceLessonQuizGates(accountId, lesson);
+    await this.enforceLessonQuizGates(accountId, lesson, courseId);
     return true;
+  }
+
+  private async getCourseOrderedLessons(courseId: string) {
+    const chapters = await db.chapter.findMany({
+      where: { courseId, status: 'PUBLISHED' },
+      orderBy: { sort: 'asc' },
+      select: {
+        units: {
+          where: { status: 'PUBLISHED' },
+          orderBy: { sort: 'asc' },
+          select: {
+            lessons: {
+              where: { status: 'PUBLISHED' },
+              orderBy: { sort: 'asc' },
+              select: {
+                id: true,
+                unitId: true,
+                sort: true,
+                titleAr: true,
+                requiresPreviousLessonPass: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    return chapters.flatMap((chapter: any) =>
+      chapter.units.flatMap((unit: any) => unit.lessons),
+    );
   }
 
   private async enforceLessonQuizGates(
@@ -312,48 +341,24 @@ export class CatalogService {
       id: string;
       unitId: string;
       sort: number;
+      requiresPreviousLessonPass?: boolean;
     },
+    courseId: string,
   ): Promise<void> {
-    const unitLessons = await db.lesson.findMany({
-      where: { unitId: lesson.unitId, status: 'PUBLISHED' },
-      orderBy: { sort: 'asc' },
-      select: { id: true, sort: true },
-    });
-    const currentIndex = unitLessons.findIndex(
+    if (!lesson.requiresPreviousLessonPass) return;
+    const orderedLessons = await this.getCourseOrderedLessons(courseId);
+    const currentIndex = orderedLessons.findIndex(
       (item: any) => item.id === lesson.id,
     );
-    const previousLessons = unitLessons.slice(
-      0,
-      currentIndex === -1 ? unitLessons.length : currentIndex,
-    );
-    if (previousLessons.length === 0) return;
-
-    const gated = await db.assessment.findMany({
-      where: {
-        lessonId: { in: previousLessons.map((item: any) => item.id) },
-        type: 'END_OF_LESSON',
-        status: 'PUBLISHED',
-        archivedAt: null,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (gated.length === 0) return;
-
-    const gatedIds = new Set(gated.map((item: any) => item.lessonId));
-    const nearestGateLesson = [...previousLessons]
-      .reverse()
-      .find((item: any) => gatedIds.has(item.id));
-    if (!nearestGateLesson) return;
-
-    const gate = gated.find(
-      (item: any) => item.lessonId === nearestGateLesson.id,
-    );
+    if (currentIndex <= 0) return;
+    const previousLesson = orderedLessons[currentIndex - 1];
+    const gate = await this.findPassableLessonQuiz(previousLesson.id);
     if (!gate) return;
-    const passed = await this.isQuizGatePassed(accountId, gate.id);
+    const passed = await this.isQuizGatePassed(accountId, gate);
     if (!passed) {
       throw new ForbiddenException({
         code: 'LESSON_LOCKED',
-        message: 'Pass the previous lesson quiz before continuing.',
+        message: 'Pass the previous lesson exam before continuing.',
         requiredAssessmentId: gate.id,
         requiredScore: gate.passingScore,
         lessonId: lesson.id,
@@ -361,28 +366,98 @@ export class CatalogService {
     }
   }
 
+  private async findPassableLessonQuiz(lessonId: string) {
+    return db.assessment.findFirst({
+      where: {
+        lessonId,
+        status: 'PUBLISHED',
+        archivedAt: null,
+        passingScore: { not: null },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async computeLessonLocks(accountId: string, courseId: string) {
+    const ordered = await this.getCourseOrderedLessons(courseId);
+    if (ordered.length === 0) return new Map<string, any>();
+    const lessonIds = ordered.map((item: any) => item.id);
+    const gates = await db.assessment.findMany({
+      where: {
+        lessonId: { in: lessonIds },
+        status: 'PUBLISHED',
+        archivedAt: null,
+        passingScore: { not: null },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, lessonId: true, passingScore: true },
+    });
+    const gateByLesson = new Map<string, any>();
+    for (const gate of gates) {
+      if (gate.lessonId) gateByLesson.set(gate.lessonId, gate);
+    }
+    const gateIds = [...new Set(gates.map((gate: any) => gate.id))];
+    const attempts = gateIds.length
+      ? await db.assessmentAttempt.findMany({
+          where: {
+            accountId,
+            assessmentId: { in: gateIds },
+            submittedAt: { not: null },
+          },
+          orderBy: { submittedAt: 'desc' },
+          select: { assessmentId: true, score: true },
+        })
+      : [];
+    const bestScore = new Map<string, number>();
+    for (const attempt of attempts) {
+      const score = attempt.score === null ? -1 : Number(attempt.score);
+      const current = bestScore.get(attempt.assessmentId) ?? -1;
+      if (score > current) bestScore.set(attempt.assessmentId, score);
+    }
+    const gatePassed = (gate: any) =>
+      gate.passingScore === null ||
+      (bestScore.get(gate.id) ?? -1) >= Number(gate.passingScore);
+
+    const locks = new Map<string, any>();
+    for (let index = 0; index < ordered.length; index += 1) {
+      const lesson = ordered[index];
+      if (!lesson.requiresPreviousLessonPass || index === 0) {
+        locks.set(lesson.id, { locked: false });
+        continue;
+      }
+      const previousGate = gateByLesson.get(ordered[index - 1].id);
+      if (!previousGate) {
+        locks.set(lesson.id, { locked: false });
+        continue;
+      }
+      if (gatePassed(previousGate)) {
+        locks.set(lesson.id, { locked: false });
+      } else {
+        locks.set(lesson.id, {
+          locked: true,
+          requiredAssessmentId: previousGate.id,
+          requiredScore: previousGate.passingScore,
+        });
+      }
+    }
+    return locks;
+  }
+
   private async isQuizGatePassed(
     accountId: string,
-    assessmentId: string,
+    gate: { id: string; passingScore: number | null },
   ): Promise<boolean> {
-    const attempt = await db.assessmentAttempt.findFirst({
+    if (!gate || gate.passingScore === null) return true;
+    const passedAttempt = await db.assessmentAttempt.findFirst({
       where: {
         accountId,
-        assessmentId,
+        assessmentId: gate.id,
         submittedAt: { not: null },
+        score: { gte: gate.passingScore },
       },
-      orderBy: { submittedAt: 'desc' },
-      select: { score: true },
+      select: { id: true },
     });
-    if (!attempt) return false;
-    const assessment = await db.assessment.findUnique({
-      where: { id: assessmentId },
-      select: { passingScore: true },
-    });
-    if (!assessment || assessment.passingScore === null) return true;
-    return (
-      attempt.score !== null && Number(attempt.score) >= assessment.passingScore
-    );
+    return Boolean(passedAttempt);
   }
 
   async getGrades(): Promise<any[]> {
@@ -794,18 +869,33 @@ export class CatalogService {
     const progressByLesson = new Map<string, any>(
       progress.map((item: any) => [item.lessonId, item]),
     );
+    const locks =
+      !isStaff && access.hasAccess
+        ? await this.computeLessonLocks(accountId, unit.chapter.courseId)
+        : new Map<string, any>();
+    const lockedLessonIds = new Set<string>();
+    for (const lesson of unit.lessons) {
+      if (locks.get(lesson.id)?.locked) lockedLessonIds.add(lesson.id);
+    }
     const contentItems = [
-      ...unit.lessons.map((lesson: any) => ({
-        type: lesson.contentType,
-        lessonId: lesson.id,
-        titleAr: lesson.titleAr,
-        contentUrl: lesson.contentUrl,
-        attachedPdfUrl: lesson.attachedPdfUrl,
-        homeworkPdfUrl: lesson.homeworkPdfUrl,
-        durationSeconds: lesson.durationSeconds,
-        completedAt: progressByLesson.get(lesson.id)?.completedAt ?? null,
-        available: access.hasAccess,
-      })),
+      ...unit.lessons
+        .filter((lesson: any) => lesson.contentType !== 'EXAM')
+        .map((lesson: any) => {
+          const isLocked = !isStaff && lockedLessonIds.has(lesson.id);
+          return {
+            type: lesson.contentType,
+            lessonId: lesson.id,
+            titleAr: lesson.titleAr,
+            contentUrl: isLocked ? null : lesson.contentUrl,
+            attachedPdfUrl: isLocked ? null : lesson.attachedPdfUrl,
+            homeworkPdfUrl: isLocked ? null : lesson.homeworkPdfUrl,
+            durationSeconds: lesson.durationSeconds,
+            completedAt: progressByLesson.get(lesson.id)?.completedAt ?? null,
+            available: access.hasAccess && !isLocked,
+            locked: isLocked,
+            gate: isLocked ? locks.get(lesson.id) : null,
+          };
+        }),
       ...unit.assessments.map((assessment: any) => ({
         type: 'ASSESSMENT',
         assessmentId: assessment.id,
@@ -1006,6 +1096,11 @@ export class CatalogService {
           ]),
     );
 
+    const lessonLocks =
+      !isStaff && accountId
+        ? await this.computeLessonLocks(accountId, courseId)
+        : new Map<string, any>();
+
     return {
       course: {
         ...course,
@@ -1026,6 +1121,20 @@ export class CatalogService {
               isStaff ||
               !unit.prerequisiteAssessmentId ||
               submittedPrerequisiteIds.has(unit.prerequisiteAssessmentId),
+            lessons: (unit.lessons as any[]).map((lesson: any) => {
+              const lock = lessonLocks.get(lesson.id);
+              const isLocked = !!lock?.locked;
+              return isLocked
+                ? {
+                    ...lesson,
+                    contentUrl: null,
+                    attachedPdfUrl: null,
+                    homeworkPdfUrl: null,
+                    locked: true,
+                    gate: lock,
+                  }
+                : { ...lesson, locked: false, gate: null };
+            }),
           })),
         })),
       },
@@ -1055,9 +1164,11 @@ export class CatalogService {
     const gate = await db.assessment.findFirst({
       where: {
         lessonId,
-        type: 'END_OF_LESSON',
+        status: 'PUBLISHED',
         archivedAt: null,
+        passingScore: { not: null },
       },
+      orderBy: { createdAt: 'desc' },
       include: { questions: true },
     });
     const gateConfig = gate
@@ -1071,7 +1182,7 @@ export class CatalogService {
       : null;
 
     const passedGate = gate
-      ? await this.isQuizGatePassed(accountId, gate.id)
+      ? await this.isQuizGatePassed(accountId, gate)
       : false;
     const latestAttempt = gate
       ? await db.assessmentAttempt.findFirst({
@@ -1096,16 +1207,13 @@ export class CatalogService {
       };
     }
 
-    const siblings = await db.lesson.findMany({
-      where: { unitId: lesson.unitId, status: 'PUBLISHED' },
-      orderBy: { sort: 'asc' },
-      select: { id: true, titleAr: true, sort: true },
-    });
-    const currentIndex = siblings.findIndex(
+    const courseId = lesson.unit.chapter.courseId;
+    const orderedLessons = await this.getCourseOrderedLessons(courseId);
+    const currentIndex = orderedLessons.findIndex(
       (item: any) => item.id === lessonId,
     );
     const nextLesson =
-      currentIndex !== -1 ? (siblings[currentIndex + 1] ?? null) : null;
+      currentIndex !== -1 ? (orderedLessons[currentIndex + 1] ?? null) : null;
 
     let nextLocked = false;
     if (nextLesson) {

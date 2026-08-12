@@ -28,7 +28,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'أكاديمية السيد البحراوي | English للإعدادي والثانوي',
+  title: 'Bahrawy English',
   description:
     'شرح ومراجعة وتدريب على منهج اللغة الإنجليزية المصري للصف الثالث الإعدادي والصفوف الأول والثاني والثالث الثانوي.',
 };

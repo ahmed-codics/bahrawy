@@ -315,6 +315,7 @@ export class VideoService {
     watchedSeconds: number,
     durationSeconds: number,
   ): Promise<{ id: string; completed: boolean; watchedSeconds: number }> {
+    await this.catalogService.canAccessLesson(accountId, lessonId);
     const isCompleted =
       durationSeconds > 0 && watchedSeconds / durationSeconds >= 0.9;
     let canAutoComplete = isCompleted;
@@ -358,31 +359,32 @@ export class VideoService {
     const gate = await db.assessment.findFirst({
       where: {
         lessonId,
-        type: 'END_OF_LESSON',
         status: 'PUBLISHED',
         archivedAt: null,
+        passingScore: { not: null },
       },
+      orderBy: { createdAt: 'desc' },
       select: { id: true, passingScore: true },
     });
     if (!gate) return true;
-    const attempt = await db.assessmentAttempt.findFirst({
+    if (gate.passingScore === null) return true;
+    const passed = await db.assessmentAttempt.findFirst({
       where: {
         accountId,
         assessmentId: gate.id,
         submittedAt: { not: null },
+        score: { gte: gate.passingScore },
       },
-      orderBy: { submittedAt: 'desc' },
-      select: { score: true },
+      select: { id: true },
     });
-    if (!attempt) return false;
-    if (gate.passingScore === null) return true;
-    return attempt.score !== null && Number(attempt.score) >= gate.passingScore;
+    return Boolean(passed);
   }
 
   async getResumePosition(
     accountId: string,
     lessonId: string,
   ): Promise<number> {
+    await this.catalogService.canAccessLesson(accountId, lessonId);
     const progress = await db.lessonProgress.findUnique({
       where: {
         accountId_lessonId: { accountId, lessonId },

@@ -4,17 +4,25 @@ import { FormEvent, use, useCallback, useEffect, useState } from 'react';
 import {
   ArrowRight,
   Ban,
+  BookOpen,
+  CheckCircle2,
+  CircleDashed,
+  Clock3,
   KeyRound,
+  LockKeyhole,
   Mail,
   MapPin,
   Monitor,
   Phone,
+  Play,
   Plus,
   Pencil,
   RotateCcw,
   School,
   Trash2,
+  Trophy,
   UserRound,
+  XCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -102,8 +110,89 @@ type Student = {
   payments: Payment[];
 };
 
-type Tab = 'entitlements' | 'payments' | 'security';
+type Tab = 'entitlements' | 'payments' | 'security' | 'progress';
 type Grade = { id: string; nameAr: string; status: string };
+
+type LessonStatus =
+  | 'LOCKED'
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'QUIZ_PENDING'
+  | 'FAILED'
+  | 'PASSED';
+
+type ProgressLesson = {
+  id: string;
+  titleAr: string;
+  contentType: string;
+  durationSeconds: number;
+  status: LessonStatus;
+  watchedSeconds: number;
+  completedAt: string | null;
+  quiz: {
+    assessmentId: string;
+    requiredScore: number | null;
+    lastScore: number | null;
+    passed: boolean;
+  } | null;
+  gate: {
+    requiredAssessmentId: string;
+    requiredScore: number | null;
+    lessonId: string;
+  } | null;
+};
+
+type ProgressUnit = {
+  id: string;
+  titleAr: string;
+  lessons: ProgressLesson[];
+};
+
+type ProgressChapter = {
+  id: string;
+  titleAr: string;
+  units: ProgressUnit[];
+};
+
+type ProgressCourse = {
+  id: string;
+  titleAr: string;
+  chapters: ProgressChapter[];
+};
+
+type StudentProgress = {
+  student: {
+    id: string;
+    displayName: string | null;
+    studentNumber: number | null;
+    grade: { id: string; nameAr: string } | null;
+  };
+  courses: ProgressCourse[];
+  summary: {
+    totalLessons: number;
+    notStarted: number;
+    inProgress: number;
+    quizPending: number;
+    failed: number;
+    passed: number;
+    locked: number;
+  };
+};
+
+const STATUS_META: Record<
+  LessonStatus,
+  {
+    label: string;
+    tone: 'success' | 'neutral' | 'amber' | 'violet' | 'danger' | 'coral';
+  }
+> = {
+  PASSED: { label: 'ناجح', tone: 'success' },
+  FAILED: { label: 'راسب', tone: 'danger' },
+  QUIZ_PENDING: { label: 'بانتظار الاختبار', tone: 'amber' },
+  IN_PROGRESS: { label: 'قيد الدراسة', tone: 'violet' },
+  NOT_STARTED: { label: 'لم يبدأ', tone: 'neutral' },
+  LOCKED: { label: 'مقفل', tone: 'coral' },
+};
 type SensitiveAction = {
   title: string;
   description: string;
@@ -125,6 +214,32 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
   const [profileOpen, setProfileOpen] = useState(false);
   const [lifecycleOpen, setLifecycleOpen] = useState(false);
   const [sensitiveAction, setSensitiveAction] = useState<SensitiveAction | null>(null);
+  const [progress, setProgress] = useState<StudentProgress | null>(null);
+  const [progressLoading, setProgressLoading] = useState(false);
+  const [progressError, setProgressError] = useState('');
+
+  useEffect(() => {
+    if (tab !== 'progress' || progress !== null) return;
+    let cancelled = false;
+    setProgressLoading(true);
+    setProgressError('');
+    fetchApi(`/admin/v1/students/${id}/progress`)
+      .then((response) => {
+        if (!cancelled) setProgress(response.data as StudentProgress);
+      })
+      .catch((requestError) => {
+        if (!cancelled)
+          setProgressError(
+            requestError instanceof Error ? requestError.message : 'تعذر تحميل التقدم',
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setProgressLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, id, progress]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -388,6 +503,7 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
           ['entitlements', 'الاشتراكات'],
           ['payments', 'المدفوعات'],
           ['security', 'الأجهزة والجلسات'],
+          ['progress', 'التقدم في الدروس'],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -598,6 +714,20 @@ export default function StudentDetailsPage({ params }: { params: Promise<{ id: s
         </section>
       )}
 
+      {tab === 'progress' && (
+        <section className="space-y-7">
+          {progressLoading ? (
+            <PageSkeleton cards={3} />
+          ) : progressError ? (
+            <ErrorState title="تعذر تحميل التقدم" description={progressError} />
+          ) : progress ? (
+            <ProgressView progress={progress} />
+          ) : (
+            <p className="text-sm text-ink-3">لا توجد بيانات تقدم.</p>
+          )}
+        </section>
+      )}
+
       <Drawer
         isOpen={grantOpen}
         onClose={() => setGrantOpen(false)}
@@ -723,6 +853,96 @@ function ProfileItem({
           {value}
         </dd>
       </div>
+    </div>
+  );
+}
+
+function ProgressView({ progress }: { progress: StudentProgress }) {
+  const summaryItems: { label: string; value: number; icon: React.ReactNode; tone: string }[] = [
+    { label: 'إجمالي الدروس', value: progress.summary.totalLessons, icon: <BookOpen className="size-4" />, tone: 'text-ink' },
+    { label: 'ناجح', value: progress.summary.passed, icon: <Trophy className="size-4" />, tone: 'text-emerald-600' },
+    { label: 'راسب', value: progress.summary.failed, icon: <XCircle className="size-4" />, tone: 'text-rose-600' },
+    { label: 'قيد الدراسة', value: progress.summary.inProgress, icon: <Play className="size-4" />, tone: 'text-violet-600' },
+    { label: 'بانتظار الاختبار', value: progress.summary.quizPending, icon: <Clock3 className="size-4" />, tone: 'text-amber-600' },
+    { label: 'مقفل', value: progress.summary.locked, icon: <LockKeyhole className="size-4" />, tone: 'text-ink-3' },
+    { label: 'لم يبدأ', value: progress.summary.notStarted, icon: <CircleDashed className="size-4" />, tone: 'text-ink-3' },
+  ];
+
+  return (
+    <div className="space-y-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        {summaryItems.map((item) => (
+          <div key={item.label} className="rounded-xl border border-border bg-surface-2 p-4">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${item.tone}`}>
+              {item.icon}
+              {item.label}
+            </span>
+            <p className="mt-2 text-2xl font-black text-ink">{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {progress.courses.length === 0 ? (
+        <p className="rounded-xl border border-border bg-surface-2 p-6 text-center text-sm text-ink-3">
+          لا توجد كورسات منشورة بعد.
+        </p>
+      ) : (
+        progress.courses.map((course) => (
+          <section key={course.id} className="space-y-4">
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-4 text-brand-600" />
+              <h3 className="text-base font-black text-ink">{course.titleAr}</h3>
+            </div>
+            {course.chapters.map((chapter) => (
+              <div key={chapter.id} className="rounded-xl border border-border bg-surface-2">
+                <div className="border-b border-border px-4 py-3 text-sm font-bold text-ink">
+                  {chapter.titleAr}
+                </div>
+                {chapter.units.map((unit) => (
+                  <div key={unit.id} className="border-b border-border/60 last:border-b-0">
+                    <div className="px-4 py-2 text-xs font-bold text-ink-3">{unit.titleAr}</div>
+                    <div className="divide-y divide-border/60">
+                      {unit.lessons.map((lesson) => {
+                        const meta = STATUS_META[lesson.status];
+                        const StatusIcon =
+                          lesson.status === 'LOCKED'
+                            ? LockKeyhole
+                            : lesson.status === 'PASSED'
+                              ? CheckCircle2
+                              : lesson.status === 'FAILED'
+                                ? XCircle
+                                : CircleDashed;
+                        return (
+                          <div
+                            key={lesson.id}
+                            className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap"
+                          >
+                            <StatusIcon className="size-4 shrink-0 text-ink-3" />
+                            <span className="min-w-0 flex-1 text-sm font-bold text-ink">
+                              {lesson.titleAr}
+                            </span>
+                            {lesson.watchedSeconds > 0 && (
+                              <span className="text-xs text-ink-3">
+                                {Math.floor(lesson.watchedSeconds / 60)} دقيقة مشاهدة
+                              </span>
+                            )}
+                            {lesson.quiz?.lastScore != null && (
+                              <span className="text-xs text-ink-3">
+                                الاختبار: {lesson.quiz.lastScore}/{lesson.quiz.requiredScore ?? 0}
+                              </span>
+                            )}
+                            <Badge tone={meta.tone}>{meta.label}</Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
+        ))
+      )}
     </div>
   );
 }

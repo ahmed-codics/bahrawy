@@ -245,6 +245,42 @@ describe('VideoService', () => {
       expect(result.completed).toBe(true);
     });
 
+    it('completes at 90% when a passing gate attempt exists even if a later attempt failed', async () => {
+      (db.assessment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'gate-1',
+        passingScore: 60,
+      });
+      (db.assessmentAttempt.findFirst as jest.Mock).mockResolvedValue({
+        id: 'passed-attempt',
+      });
+      (db.lessonProgress.upsert as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({
+          id: 'prog-1',
+          watchedSeconds: 90,
+          completedAt: args.update?.completedAt
+            ? (args.update.completedAt as { set: Date }).set
+            : new Date(),
+        }),
+      );
+
+      const result = await service.updateWatchProgress(
+        'acc-1',
+        'lesson-1',
+        90,
+        100,
+      );
+      expect(result.completed).toBe(true);
+      expect(db.assessmentAttempt.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            accountId: 'acc-1',
+            assessmentId: 'gate-1',
+            score: { gte: 60 },
+          }),
+        }),
+      );
+    });
+
     it('auto-completes at 90% when the lesson has no gate quiz', async () => {
       (db.assessment.findFirst as jest.Mock).mockResolvedValue(null);
       (db.lessonProgress.upsert as jest.Mock).mockResolvedValue({

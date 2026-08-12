@@ -45,6 +45,13 @@ export class AuthController {
     }
   }
 
+  private deviceFingerprint(req: Request): string | undefined {
+    const header = req.headers['x-device-fingerprint'];
+    return typeof header === 'string' && header.trim().length > 0
+      ? header.trim()
+      : undefined;
+  }
+
   @Post('check-phone')
   @Throttle(30, 900_000)
   checkPhone() {
@@ -58,7 +65,11 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { account, session } = await this.authService.registerStudent(body);
+    const { account, session } = await this.authService.registerStudent(
+      body,
+      this.deviceFingerprint(req),
+      req.headers['user-agent'],
+    );
     this.setSessionCookie(req, res, session.plainToken);
     return {
       status: 'SUCCESS',
@@ -78,6 +89,8 @@ export class AuthController {
       body.phone,
       body.credentialCode,
       body.password,
+      this.deviceFingerprint(req),
+      req.headers['user-agent'],
     );
     this.setSessionCookie(req, res, session.plainToken);
     return { status: 'SUCCESS', accountId: account.id, kind: account.kind };
@@ -98,6 +111,7 @@ export class AuthController {
       body.totpToken,
       ipAddress,
       userAgent,
+      this.deviceFingerprint(req),
     );
     this.setSessionCookie(req, res, session.plainToken);
     return {

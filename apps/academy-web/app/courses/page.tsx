@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, BookOpen, CheckCircle2, Filter, GraduationCap, ImageIcon } from 'lucide-react';
 import type { ProductDTO } from '@bahrawy/types';
 import { PublicShell } from '../../components/PublicShell';
+import { PriceTag } from '../../components/PriceTag';
 import { API_BASE } from '../../lib/api';
 
 export const metadata: Metadata = {
@@ -238,12 +239,8 @@ export default async function CoursesPage({
                               <small>
                                 {purchaseProduct?.type === 'BUNDLE' ? 'متاح ضمن باقة' : 'السعر'}
                               </small>
-                              <strong>
-                                {price && Number(price.amount) === 0
-                                  ? 'مجاني'
-                                  : price
-                                    ? `${arNumber.format(Number(price.amount))} ${price.currency || 'EGP'}`
-                                    : '—'}
+                              <strong className="text-lg font-black">
+                                <PriceTag price={price} />
                               </strong>
                             </span>
                             {checkoutPath ? (
@@ -322,12 +319,8 @@ export default async function CoursesPage({
                           <div className="academy-course-price-row">
                             <span>
                               <small>السعر</small>
-                              <strong>
-                                {price && Number(price.amount) === 0
-                                  ? 'مجاني'
-                                  : price
-                                    ? `${arNumber.format(Number(price.amount))} ${price.currency || 'EGP'}`
-                                    : '—'}
+                              <strong className="text-lg font-black">
+                                <PriceTag price={price} />
                               </strong>
                             </span>
                             <Link

@@ -17,7 +17,7 @@ import { PermissionsGuard } from '../../rbac/permissions.guard';
 import { RequireAdminPermission } from '../common/decorators/require-permission.decorator';
 import { AdminApiErrorFilter } from '../common/filters/admin-error.filter';
 import { AdminApiResponseInterceptor } from '../common/interceptors/admin-response.interceptor';
-import { ReviewPaymentDto } from './payments.dto';
+import { ListPaymentsQueryDto, ReviewPaymentDto } from './payments.dto';
 import { AdminV1PaymentsService } from './payments.service';
 
 type AdminRequest = Request & {
@@ -33,19 +33,13 @@ export class AdminV1PaymentsController {
   constructor(private readonly payments: AdminV1PaymentsService) {}
 
   @Get()
-  list(
-    @Req() request: AdminRequest,
-    @Query('status') status?: string,
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  list(@Req() request: AdminRequest, @Query() query: ListPaymentsQueryDto) {
     return this.payments.list(
       request.account.organizationId,
-      status,
-      search,
-      Number(page) || 1,
-      Number(pageSize) || 25,
+      query.status,
+      query.search,
+      query.page ?? 1,
+      query.pageSize ?? 25,
     );
   }
 

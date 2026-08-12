@@ -11,9 +11,12 @@ import {
   LifeBuoy,
   ScrollText,
   Settings,
+  ShieldAlert,
+  ShieldBan,
   ShieldCheck,
   ShoppingBag,
   Users,
+  Trophy,
 } from 'lucide-react';
 import { Button, ErrorState, PageSkeleton, PageTransition, StaffShell } from '@bahrawy/ui';
 import { ApiRequestError, fetchApi, fetchCsrfToken, clearCsrfToken } from '../../lib/api';
@@ -135,6 +138,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       isActive: pathname.startsWith('/dashboard/questions'),
       icon: <Database className="size-5" />,
       permission: 'ASSESSMENT_MANAGE',
+    },
+    {
+      label: 'درجات الطلاب',
+      href: '/dashboard/exam-results',
+      isActive: pathname.startsWith('/dashboard/exam-results'),
+      icon: <Trophy className="size-5" />,
+      permission: 'ASSESSMENT_MANAGE',
+    },
+    {
+      label: 'الطلاب الموقوفون في الامتحانات',
+      href: '/dashboard/exam-violations',
+      isActive: pathname.startsWith('/dashboard/exam-violations'),
+      icon: <ShieldAlert className="size-5" />,
+      permission: 'ASSESSMENT_MANAGE',
+    },
+    {
+      label: 'قائمة المحظورين',
+      href: '/dashboard/device-locks',
+      isActive: pathname.startsWith('/dashboard/device-locks'),
+      icon: <ShieldBan className="size-5" />,
+      permission: 'STUDENT_MANAGE',
     },
     {
       label: 'المدفوعات',

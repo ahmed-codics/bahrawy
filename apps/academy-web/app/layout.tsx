@@ -22,8 +22,8 @@ const marhey = Marhey({
 export const metadata: Metadata = {
   metadataBase: new URL('https://el-bahrawy.com'),
   title: {
-    default: 'أكاديمية مستر السيد البحراوي | منصة اللغة الإنجليزية',
-    template: '%s | أكاديمية مستر السيد البحراوي',
+    default: 'Bahrawy English',
+    template: 'Bahrawy English',
   },
   description:
     'منصة مستر السيد البحراوي لتعلّم اللغة الإنجليزية لطلاب الثانوية والإعدادية في مصر، مع شروحات واختبارات ومتابعة للتقدم.',
@@ -40,9 +40,12 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   applicationName: 'أكاديمية السيد البحراوي',
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
+    ],
+    shortcut: '/icon.png',
+    apple: '/apple-touch-icon.png',
   },
   alternates: { canonical: 'https://el-bahrawy.com' },
   robots: {
@@ -100,7 +103,7 @@ export default function RootLayout({
         '@id': 'https://el-bahrawy.com/#organization',
         name: 'أكاديمية مستر السيد البحراوي',
         url: 'https://el-bahrawy.com',
-        logo: 'https://el-bahrawy.com/icon.svg',
+        logo: 'https://el-bahrawy.com/icon.png',
         description: 'منصة تعليمية متخصصة في تدريس اللغة الإنجليزية لطلاب مصر.',
       },
       {

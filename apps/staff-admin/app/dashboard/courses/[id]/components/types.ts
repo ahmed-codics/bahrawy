@@ -49,9 +49,16 @@ export type ContentItem = {
   attachedPdfUrl?: string | null;
   homeworkPdfUrl?: string | null;
   durationSeconds?: number;
+  requiresPreviousLessonPass?: boolean;
   status: string;
   version: number;
   videoLesson: VideoLessonRecord | null;
+  assessments?: Array<{
+    id: string;
+    type: string;
+    titleAr: string;
+    status: string;
+  }>;
 };
 
 export type UnitRecord = {
@@ -72,7 +79,11 @@ export type UnitRecord = {
     version: number;
     titleAr: string;
     coverImageUrl?: string | null;
-    prices?: Array<{ amount: number | string; currency: string }>;
+    prices?: Array<{
+      amount: number | string;
+      originalAmount?: number | string | null;
+      currency: string;
+    }>;
   } | null;
   lessons: ContentItem[];
   assessments: AssessmentRecord[];
@@ -113,7 +124,11 @@ export type CourseWithContent = {
     version: number;
     titleAr: string;
     coverImageUrl?: string | null;
-    prices?: Array<{ amount: number | string; currency: string }>;
+    prices?: Array<{
+      amount: number | string;
+      originalAmount?: number | string | null;
+      currency: string;
+    }>;
   } | null;
   chapters: ChapterRecord[];
   assessmentByLessonId?: Record<string, AssessmentRecord>;

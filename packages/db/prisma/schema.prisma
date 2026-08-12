@@ -12,6 +12,13 @@ enum PublishStatus {
   ARCHIVED
 }
 
+enum ExamSessionStatus {
+  ACTIVE
+  LOCKED
+  EXPIRED
+  SUBMITTED
+}
+
 enum SupportTicketStatus {
   OPEN
   IN_PROGRESS
@@ -263,8 +270,11 @@ model Account {
   staffAccessIdentities StaffAccessIdentity[]
   accountRoles          AccountRole[]
   devices               StudentDevice[]
+  deviceBlocks          DeviceBlock[]
   entitlements          Entitlement[]
   assessmentAttempts    AssessmentAttempt[]
+  examSessions          ExamSession[]
+  examGrants            ExamGrant[]
   supportTickets        SupportTicket[]
   notifications         InAppNotification[]
   supportMessages       SupportMessage[]
@@ -277,24 +287,24 @@ model Account {
 }
 
 model StudentProfile {
-  id                  String   @id @default(uuid())
-  studentNumber       Int      @unique @default(autoincrement())
-  accountId           String   @unique
-  gradeId             String?
-  displayName         String
-  firstName           String?
-  secondName          String?
-  thirdName           String?
-  lastName            String?
+  id                   String   @id @default(uuid())
+  studentNumber        Int      @unique @default(autoincrement())
+  accountId            String   @unique
+  gradeId              String?
+  displayName          String
+  firstName            String?
+  secondName           String?
+  thirdName            String?
+  lastName             String?
   parentPhoneEncrypted String?
-  parentPhoneHmac     String?
+  parentPhoneHmac      String?
   motherPhoneEncrypted String?
-  schoolName          String?
-  guardianOccupation  String?
-  gender              String?
-  city                String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  schoolName           String?
+  guardianOccupation   String?
+  gender               String?
+  city                 String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   account   Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
   grade     Grade?            @relation(fields: [gradeId], references: [id], onDelete: Restrict)
@@ -368,6 +378,7 @@ model AuthSession {
   revokedReason     String?
   ipAddress         String?
   userAgent         String?
+  deviceFingerprint String?
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -494,6 +505,7 @@ model StudentDevice {
   accountId         String
   deviceFingerprint String
   label             String?
+  isPrimary         Boolean  @default(false)
   createdAt         DateTime @default(now())
   lastUsedAt        DateTime @default(now())
 
@@ -501,6 +513,22 @@ model StudentDevice {
 
   @@unique([accountId, deviceFingerprint])
   @@index([accountId])
+}
+
+model DeviceBlock {
+  id                String    @id @default(uuid())
+  accountId         String
+  deviceFingerprint String
+  reason            String
+  blockedAt         DateTime  @default(now())
+  resolvedAt        DateTime?
+  resolution        String?
+  resolvedBy        String?
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([blockedAt])
 }
 
 model ActivityLease {
@@ -616,23 +644,24 @@ model Unit {
 }
 
 model Lesson {
-  id              String        @id @default(uuid())
-  unitId          String
-  titleAr         String
-  titleEn         String?
-  contentType     String        @default("VIDEO") // VIDEO, PDF, TEXT
-  contentUrl      String?
-  attachedPdfUrl  String?
-  homeworkPdfUrl  String?
-  durationSeconds Int           @default(0)
-  sort            Int           @default(0)
-  status          PublishStatus @default(DRAFT)
-  publishAt       DateTime?
-  unpublishAt     DateTime?
-  archivedAt      DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  version         Int           @default(1)
+  id                         String        @id @default(uuid())
+  unitId                     String
+  titleAr                    String
+  titleEn                    String?
+  contentType                String        @default("VIDEO") // VIDEO, PDF, TEXT
+  contentUrl                 String?
+  attachedPdfUrl             String?
+  homeworkPdfUrl             String?
+  durationSeconds            Int           @default(0)
+  sort                       Int           @default(0)
+  requiresPreviousLessonPass Boolean       @default(false)
+  status                     PublishStatus @default(DRAFT)
+  publishAt                  DateTime?
+  unpublishAt                DateTime?
+  archivedAt                 DateTime?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+  version                    Int           @default(1)
 
   unit        Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
   assessments Assessment[]
@@ -685,16 +714,17 @@ model Product {
 }
 
 model Price {
-  id            String    @id @default(uuid())
-  productId     String
-  amount        Decimal   @db.Decimal(10, 2)
-  currency      String    @default("EGP")
-  billingPeriod String    @default("ONCE") // ONCE, MONTHLY
-  status        String    @default("ACTIVE")
-  archivedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  version       Int       @default(1)
+  id             String    @id @default(uuid())
+  productId      String
+  amount         Decimal   @db.Decimal(10, 2)
+  originalAmount Decimal?  @db.Decimal(10, 2)
+  currency       String    @default("EGP")
+  billingPeriod  String    @default("ONCE") // ONCE, MONTHLY
+  status         String    @default("ACTIVE")
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  version        Int       @default(1)
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -937,6 +967,8 @@ model Assessment {
   prerequisiteForUnits Unit[]               @relation("UnitPrerequisite")
   questions            AssessmentQuestion[]
   attempts             AssessmentAttempt[]
+  examSessions         ExamSession[]
+  examGrants           ExamGrant[]
 
   @@index([courseId])
   @@index([unitId])
@@ -959,6 +991,7 @@ model AssessmentAttempt {
   id               String    @id @default(uuid())
   assessmentId     String
   accountId        String
+  examSessionId    String?
   startedAt        DateTime  @default(now())
   expiresAt        DateTime?
   autosavedAnswers Json
@@ -970,11 +1003,85 @@ model AssessmentAttempt {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  account    Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  assessment  Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  account     Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  examSession ExamSession? @relation(fields: [examSessionId], references: [id], onDelete: SetNull)
+  examGrants  ExamGrant[]
 
   @@index([accountId])
   @@index([assessmentId])
+  @@index([examSessionId])
+}
+
+model ExamSession {
+  id             String            @id @default(uuid())
+  assessmentId   String
+  accountId      String
+  startedAt      DateTime          @default(now())
+  expiresAt      DateTime?
+  lastActivityAt DateTime          @default(now())
+  endedAt        DateTime?
+  status         ExamSessionStatus @default(ACTIVE)
+  attemptCount   Int               @default(1)
+  openCount      Int               @default(1)
+  violationCount Int               @default(0)
+  lockedAt       DateTime?
+  lockReason     String?
+  reopenedAt     DateTime?
+  reopenedBy     String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  assessment Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  account    Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  attempts   AssessmentAttempt[]
+  events     ExamSessionEvent[]
+
+  @@index([accountId])
+  @@index([assessmentId])
+  @@index([accountId, assessmentId, status])
+  @@index([status])
+  @@index([lockedAt])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model ExamSessionEvent {
+  id           String   @id @default(uuid())
+  sessionId    String
+  accountId    String
+  assessmentId String
+  eventType    String
+  metadata     Json?
+  actor        String?
+  timestamp    DateTime @default(now())
+
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([accountId])
+  @@index([assessmentId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+model ExamGrant {
+  id            String    @id @default(uuid())
+  accountId     String
+  assessmentId  String
+  createdBy     String?
+  reason        String    @default("ADMIN_UNLOCK")
+  createdAt     DateTime  @default(now())
+  usedAt        DateTime?
+  usedAttemptId String?
+
+  account     Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  assessment  Assessment         @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  usedAttempt AssessmentAttempt? @relation(fields: [usedAttemptId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, assessmentId])
+  @@index([assessmentId])
+  @@index([createdAt])
 }
 
 model SupportTicket {

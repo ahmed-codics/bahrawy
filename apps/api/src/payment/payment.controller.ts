@@ -237,7 +237,7 @@ export class PaymentPlanController {
       accountId: req.account.id,
       productId: product.id,
       priceId: price.id,
-      amountRequested: Number(body.amountRequested ?? price.amount),
+      amountRequested: Number(price.amount),
       referenceNumber: body.referenceNumber,
       idempotencyKey:
         body.idempotencyKey ?? `${req.account.id}:${product.id}:${Date.now()}`,

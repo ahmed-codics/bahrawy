@@ -629,19 +629,58 @@ export default function AssessmentEditorPage({
             </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-bold">المدة الزمنية</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                type="number"
-                min="0"
-                value={durationMinutes}
-                onChange={(event) => setDurationMinutes(Number(event.target.value))}
-                className="w-28"
+          <div className="space-y-3 rounded-lg border border-border-default bg-canvas/50 p-3">
+            <label className="flex cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                className="size-4 accent-interactive"
+                checked={durationMinutes > 0}
+                onChange={(event) =>
+                  setDurationMinutes(event.target.checked ? 30 : 0)
+                }
               />
-              <span className="text-sm text-text-muted">دقيقة</span>
-              <span className="text-xs text-text-muted">(0 = بدون حد زمني)</span>
-            </div>
+              <span className="text-sm font-semibold">تفعيل مؤقت الامتحان</span>
+            </label>
+            {durationMinutes > 0 && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={durationMinutes}
+                    onChange={(event) =>
+                      setDurationMinutes(
+                        Math.max(1, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="w-28"
+                  />
+                  <span className="text-sm text-text-muted">دقيقة</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[15, 30, 45, 60, 90, 120].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setDurationMinutes(preset)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                        durationMinutes === preset
+                          ? 'border-interactive bg-interactive text-white'
+                          : 'border-border-default text-text-muted hover:border-interactive hover:text-primary'
+                      }`}
+                    >
+                      {preset} د
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-text-muted">
+                  عند تفعيله سيظهر للطالب عدّاد تنازلي «الوقت المتبقي» وينتهي
+                  الامتحان تلقائياً عند انتهاء المدة. تغيير المدة يؤثر على
+                  امتحانات جديدة فقط، والامتحانات المفتوحة حالياً تُحافظ على
+                  وقتها المتبقي.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 rounded-lg border border-border-default bg-canvas/50 p-3">

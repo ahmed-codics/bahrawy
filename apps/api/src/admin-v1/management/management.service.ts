@@ -56,14 +56,25 @@ export class AdminV1ManagementService {
         skip,
         take,
         orderBy: { displayName: 'asc' },
-        include: {
+        select: {
+          id: true,
+          displayName: true,
           account: {
-            include: {
+            select: {
+              id: true,
+              status: true,
+              version: true,
+              emailEncrypted: true,
               accountRoles: {
-                include: {
+                select: {
+                  roleId: true,
                   role: {
-                    include: {
-                      rolePermissions: { include: { permission: true } },
+                    select: {
+                      id: true,
+                      code: true,
+                      rolePermissions: {
+                        select: { permission: { select: { code: true } } },
+                      },
                     },
                   },
                 },
@@ -87,7 +98,9 @@ export class AdminV1ManagementService {
       } catch {
         // Keep the masked fallback when legacy encrypted data is unreadable.
       }
-      return { ...profile, email };
+      const { emailEncrypted: _ee, ...safeAccount } = profile.account;
+      void _ee;
+      return { ...profile, account: safeAccount, email };
     });
     return {
       items,
@@ -233,7 +246,11 @@ export class AdminV1ManagementService {
       after: { status: input.status, roleIds: input.roleIds },
       reason: input.reason,
     });
-    return updated;
+    return {
+      id: updated.id,
+      status: updated.status,
+      version: updated.version,
+    };
   }
 
   async staffDeletionImpact(
@@ -345,7 +362,12 @@ export class AdminV1ManagementService {
       after: updated,
       reason: input.reason,
     });
-    return updated;
+    return {
+      id: updated.id,
+      status: updated.status,
+      archivedAt: updated.archivedAt,
+      version: updated.version,
+    };
   }
 
   auditEvents(

@@ -133,6 +133,10 @@ export class AdminV1ProductsService {
               prices: {
                 create: {
                   amount: input.priceAmount,
+                  originalAmount: this.resolveOriginalAmount(
+                    input.priceAmount,
+                    input.originalAmount,
+                  ),
                   currency: input.currency ?? 'EGP',
                   billingPeriod: input.billingPeriod ?? 'ONCE',
                   status: 'ACTIVE',
@@ -290,6 +294,10 @@ export class AdminV1ProductsService {
           data: {
             productId: id,
             amount: input.priceAmount,
+            originalAmount: this.resolveOriginalAmount(
+              input.priceAmount,
+              input.originalAmount,
+            ),
             currency: input.currency ?? product.prices[0]?.currency ?? 'EGP',
             billingPeriod:
               input.billingPeriod ?? product.prices[0]?.billingPeriod ?? 'ONCE',
@@ -468,6 +476,7 @@ export class AdminV1ProductsService {
       coverImageUrl: input.coverImageUrl ?? course.coverImageUrl ?? undefined,
       gradeId: course.gradeId ?? undefined,
       priceAmount: input.priceAmount,
+      originalAmount: input.originalAmount,
       currency: input.currency,
       version: input.version,
       membership: { courseId },
@@ -514,6 +523,7 @@ export class AdminV1ProductsService {
       coverImageUrl: input.coverImageUrl,
       gradeId: unit.chapter.course.gradeId ?? undefined,
       priceAmount: input.priceAmount,
+      originalAmount: input.originalAmount,
       currency: input.currency,
       version: input.version,
       membership: { unitId },
@@ -535,6 +545,7 @@ export class AdminV1ProductsService {
       coverImageUrl?: string;
       gradeId?: string;
       priceAmount: number;
+      originalAmount?: number;
       currency?: string;
       version?: number;
       membership: { courseId?: string; unitId?: string };
@@ -593,6 +604,10 @@ export class AdminV1ProductsService {
         data: {
           productId,
           amount: input.priceAmount,
+          originalAmount: this.resolveOriginalAmount(
+            input.priceAmount,
+            input.originalAmount,
+          ),
           currency:
             input.currency ?? input.existing?.prices[0]?.currency ?? 'EGP',
           billingPeriod: 'ONCE',
@@ -633,6 +648,21 @@ export class AdminV1ProductsService {
         conflict: { currentVersion },
       });
     }
+  }
+
+  private resolveOriginalAmount(
+    finalAmount?: number,
+    originalAmount?: number,
+  ): number | null {
+    if (finalAmount === undefined || originalAmount === undefined) return null;
+    if (originalAmount < finalAmount) {
+      throw new BadRequestException({
+        code: 'ORIGINAL_BELOW_FINAL',
+        message: 'السعر الأصلي لا يمكن أن يكون أقل من السعر النهائي',
+      });
+    }
+    if (originalAmount <= finalAmount) return null;
+    return originalAmount;
   }
 
   private async validateMembership(

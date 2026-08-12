@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -9,6 +10,29 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
+
+export class ListCoursesQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+
+  @IsOptional()
+  @IsIn(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
+
+  @IsOptional()
+  @IsString()
+  termId?: string;
+}
 
 export class CreateCourseDto {
   @IsString()
@@ -104,6 +128,10 @@ export class CreateContentNodeDto {
   @IsOptional()
   @IsString()
   contentType?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresPreviousLessonPass?: boolean;
 }
 
 export class UpdateContentNodeDto {
@@ -152,6 +180,10 @@ export class UpdateContentNodeDto {
   @IsInt()
   @Min(0)
   sort?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresPreviousLessonPass?: boolean;
 
   @Type(() => Number)
   @IsInt()

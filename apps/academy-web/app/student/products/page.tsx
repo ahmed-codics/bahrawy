@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Crown, PackageOpen, ShieldCheck, Sparkles } from 'lucide-react';
 import { Badge, Button, EmptyState, PageSkeleton } from '@bahrawy/ui';
 import type { ProductDTO } from '@bahrawy/types';
+import { PriceTag } from '../../../components/PriceTag';
 import { API_BASE, fetchApi } from '../../../lib/api';
 
 export default function StudentProductsPage() {
@@ -166,11 +167,7 @@ function BundleCard({
         <div className="mt-6 border-t border-border-default pt-5">
           <p className="text-xs font-bold text-text-muted">إجمالي الاشتراك</p>
           <p className="ba-number mt-1 text-3xl font-black">
-            {price && Number(price.amount) === 0
-              ? 'مجاني'
-              : price
-                ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
-                : '—'}
+            <PriceTag price={price} />
           </p>
         </div>
         <Button

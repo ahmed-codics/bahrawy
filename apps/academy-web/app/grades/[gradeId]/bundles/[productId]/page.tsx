@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent, EmptyState, PageSkeleton } from '@bahrawy/ui';
+import { PriceTag } from '../../../../../components/PriceTag';
 import { PublicShell } from '../../../../../components/PublicShell';
 import { API_BASE, fetchApi } from '../../../../../lib/api';
 
@@ -149,8 +150,7 @@ export default function BundleDetailPage({
                 <div>
                   <span className="block text-xs font-bold text-text-muted">سعر الباقة</span>
                   <strong className="mt-1 block font-heading text-2xl font-black text-text sm:text-3xl">
-                    {price?.amount ?? '—'}{' '}
-                    <span className="text-base text-text-muted">{price?.currency || 'EGP'}</span>
+                    <PriceTag price={price} />
                   </strong>
                 </div>
                 <button

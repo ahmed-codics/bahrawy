@@ -70,6 +70,9 @@ export class AdminV1AssessmentsService {
   async update(actor: Actor, id: string, input: UpdateAssessmentDto) {
     const assessment = await db.assessment.findFirst({
       where: { id, course: { organizationId: actor.organizationId } },
+      include: {
+        lesson: { include: { unit: { include: { chapter: true } } } },
+      },
     });
     if (!assessment) throw new NotFoundException('Assessment not found');
     if (assessment.version !== input.version) {
@@ -81,18 +84,71 @@ export class AdminV1AssessmentsService {
     }
     const { version, ...data } = input;
     void version;
-    const updated = await db.assessment.update({
-      where: { id },
-      data: {
-        ...data,
-        archivedAt:
-          input.status === 'ARCHIVED'
-            ? new Date()
-            : input.status === 'DRAFT' || input.status === 'PUBLISHED'
-              ? null
-              : undefined,
-        version: { increment: 1 },
-      },
+    // Publishing an exam (assessment linked to an EXAM lesson) must also publish
+    // the parent lesson; otherwise the exam stays invisible to students because
+    // the lesson itself is still a draft.
+    const examLesson = assessment.lesson;
+    const publishExamLesson =
+      input.status === 'PUBLISHED' &&
+      examLesson?.contentType === 'EXAM' &&
+      examLesson.unit;
+    const updated = await db.$transaction(async (tx: any) => {
+      if (publishExamLesson && examLesson) {
+        await tx.course.updateMany({
+          where: {
+            id: examLesson.unit.chapter.courseId,
+            status: { not: 'PUBLISHED' },
+          },
+          data: {
+            status: 'PUBLISHED',
+            archivedAt: null,
+            version: { increment: 1 },
+          },
+        });
+        await tx.chapter.updateMany({
+          where: {
+            id: examLesson.unit.chapterId,
+            status: { not: 'PUBLISHED' },
+          },
+          data: {
+            status: 'PUBLISHED',
+            archivedAt: null,
+            version: { increment: 1 },
+          },
+        });
+        await tx.unit.updateMany({
+          where: {
+            id: examLesson.unitId,
+            status: { not: 'PUBLISHED' },
+          },
+          data: {
+            status: 'PUBLISHED',
+            archivedAt: null,
+            version: { increment: 1 },
+          },
+        });
+        await tx.lesson.update({
+          where: { id: examLesson.id },
+          data: {
+            status: 'PUBLISHED',
+            archivedAt: null,
+            version: { increment: 1 },
+          },
+        });
+      }
+      return tx.assessment.update({
+        where: { id },
+        data: {
+          ...data,
+          archivedAt:
+            input.status === 'ARCHIVED'
+              ? new Date()
+              : input.status === 'DRAFT' || input.status === 'PUBLISHED'
+                ? null
+                : undefined,
+          version: { increment: 1 },
+        },
+      });
     });
     await this.audit.logEvent({
       organizationId: actor.organizationId,

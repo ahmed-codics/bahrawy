@@ -418,6 +418,7 @@ export class AdminV1CoursesService {
           titleAr: input.titleAr,
           titleEn: input.titleEn,
           contentType: input.contentType ?? 'VIDEO',
+          requiresPreviousLessonPass: input.requiresPreviousLessonPass ?? false,
           sort,
           status: 'DRAFT',
         },
@@ -487,8 +488,18 @@ export class AdminV1CoursesService {
         );
       }
     }
-    const { version, publishAt, unpublishAt, ...data } = input;
+    const {
+      version,
+      publishAt,
+      unpublishAt,
+      requiresPreviousLessonPass,
+      ...data
+    } = input;
     void version;
+    const lessonGateFlag =
+      requiresPreviousLessonPass === undefined
+        ? {}
+        : { requiresPreviousLessonPass };
     const lifecycle = {
       publishAt: publishAt
         ? new Date(publishAt)
@@ -569,13 +580,13 @@ export class AdminV1CoursesService {
           });
           return tx.lesson.update({
             where: { id },
-            data: { ...data, ...lifecycle },
+            data: { ...data, ...lessonGateFlag, ...lifecycle },
           });
         });
       } else {
         updated = await db.lesson.update({
           where: { id },
-          data: { ...data, ...lifecycle },
+          data: { ...data, ...lessonGateFlag, ...lifecycle },
         });
       }
     }

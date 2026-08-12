@@ -21,6 +21,7 @@ import { AdminApiErrorFilter } from '../common/filters/admin-error.filter';
 import { AdminApiResponseInterceptor } from '../common/interceptors/admin-response.interceptor';
 import {
   AssignQuestionsDto,
+  ListQuestionsQueryDto,
   QuestionInputDto,
   UpdateQuestionDto,
 } from './questions.dto';
@@ -41,21 +42,14 @@ export class AdminV1QuestionsController {
   constructor(private readonly questionsService: AdminV1QuestionsService) {}
 
   @Get()
-  list(
-    @Req() request: AdminRequest,
-    @Query('search') search?: string,
-    @Query('gradeId') gradeId?: string,
-    @Query('archived') archived?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  list(@Req() request: AdminRequest, @Query() query: ListQuestionsQueryDto) {
     return this.questionsService.list(
       request.account.organizationId,
-      search,
-      gradeId,
-      archived === 'true',
-      Number(page) || 1,
-      Number(pageSize) || 25,
+      query.search,
+      query.gradeId,
+      query.archived === 'true',
+      query.page ?? 1,
+      query.pageSize ?? 25,
     );
   }
 

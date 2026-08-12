@@ -70,6 +70,11 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
             descriptionAr: values.descriptionAr || undefined,
             coverImageUrl,
             priceAmount: isFree ? 0 : Number(values.priceAmount),
+            originalAmount: isFree
+              ? undefined
+              : String(values.originalAmount || '').trim()
+                ? Number(values.originalAmount)
+                : undefined,
             version: course.courseProduct?.version,
           }),
         });
@@ -163,6 +168,18 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
             label="سعر شراء الكورس كاملاً (EGP)"
             defaultValue={String(course.courseProduct?.prices?.[0]?.amount ?? '')}
             placeholder="مثال: 500"
+            disabled={isFree}
+          />
+          <Input
+            name="originalAmount"
+            type="number"
+            min="0"
+            step="1"
+            label="السعر الأصلي قبل الخصم (اختياري)"
+            defaultValue={String(
+              course.courseProduct?.prices?.[0]?.originalAmount ?? '',
+            )}
+            placeholder="مثال: 650"
             disabled={isFree}
           />
           <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-sm font-semibold text-ink">

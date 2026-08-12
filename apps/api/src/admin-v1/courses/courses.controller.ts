@@ -22,6 +22,7 @@ import { AdminApiResponseInterceptor } from '../common/interceptors/admin-respon
 import {
   CreateContentNodeDto,
   CreateCourseDto,
+  ListCoursesQueryDto,
   ReorderContentDto,
   UpdateContentNodeDto,
   UpdateCourseDto,
@@ -46,25 +47,16 @@ export class AdminV1CoursesController {
   constructor(private readonly coursesService: AdminV1CoursesService) {}
 
   @Get()
-  list(
-    @Req() request: AdminRequest,
-    @Query('gradeId') gradeId?: string,
-    @Query('status') status?: string,
-    @Query('search') search?: string,
-    @Query('subjectId') subjectId?: string,
-    @Query('termId') termId?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  list(@Req() request: AdminRequest, @Query() query: ListCoursesQueryDto) {
     return this.coursesService.list(
       request.account.organizationId,
-      gradeId,
-      status,
-      search,
-      subjectId,
-      termId,
-      Number(page) || 1,
-      Number(pageSize) || 24,
+      query.gradeId,
+      query.status,
+      query.search,
+      query.subjectId,
+      query.termId,
+      query.page ?? 1,
+      query.pageSize ?? 24,
     );
   }
 

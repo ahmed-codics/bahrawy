@@ -17,6 +17,7 @@ import {
   Select,
 } from '@bahrawy/ui';
 import { API_BASE, fetchApi } from '../../../lib/api';
+import { discountLabel } from '../../../lib/pricing';
 import { LifecycleDialog } from '../_components/LifecycleDialog';
 
 type Course = {
@@ -33,6 +34,7 @@ type Grade = { id: string; nameAr: string; code: string };
 type Price = {
   id: string;
   amount: number | string;
+  originalAmount?: number | string | null;
   currency: string;
   billingPeriod: string;
   status: string;
@@ -69,6 +71,7 @@ type ProductForm = {
   gradeId: string;
   courseIds: string[];
   priceAmount: string;
+  originalAmount: string;
   isFree: boolean;
   billingPeriod: string;
 };
@@ -84,6 +87,7 @@ const EMPTY_FORM: ProductForm = {
   gradeId: '',
   courseIds: [],
   priceAmount: '',
+  originalAmount: '',
   isFree: false,
   billingPeriod: 'ONCE',
 };
@@ -224,6 +228,14 @@ export default function ProductsPage() {
         ...(form.isFree || form.priceAmount !== ''
           ? {
               priceAmount: form.isFree ? 0 : Number(form.priceAmount),
+              ...(form.isFree
+                ? {}
+                : {
+                    originalAmount:
+                      form.originalAmount.trim() === ''
+                        ? undefined
+                        : Number(form.originalAmount),
+                  }),
               currency: 'EGP',
               billingPeriod: form.billingPeriod,
             }
@@ -329,7 +341,10 @@ export default function ProductsPage() {
               return price
                 ? Number(price.amount) === 0
                   ? 'مجاني'
-                  : `${price.amount} ${price.currency}`
+                  : price.originalAmount &&
+                      Number(price.originalAmount) > Number(price.amount)
+                    ? `${price.originalAmount} → ${price.amount} ${price.currency}`
+                    : `${price.amount} ${price.currency}`
                 : 'بدون سعر';
             },
           },
@@ -485,21 +500,47 @@ export default function ProductsPage() {
               type="number"
               min="0"
               step="0.01"
-              label={editing ? 'سعر جديد (اختياري)' : 'السعر'}
+              label={editing ? 'سعر جديد (اختياري)' : 'السعر النهائي'}
               value={form.priceAmount}
               onChange={(event) => updateForm('priceAmount', event.target.value)}
               disabled={form.isFree}
             />
-            <Select
-              label="نوع الدفع"
-              value={form.billingPeriod}
-              onChange={(event) => updateForm('billingPeriod', event.target.value)}
-            >
-              <option value="ONCE">مرة واحدة</option>
-              <option value="MONTHLY">شهري</option>
-              <option value="TERM">فصل دراسي</option>
-            </Select>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              label="السعر الأصلي (اختياري للخصم)"
+              value={form.originalAmount}
+              onChange={(event) => updateForm('originalAmount', event.target.value)}
+              disabled={form.isFree}
+            />
           </div>
+          <Select
+            label="نوع الدفع"
+            value={form.billingPeriod}
+            onChange={(event) => updateForm('billingPeriod', event.target.value)}
+          >
+            <option value="ONCE">مرة واحدة</option>
+            <option value="MONTHLY">شهري</option>
+            <option value="TERM">فصل دراسي</option>
+          </Select>
+          {(() => {
+            if (form.isFree) return null;
+            if (
+              form.originalAmount !== '' &&
+              Number(form.priceAmount) > Number(form.originalAmount)
+            ) {
+              return (
+                <p className="text-xs font-bold text-danger">
+                  السعر الأصلي يجب أن يكون أكبر من أو يساوي السعر النهائي.
+                </p>
+              );
+            }
+            const discount = discountLabel(form.priceAmount, form.originalAmount);
+            return discount ? (
+              <p className="text-xs font-black text-brand-600">{discount}</p>
+            ) : null;
+          })()}
           <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-sm font-semibold text-ink">
             <input
               type="checkbox"
@@ -515,6 +556,9 @@ export default function ProductsPage() {
               {editing.prices.map((price) => (
                 <div key={price.id} className="flex justify-between gap-3 text-sm">
                   <span>
+                    {price.originalAmount
+                      ? `${price.originalAmount} → `
+                      : ''}
                     {price.amount} {price.currency} · {price.billingPeriod}
                   </span>
                   <span className="text-ink-3">

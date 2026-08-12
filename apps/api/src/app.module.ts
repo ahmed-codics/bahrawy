@@ -11,6 +11,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { StorageModule } from './storage/storage.module';
 import { PaymentModule } from './payment/payment.module';
 import { AssessmentModule } from './assessment/assessment.module';
+import { ExamSessionModule } from './exam-session/exam-session.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SupportModule } from './support/support.module';
 import { NotificationModule } from './notification/notification.module';
@@ -41,6 +42,7 @@ import {
     StorageModule,
     PaymentModule,
     AssessmentModule,
+    ExamSessionModule,
     DashboardModule,
     SupportModule,
     NotificationModule,

@@ -10,6 +10,21 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
+
+export class ListProductsQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+}
 
 export class ProductInputDto {
   @IsString()
@@ -69,6 +84,12 @@ export class ProductInputDto {
   priceAmount?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  originalAmount?: number;
+
+  @IsOptional()
   @IsString()
   currency?: string;
 
@@ -117,6 +138,12 @@ export class UpsertCommerceDto {
   @IsNumber()
   @Min(0)
   priceAmount!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  originalAmount?: number;
 
   @IsOptional()
   @IsString()

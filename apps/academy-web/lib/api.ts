@@ -1,5 +1,17 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status = 0, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 const DEVICE_FINGERPRINT_KEY = 'bahrawy-device-fingerprint';
 
 function getDeviceFingerprint() {
@@ -124,9 +136,11 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     let errorMsg = 'An error occurred';
+    let errorCode: string | undefined;
     try {
       const errData = await response.json();
       const message = errData.message;
+      errorCode = errData.code;
       errorMsg =
         typeof message === 'string'
           ? message
@@ -140,7 +154,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     } catch {
       // Ignore
     }
-    throw new Error(errorMsg);
+    throw new ApiError(errorMsg, response.status, errorCode);
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {

@@ -8,6 +8,7 @@ import {
 import { db, Prisma } from '@bahrawy/db';
 import { SecurityService } from '../security/security.service';
 import { TotpService } from '../totp/totp.service';
+import { DeviceLeaseService } from '../device-lease/device-lease.service';
 import { RegisterStudentDto } from './register.dto';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class AuthService {
   constructor(
     private readonly securityService: SecurityService,
     private readonly totpService: TotpService,
+    private readonly deviceLeaseService: DeviceLeaseService,
   ) {}
 
   async checkPhone(phone: string): Promise<boolean> {
@@ -26,7 +28,11 @@ export class AuthService {
     return !!existing;
   }
 
-  async registerStudent(input: RegisterStudentDto) {
+  async registerStudent(
+    input: RegisterStudentDto,
+    deviceFingerprint?: string,
+    userAgent?: string,
+  ) {
     const grade = await db.grade.findFirst({
       where: { id: input.gradeId, status: 'ACTIVE', archivedAt: null },
       select: { id: true, organizationId: true },
@@ -127,8 +133,29 @@ export class AuthService {
           },
         });
 
-        const session = await this.createSessionInternal(account.id, tx);
+        const session = await this.createSessionInternal(
+          account.id,
+          tx,
+          undefined,
+          userAgent,
+          deviceFingerprint,
+        );
         return { account, session };
+      })
+      .then(async (result) => {
+        if (deviceFingerprint) {
+          try {
+            await this.deviceLeaseService.validateOrRegisterDevice(
+              result.account,
+              deviceFingerprint,
+              userAgent,
+            );
+          } catch {
+            // Registration must not fail if device registration races; the
+            // session is bound to the device fingerprint regardless.
+          }
+        }
+        return result;
       })
       .catch((error) => {
         if (error instanceof ConflictException) throw error;
@@ -152,7 +179,13 @@ export class AuthService {
   }
 
   // 1. Activation
-  async activate(phone: string, credentialCode: string, newPassword: string) {
+  async activate(
+    phone: string,
+    credentialCode: string,
+    newPassword: string,
+    deviceFingerprint?: string,
+    userAgent?: string,
+  ) {
     const phoneHmac = this.securityService.generatePhoneHmac(phone);
     const account = await db.account.findFirst({
       where: { phoneHmac, deletedAt: null },
@@ -276,8 +309,28 @@ export class AuthService {
       });
 
       // Create new application session
-      const session = await this.createSessionInternal(account.id, tx);
+      const session = await this.createSessionInternal(
+        account.id,
+        tx,
+        undefined,
+        userAgent,
+        deviceFingerprint,
+      );
       return { account: updatedAccount, session };
+    }).then(async (result) => {
+      if (deviceFingerprint) {
+        try {
+          await this.deviceLeaseService.validateOrRegisterDevice(
+            result.account,
+            deviceFingerprint,
+            userAgent,
+          );
+        } catch {
+          // Session is already bound to the device fingerprint; device row
+          // registration is best-effort here.
+        }
+      }
+      return result;
     });
   }
 
@@ -288,6 +341,7 @@ export class AuthService {
     totpToken?: string,
     ipAddress?: string,
     userAgent?: string,
+    deviceFingerprint?: string,
   ) {
     const phoneHmac = this.securityService.generatePhoneHmac(phone);
     const account = await db.account.findFirst({
@@ -313,6 +367,7 @@ export class AuthService {
       userAgent,
       phoneHmac,
       'Invalid phone number or password',
+      deviceFingerprint,
     );
   }
 
@@ -358,6 +413,7 @@ export class AuthService {
     userAgent: string | undefined,
     phoneHmac: string | null,
     invalidCredentialsMessage: string,
+    deviceFingerprint?: string,
   ) {
     const isPassMatch = await this.securityService.verifyPassword(
       account.passwordHash,
@@ -426,8 +482,23 @@ export class AuthService {
       }
     }
 
-    // Create session
-    const session = await this.createSession(account.id, ipAddress, userAgent);
+    // Device lock enforcement: a student may only authenticate from their
+    // single primary device. An unknown device immediately blocks the account.
+    if (account.kind === 'STUDENT') {
+      await this.deviceLeaseService.validateOrRegisterDevice(
+        account,
+        deviceFingerprint ?? '',
+        userAgent,
+      );
+    }
+
+    // Create session (bound to the authenticated device for students)
+    const session = await this.createSession(
+      account.id,
+      ipAddress,
+      userAgent,
+      account.kind === 'STUDENT' ? deviceFingerprint : undefined,
+    );
     await this.logSecurityEvent(account.id, phoneHmac, 'LOGIN', 'SUCCESS');
 
     return { account, session };
@@ -438,6 +509,7 @@ export class AuthService {
     accountId: string,
     ipAddress?: string,
     userAgent?: string,
+    deviceFingerprint?: string,
   ) {
     return await db.$transaction(async (tx: any) => {
       return await this.createSessionInternal(
@@ -445,6 +517,7 @@ export class AuthService {
         tx,
         ipAddress,
         userAgent,
+        deviceFingerprint,
       );
     });
   }
@@ -454,6 +527,7 @@ export class AuthService {
     tx: any,
     ipAddress?: string,
     userAgent?: string,
+    deviceFingerprint?: string,
   ) {
     const plainToken = this.securityService.generateRandomToken();
     const tokenHash = this.securityService.hashOpaqueToken(plainToken);
@@ -471,6 +545,7 @@ export class AuthService {
         absoluteExpiresAt,
         ipAddress,
         userAgent,
+        deviceFingerprint,
       },
     });
 

@@ -28,3 +28,5 @@ packages/db/backups/
 packages/db/scripts/temp-verify.js
 packages/db/temp-db/
 /data/
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json

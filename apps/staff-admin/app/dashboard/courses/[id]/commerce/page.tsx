@@ -49,6 +49,11 @@ export default function CourseCommercePage({
           descriptionAr: course.descriptionAr || undefined,
           coverImageUrl: course.coverImageUrl || undefined,
           priceAmount: isFree ? 0 : Number(values.priceAmount),
+          originalAmount: isFree
+            ? undefined
+            : String(values.originalAmount || '').trim()
+              ? Number(values.originalAmount)
+              : undefined,
           currency: 'EGP',
           version: course.courseProduct?.version,
         }),
@@ -83,16 +88,20 @@ export default function CourseCommercePage({
       <Card>
         <CardContent className="space-y-5 pt-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm text-ink-3">السعر الحالي</p>
-              <p className="mt-1 text-3xl font-black">
-                {activePrice
-                  ? Number(activePrice.amount) === 0
-                    ? 'مجاني'
-                    : `${Number(activePrice.amount).toLocaleString('ar-EG')} جنيه`
-                  : 'غير محدد'}
-              </p>
-            </div>
+<div>
+                <p className="text-sm text-ink-3">السعر الحالي</p>
+                <p className="mt-1 text-3xl font-black">
+                  {activePrice
+                    ? Number(activePrice.amount) === 0
+                      ? 'مجاني'
+                      : activePrice.originalAmount &&
+                          Number(activePrice.originalAmount) >
+                            Number(activePrice.amount)
+                        ? `${Number(activePrice.originalAmount).toLocaleString('ar-EG')} → ${Number(activePrice.amount).toLocaleString('ar-EG')} جنيه`
+                        : `${Number(activePrice.amount).toLocaleString('ar-EG')} جنيه`
+                    : 'غير محدد'}
+                </p>
+              </div>
             <Badge tone={activePrice ? 'success' : 'amber'}>
               {activePrice ? 'سعر نشط' : 'يحتاج إعداد'}
             </Badge>
@@ -108,6 +117,16 @@ export default function CourseCommercePage({
               defaultValue={String(activePrice?.amount ?? '')}
               disabled={isFree}
               required={!isFree}
+            />
+            <Input
+              name="originalAmount"
+              type="number"
+              min="0"
+              step="1"
+              label="السعر الأصلي قبل الخصم (اختياري)"
+              defaultValue={String(activePrice?.originalAmount ?? '')}
+              placeholder="مثال: 700"
+              disabled={isFree}
             />
             <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-border px-4 text-sm font-bold">
               <input

@@ -13,6 +13,7 @@ import {
   PageIntro,
   PageSkeleton,
 } from '@bahrawy/ui';
+import { PriceTag } from '../../../../../../components/PriceTag';
 import { PublicShell } from '../../../../../../components/PublicShell';
 import { fetchApi } from '../../../../../../lib/api';
 
@@ -148,8 +149,7 @@ function BuyCard({
         <div>
           <h2 className="font-heading text-2xl font-black">{title}</h2>
           <p className="ba-number mt-3 text-3xl font-black">
-            {price && Number(price.amount) === 0 ? 'مجاني' : price?.amount ?? '—'}{' '}
-            {price && Number(price.amount) !== 0 && <span className="text-sm">{price.currency || 'EGP'}</span>}
+            <PriceTag price={price} />
           </p>
         </div>
         <Button

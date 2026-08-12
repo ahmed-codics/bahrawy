@@ -18,7 +18,11 @@ import { PermissionsGuard } from '../../rbac/permissions.guard';
 import { RequireAdminPermission } from '../common/decorators/require-permission.decorator';
 import { AdminApiErrorFilter } from '../common/filters/admin-error.filter';
 import { AdminApiResponseInterceptor } from '../common/interceptors/admin-response.interceptor';
-import { ReplyTicketDto, UpdateTicketDto } from './support.dto';
+import {
+  ListTicketsQueryDto,
+  ReplyTicketDto,
+  UpdateTicketDto,
+} from './support.dto';
 import { AdminV1SupportService } from './support.service';
 
 type AdminRequest = Request & {
@@ -34,21 +38,14 @@ export class AdminV1SupportController {
   constructor(private readonly support: AdminV1SupportService) {}
 
   @Get()
-  list(
-    @Req() request: AdminRequest,
-    @Query('status') status?: string,
-    @Query('priority') priority?: string,
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  list(@Req() request: AdminRequest, @Query() query: ListTicketsQueryDto) {
     return this.support.list(
       request.account.organizationId,
-      status,
-      priority,
-      search,
-      Number(page) || 1,
-      Number(pageSize) || 25,
+      query.status,
+      query.priority,
+      query.search,
+      query.page ?? 1,
+      query.pageSize ?? 25,
     );
   }
 

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { SecurityService } from '../security/security.service';
 import { TotpService } from '../totp/totp.service';
+import { DeviceLeaseService } from '../device-lease/device-lease.service';
 import { UnauthorizedException } from '@nestjs/common';
 import { db } from '@bahrawy/db';
 
@@ -55,7 +56,18 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthService, SecurityService, TotpService],
+      providers: [
+        AuthService,
+        SecurityService,
+        TotpService,
+        {
+          provide: DeviceLeaseService,
+          useValue: {
+            validateOrRegisterDevice: jest.fn().mockResolvedValue(undefined),
+            blockAccountForDevice: jest.fn().mockRejectedValue(new Error('blocked')),
+          },
+        },
+      ],
     }).compile();
     service = module.get<AuthService>(AuthService);
     securityService = module.get<SecurityService>(SecurityService);

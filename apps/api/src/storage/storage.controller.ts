@@ -195,18 +195,12 @@ export class StorageController {
               { homeworkPdfUrl: { in: references } },
             ],
           },
-          select: { unitId: true },
+          select: { id: true },
         });
         if (!lesson) {
           throw new ForbiddenException('You do not have access to this file');
         }
-        const access = await this.catalogService.getUnitAccess(
-          req.account.id,
-          lesson.unitId,
-        );
-        if (!access.hasAccess) {
-          throw new ForbiddenException('You do not have access to this file');
-        }
+        await this.catalogService.canAccessLesson(req.account.id, lesson.id);
       }
     }
 

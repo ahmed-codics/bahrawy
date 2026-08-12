@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   Clock3,
   ListChecks,
+  Maximize2,
   Save,
+  ShieldAlert,
   Trophy,
   XCircle,
 } from 'lucide-react';
@@ -69,6 +71,20 @@ type Result = {
   assessment?: Attempt['assessment'];
 };
 
+type ExamSession = {
+  id: string;
+  assessmentId: string;
+  startedAt: string;
+  expiresAt: string | null;
+  status: 'ACTIVE' | 'LOCKED' | 'EXPIRED' | 'SUBMITTED';
+  attemptCount: number;
+  openCount: number;
+  violationCount: number;
+  lockedAt: string | null;
+  lockReason: string | null;
+  reopenedAt: string | null;
+};
+
 function normalizeOptions(options: unknown): Option[] {
   if (Array.isArray(options)) {
     return options.flatMap((option, index) => {
@@ -103,12 +119,15 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const router = useRouter();
   const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [session, setSession] = useState<ExamSession | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState('');
+  const [lockMessage, setLockMessage] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [now, setNow] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
@@ -117,6 +136,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
     async (newAttempt = false) => {
       setLoading(true);
       setError('');
+      setLockMessage('');
       try {
         const start = await fetchApi(`/assessments/${id}/start`, {
           method: 'POST',
@@ -135,14 +155,54 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
         } else {
           setResult(null);
         }
+        const sess = await fetchApi(`/assessments/${id}/exam-session`);
+        setSession((sess.data as ExamSession) ?? null);
+        fullscreenHandledRef.current = false;
+        setIsFullscreen(false);
       } catch (caught) {
         setAttempt(null);
-        setError(caught instanceof Error ? caught.message : 'تعذر بدء الاختبار.');
+        setResult(null);
+        setSession(null);
+        const message = caught instanceof Error ? caught.message : 'تعذر بدء الاختبار.';
+        setLockMessage(message);
+        setError(message);
       } finally {
         setLoading(false);
       }
     },
     [id],
+  );
+
+  const reportViolation = useCallback(
+    async (reason: 'FULLSCREEN_EXIT' | 'TAB_SWITCH' | 'WINDOW_BLUR') => {
+      if (!attempt || result) return;
+      try {
+        const res = await fetchApi(`/assessments/attempt/${attempt.id}/exam-session/violations`, {
+          method: 'POST',
+          body: JSON.stringify({ reason }),
+        });
+        const report = res.data as {
+          sessionId: string;
+          status: string;
+          lockReason: string | null;
+          violationCount: number;
+        };
+        setSession((prev) =>
+          prev ? { ...prev, status: 'LOCKED', lockReason: report.lockReason ?? reason } : prev,
+        );
+        setLockMessage(
+          report.lockReason === 'TAB_SWITCH'
+            ? 'تم إيقاف الامتحان بسبب التنقل بين الألسنة أو النوافذ أثناء الامتحان.'
+            : report.lockReason === 'WINDOW_BLUR'
+              ? 'تم إيقاف الامتحان بسبب مغادرة نافذة الامتحان.'
+              : 'تم إيقاف الامتحان بسبب الخروج من وضع ملء الشاشة.',
+        );
+      } catch {
+        // A conflicting server state (e.g. already locked) still blocks the UI
+        // because the next autosave/read call will reject.
+      }
+    },
+    [attempt, result],
   );
 
   useEffect(() => {
@@ -152,19 +212,93 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
     return () => window.cancelAnimationFrame(frame);
   }, [loadAttempt]);
 
+  // While the session is LOCKED, keep the page in sync with the server: the
+  // admin may reopen the exam at any moment, and the backend is the source of
+  // truth. When the session comes back ACTIVE, reload the attempt so the
+  // student can continue without a manual page refresh.
+  useEffect(() => {
+    if (session?.status !== 'LOCKED' || result || !attempt) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const res = await fetchApi(`/assessments/${id}/exam-session`);
+          const data = res.data as ExamSession | null;
+          if (data?.status === 'ACTIVE') {
+            await loadAttempt();
+          }
+        } catch {
+          // Transient network/backend errors are ignored; keep polling.
+        }
+      })();
+    }, 10_000);
+    return () => window.clearInterval(timer);
+  }, [attempt, id, loadAttempt, result, session?.status]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
+  const enterFullscreen = useCallback(async () => {
+    try {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      }
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    } catch {
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  const fullscreenHandledRef = useRef(false);
+
+  const hasTimeLimit = Boolean(attempt?.expiresAt);
+
+  useEffect(() => {
+    if (!attempt || result || !hasTimeLimit || session?.status !== 'ACTIVE') return;
+    const onFullscreenChange = () => {
+      const element = document.fullscreenElement;
+      setIsFullscreen(Boolean(element));
+      if (!element && fullscreenHandledRef.current) {
+        void reportViolation('FULLSCREEN_EXIT');
+      }
+      if (element) fullscreenHandledRef.current = true;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        void reportViolation('TAB_SWITCH');
+      }
+    };
+    const onBlur = () => {
+      void reportViolation('WINDOW_BLUR');
+    };
+    const onPageHide = () => {
+      void reportViolation('WINDOW_BLUR');
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [attempt, result, hasTimeLimit, session?.status, reportViolation]);
+
   const questions = useMemo(
     () => [...(attempt?.assessment.questions || [])].sort((a, b) => a.sort - b.sort),
     [attempt],
   );
-  const hasTimeLimit = Boolean(attempt?.expiresAt);
   const remainingSeconds = attempt?.expiresAt
     ? Math.max(0, Math.floor((new Date(attempt.expiresAt).getTime() - now) / 1000))
     : 0;
+  const sessionStatus = session?.status ?? 'ACTIVE';
+  const isLocked = sessionStatus === 'LOCKED';
+  const isExpired =
+    sessionStatus === 'EXPIRED' || (hasTimeLimit && !result && remainingSeconds <= 0);
   const answeredCount = questions.filter((question) => answers[question.questionId]).length;
   const activeQuestionIndex = Math.min(currentQuestion, Math.max(questions.length - 1, 0));
   const activeQuestion = questions[activeQuestionIndex];
@@ -270,7 +404,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
   );
 
   if (loading) return <PageSkeleton cards={4} />;
-  if (error && !attempt)
+  if (error && !attempt && !session)
     return (
       <ErrorState
         title="تعذر فتح الاختبار"
@@ -278,6 +412,98 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
         onRetry={() => window.location.reload()}
       />
     );
+
+  if (isLocked && !result) {
+    return (
+      <PageIntro className="mx-auto max-w-xl">
+        <Card tone="coral">
+          <CardContent className="py-12 text-center sm:py-16">
+            <span className="mx-auto flex size-20 items-center justify-center rounded-[1.5rem] bg-danger/10 text-danger">
+              <ShieldAlert className="size-10" />
+            </span>
+            <h1 className="mt-6 font-heading text-3xl font-black">توقف الاختبار</h1>
+            <p className="mt-4 text-text-muted">
+              {lockMessage ||
+                'تم إيقاف الامتحان بسبب مخالفة قواعد الامتحان. تواصل مع إدارة الأكاديمية لإعادة فتحه.'}
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Button variant="outline" onClick={() => void loadAttempt()}>
+                إعادة المحاولة
+              </Button>
+              <Button variant="ghost" onClick={() => router.back()}>
+                العودة إلى الكورسات
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </PageIntro>
+    );
+  }
+
+  if (isExpired && attempt && !result) {
+    return (
+      <PageIntro className="mx-auto max-w-xl">
+        <Card tone="coral">
+          <CardContent className="py-12 text-center sm:py-16">
+            <span className="mx-auto flex size-20 items-center justify-center rounded-[1.5rem] bg-danger/10 text-danger">
+              <Clock3 className="size-10" />
+            </span>
+            <h1 className="mt-6 font-heading text-3xl font-black">انتهى الوقت المحدد</h1>
+            <p className="mt-4 text-text-muted">
+              تم حفظ إجاباتك تلقائياً. يمكنك تسليم الاختبار الآن لاحتفاظ بنتيجتك.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Button
+                loading={submitting}
+                loadingText="يتم التسليم..."
+                onClick={() => void submit()}
+              >
+                تسليم الإجابات المحفوظة
+              </Button>
+              <Button variant="outline" onClick={() => router.push('/student/courses')}>
+                العودة إلى الكورسات
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </PageIntro>
+    );
+  }
+
+  if (
+    hasTimeLimit &&
+    !isFullscreen &&
+    !result &&
+    !isLocked &&
+    !isExpired &&
+    attempt &&
+    !attempt.submittedAt
+  ) {
+    return (
+      <PageIntro className="mx-auto max-w-xl">
+        <Card>
+          <CardContent className="py-12 text-center sm:py-16">
+            <span className="mx-auto flex size-20 items-center justify-center rounded-[1.5rem] bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-200">
+              <Maximize2 className="size-10" />
+            </span>
+            <h1 className="mt-6 font-heading text-3xl font-black">وضع ملء الشاشة</h1>
+            <p className="mt-4 text-text-muted">
+              لكي يبدأ الاختبار، يجب أن يكون في وضع ملء الشاشة. لا يمكن الخروج من الاختبار أو التنقل
+              بين النوافذ أثناء الامتحان.
+            </p>
+            <ul className="mx-auto mt-6 max-w-sm space-y-2 text-start text-sm text-text-muted">
+              <li>• يبدأ العد التنازلي فور دخول وضع ملء الشاشة.</li>
+              <li>• الخروج من ملء الشاشة أو مغادرة النافذة يوقف الاختبار.</li>
+            </ul>
+            <Button size="lg" className="mt-8" onClick={() => void enterFullscreen()}>
+              <Maximize2 className="size-5" />
+              دخول وضع ملء الشاشة
+            </Button>
+          </CardContent>
+        </Card>
+      </PageIntro>
+    );
+  }
 
   if (result) {
     const score = Number(result.score || 0);
@@ -450,9 +676,12 @@ export default function AssessmentPage({ params }: { params: Promise<{ id: strin
             >
               <Clock3 className="size-4" />
               {hasTimeLimit ? (
-                <span className="ba-number">
-                  {String(Math.floor(remainingSeconds / 60)).padStart(2, '0')}:
-                  {String(remainingSeconds % 60).padStart(2, '0')}
+                <span>
+                  <span className="sr-only">الوقت المتبقي</span>
+                  <span className="ba-number">
+                    {String(Math.floor(remainingSeconds / 60)).padStart(2, '0')}:
+                    {String(remainingSeconds % 60).padStart(2, '0')}
+                  </span>
                 </span>
               ) : (
                 <span>بدون حد زمني</span>

@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Badge, Button, EmptyState, PageSkeleton } from '@bahrawy/ui';
+import { PriceTag } from '../../../../../../components/PriceTag';
 import { API_BASE, fetchApi } from '../../../../../../lib/api';
 
 type Product = {
@@ -33,6 +34,12 @@ type ContentItem = {
   questionCount?: number;
   completedAt?: string | null;
   available?: boolean;
+  locked?: boolean;
+  gate?: {
+    requiredAssessmentId?: string;
+    requiredScore?: number | null;
+    lessonId?: string;
+  } | null;
   attempt?: { submittedAt?: string | null; startedAt?: string } | null;
 };
 type UnitDetail = {
@@ -79,9 +86,6 @@ export default function LessonPage({
 
   const { unit, contentItems, lessonProduct, hasAccess } = detail;
   const price = lessonProduct?.prices?.[0];
-  const priceText = price
-    ? `${Number(price.amount).toLocaleString('ar-EG')} ${price.currency || 'EGP'}`
-    : null;
 
   const openItem = (item: ContentItem) => {
     if (item.type === 'ASSESSMENT' && item.assessmentId)
@@ -164,8 +168,10 @@ export default function LessonPage({
           {!detail.access?.hasEntitlement && (
             <div className="w-full rounded-2xl border border-brand-200 bg-brand-50 p-5 text-center dark:border-brand-900 dark:bg-brand-950/25 lg:w-auto lg:min-w-56">
               <p className="text-xs font-bold text-text-muted">سعر الدرس</p>
-              <p className="ba-number mt-2 text-3xl font-black">{priceText || 'غير محدد بعد'}</p>
-              {lessonProduct && priceText && (
+              <p className="ba-number mt-2 text-3xl font-black">
+                {price ? <PriceTag price={price} /> : 'غير محدد بعد'}
+              </p>
+              {lessonProduct && price && (
                 <Button
                   className="mt-5 w-full"
                   variant="accent"
@@ -228,6 +234,7 @@ function ContentCard({
   onOpen: () => void;
 }) {
   const allowed = hasAccess && item.available !== false;
+  const quizLocked = !!item.locked;
   const Icon =
     item.type === 'VIDEO' ? PlayCircle : item.type === 'ASSESSMENT' ? ClipboardCheck : FileText;
   const isActiveAssessment =
@@ -238,6 +245,11 @@ function ContentCard({
       {isActiveAssessment && (
         <Badge tone="amber" className="absolute left-4 top-4">
           قيد الإجراء
+        </Badge>
+      )}
+      {quizLocked && (
+        <Badge tone="neutral" className="absolute left-4 top-4">
+          <LockKeyhole className="size-3.5" /> مغلق
         </Badge>
       )}
       <div className="flex items-start gap-4">
@@ -265,24 +277,33 @@ function ContentCard({
           ) : item.questionCount ? (
             <p className="mt-1 text-xs text-text-muted">{item.questionCount} أسئلة</p>
           ) : null}
+          {quizLocked && (
+            <p className="mt-2 text-xs font-bold leading-5 text-error">
+              🔒 مغلق حتى اجتياز اختبار الدرس السابق
+              {item.gate?.requiredScore != null
+                ? ` (مطلوب ${item.gate.requiredScore} درجة)`
+                : ''}
+            </p>
+          )}
         </div>
       </div>
       <Button
         className="mt-5 w-full"
-        variant={allowed ? 'primary' : 'outline'}
-        disabled={!allowed}
+        variant={quizLocked ? 'outline' : allowed ? 'primary' : 'outline'}
         trailingIcon={
-          allowed ? <ArrowLeft className="size-4" /> : <LockKeyhole className="size-4" />
+          quizLocked ? <LockKeyhole className="size-4" /> : allowed ? <ArrowLeft className="size-4" /> : <LockKeyhole className="size-4" />
         }
         onClick={onOpen}
       >
-        {allowed
-          ? isActiveAssessment
-            ? 'متابعة الاختبار'
-            : item.completedAt
-              ? 'راجع المحتوى'
-              : 'افتح المحتوى'
-          : 'مقفل حتى فتح الدرس'}
+        {quizLocked
+          ? 'هذا الدرس مغلق'
+          : allowed
+            ? isActiveAssessment
+              ? 'متابعة الاختبار'
+              : item.completedAt
+                ? 'راجع المحتوى'
+                : 'افتح المحتوى'
+            : 'مقفل حتى فتح الدرس'}
       </Button>
     </article>
   );

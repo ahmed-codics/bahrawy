@@ -10,6 +10,21 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
+
+export class ListStudentsQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeId?: string;
+}
 
 export class CreateStudentDto {
   @IsString()

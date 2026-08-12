@@ -8,6 +8,21 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
+
+export class ListTicketsQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  priority?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
 
 export class UpdateTicketDto {
   @IsOptional()
