@@ -18,6 +18,7 @@ import {
   getSessionCookieName,
   SESSION_COOKIE_OPTIONS,
   SESSION_COOKIE_NAMES,
+  getSessionCookieOptions,
 } from './session-cookie';
 import { db } from '@bahrawy/db';
 import { StaffPermission } from '@bahrawy/types';
@@ -35,8 +36,17 @@ export class AuthController {
     private readonly csrfService: CsrfService,
   ) {}
 
-  private setSessionCookie(req: Request, res: Response, token: string) {
-    res.cookie(getSessionCookieName(req), token, SESSION_COOKIE_OPTIONS);
+  private setSessionCookie(
+    req: Request,
+    res: Response,
+    token: string,
+    rememberMe = false,
+  ) {
+    res.cookie(
+      getSessionCookieName(req),
+      token,
+      getSessionCookieOptions(rememberMe),
+    );
   }
 
   private clearSessionCookie(req: Request, res: Response) {
@@ -69,6 +79,7 @@ export class AuthController {
       body,
       this.deviceFingerprint(req),
       req.headers['user-agent'],
+      req.ip,
     );
     this.setSessionCookie(req, res, session.plainToken);
     return {
@@ -91,6 +102,7 @@ export class AuthController {
       body.password,
       this.deviceFingerprint(req),
       req.headers['user-agent'],
+      req.ip,
     );
     this.setSessionCookie(req, res, session.plainToken);
     return { status: 'SUCCESS', accountId: account.id, kind: account.kind };
@@ -99,12 +111,19 @@ export class AuthController {
   @Post('login')
   @Throttle(10, 900_000)
   async login(
-    @Body() body: { phone: string; password: string; totpToken?: string },
+    @Body()
+    body: {
+      phone: string;
+      password: string;
+      totpToken?: string;
+      rememberMe?: boolean;
+    },
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const ipAddress = req.ip;
     const userAgent = req.headers['user-agent'];
+    const rememberMe = body.rememberMe === true;
     const { account, session } = await this.authService.login(
       body.phone,
       body.password,
@@ -112,8 +131,9 @@ export class AuthController {
       ipAddress,
       userAgent,
       this.deviceFingerprint(req),
+      rememberMe,
     );
-    this.setSessionCookie(req, res, session.plainToken);
+    this.setSessionCookie(req, res, session.plainToken, rememberMe);
     return {
       status: 'SUCCESS',
       accountId: account.id,
@@ -131,14 +151,16 @@ export class AuthController {
   ) {
     const ipAddress = req.ip;
     const userAgent = req.headers['user-agent'];
+    const rememberMe = body.rememberMe === true;
     const { account, session } = await this.authService.staffLogin(
       body.email,
       body.password,
       body.totpToken,
       ipAddress,
       userAgent,
+      rememberMe,
     );
-    this.setSessionCookie(req, res, session.plainToken);
+    this.setSessionCookie(req, res, session.plainToken, rememberMe);
     return {
       status: 'SUCCESS',
       accountId: account.id,

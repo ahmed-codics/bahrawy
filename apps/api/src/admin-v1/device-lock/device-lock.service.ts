@@ -25,9 +25,7 @@ const studentNumberFromSearch = (search: string): number | null => {
 const maskFingerprint = (fingerprint: string | null | undefined): string => {
   const value = (fingerprint ?? '').trim();
   if (!value) return '';
-  return value.length <= 8
-    ? value
-    : `${value.slice(0, 8)}…${value.slice(-4)}`;
+  return value.length <= 8 ? value : `${value.slice(0, 8)}…${value.slice(-4)}`;
 };
 
 @Injectable()
@@ -39,10 +37,7 @@ export class AdminV1DeviceLockService {
 
   async list(organizationId: string, query: DeviceLockListQueryDto) {
     const page = Math.max(query.page ?? 1, 1);
-    const pageSize = Math.min(
-      Math.max(query.pageSize ?? 25, 1),
-      MAX_PAGE_SIZE,
-    );
+    const pageSize = Math.min(Math.max(query.pageSize ?? 25, 1), MAX_PAGE_SIZE);
     const search = (query.search ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
     const studentNumber = studentNumberFromSearch(search);
 
@@ -114,6 +109,9 @@ export class AdminV1DeviceLockService {
       accountId: string;
       deviceFingerprint: string;
       reason: string;
+      ipAddress: string | null;
+      userAgent: string | null;
+      previousStatus: string | null;
       blockedAt: Date;
       resolvedAt: Date | null;
       resolution: string | null;
@@ -141,6 +139,9 @@ export class AdminV1DeviceLockService {
             accountId: true,
             deviceFingerprint: true,
             reason: true,
+            ipAddress: true,
+            userAgent: true,
+            previousStatus: true,
             blockedAt: true,
             resolvedAt: true,
             resolution: true,
@@ -156,42 +157,79 @@ export class AdminV1DeviceLockService {
       }
     }
     const latestOpenBlockByAccount = new Map<string, BlockRow>();
+    const attemptCountByAccount = new Map<string, number>();
     for (const block of blocks) {
       if (!block.resolvedAt && !latestOpenBlockByAccount.has(block.accountId)) {
         latestOpenBlockByAccount.set(block.accountId, block);
       }
+      attemptCountByAccount.set(
+        block.accountId,
+        (attemptCountByAccount.get(block.accountId) ?? 0) + 1,
+      );
     }
 
-    const rawItems = profiles.map((profile) => {
-      const primary = primaryByAccount.get(profile.account.id);
-      const latestBlock = latestOpenBlockByAccount.get(profile.account.id);
-      return {
-        accountId: profile.account.id,
-        studentNumber: profile.studentNumber,
-        displayName: profile.displayName,
-        gradeId: profile.gradeId,
-        accountStatus: profile.account.status,
-        version: profile.account.version,
-        createdAt: profile.account.createdAt,
-        primaryDevice: primary
-          ? {
-              id: primary.id,
-              label: primary.label,
-              fingerprint: maskFingerprint(primary.deviceFingerprint),
-              lastUsedAt: primary.lastUsedAt,
-            }
-          : null,
-        blockedAt: latestBlock?.blockedAt ?? null,
-        blockReason: latestBlock?.reason ?? null,
-        attemptedDevice: latestBlock
-          ? {
-              fingerprint: maskFingerprint(latestBlock.deviceFingerprint),
-              reason: latestBlock.reason,
-              blockedAt: latestBlock.blockedAt,
-            }
-          : null,
-      };
-    });
+    const gradeNameById = new Map<string, string>();
+    for (const grade of grades) {
+      gradeNameById.set(grade.id, grade.nameAr);
+    }
+
+    const rawItems = profiles
+      .map((profile) => {
+        const primary = primaryByAccount.get(profile.account.id);
+        const latestBlock = latestOpenBlockByAccount.get(profile.account.id);
+        const reason = query.reason;
+        const status = query.status;
+        if (reason && latestBlock?.reason !== reason) return null;
+        if (status && profile.account.status !== status) return null;
+        if (
+          query.blockedFrom &&
+          latestBlock &&
+          latestBlock.blockedAt < new Date(query.blockedFrom)
+        ) {
+          return null;
+        }
+        if (
+          query.blockedTo &&
+          latestBlock &&
+          latestBlock.blockedAt > new Date(query.blockedTo)
+        ) {
+          return null;
+        }
+        return {
+          accountId: profile.account.id,
+          studentNumber: profile.studentNumber,
+          displayName: profile.displayName,
+          gradeId: profile.gradeId,
+          gradeName: profile.gradeId
+            ? (gradeNameById.get(profile.gradeId) ?? null)
+            : null,
+          accountStatus: profile.account.status,
+          version: profile.account.version,
+          createdAt: profile.account.createdAt,
+          primaryDevice: primary
+            ? {
+                id: primary.id,
+                label: primary.label,
+                fingerprint: maskFingerprint(primary.deviceFingerprint),
+                lastUsedAt: primary.lastUsedAt,
+              }
+            : null,
+          blockedAt: latestBlock?.blockedAt ?? null,
+          blockReason: latestBlock?.reason ?? null,
+          ipAddress: latestBlock?.ipAddress ?? null,
+          userAgent: latestBlock?.userAgent ?? null,
+          previousStatus: latestBlock?.previousStatus ?? null,
+          attemptCount: attemptCountByAccount.get(profile.account.id) ?? 0,
+          attemptedDevice: latestBlock
+            ? {
+                fingerprint: maskFingerprint(latestBlock.deviceFingerprint),
+                reason: latestBlock.reason,
+                blockedAt: latestBlock.blockedAt,
+              }
+            : null,
+        };
+      })
+      .filter((item) => item !== null);
 
     const total = rawItems.length;
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -210,9 +248,14 @@ export class AdminV1DeviceLockService {
       accountId,
     );
     const updated = await db.$transaction(async (tx: any) => {
+      const openBlock = await tx.deviceBlock.findFirst({
+        where: { accountId, resolvedAt: null },
+        orderBy: { blockedAt: 'desc' },
+      });
+      const restoreStatus = openBlock?.previousStatus || 'ACTIVE';
       const account = await tx.account.update({
         where: { id: accountId },
-        data: { status: 'ACTIVE', version: { increment: 1 } },
+        data: { status: restoreStatus, version: { increment: 1 } },
       });
       await tx.deviceBlock.updateMany({
         where: { accountId, resolvedAt: null },
@@ -228,7 +271,7 @@ export class AdminV1DeviceLockService {
       organizationId: actor.organizationId,
       actorType: 'STAFF',
       actorId: actor.id,
-      action: 'STUDENT_DEVICE_UNLOCK',
+      action: 'ADMIN_DEVICE_UNLOCK',
       targetType: 'ACCOUNT',
       targetId: accountId,
       before: { status: student.status },
@@ -263,9 +306,10 @@ export class AdminV1DeviceLockService {
     );
 
     const updated = await db.$transaction(async (tx: any) => {
+      const restoreStatus = latest.previousStatus || 'ACTIVE';
       const account = await tx.account.update({
         where: { id: accountId },
-        data: { status: 'ACTIVE', version: { increment: 1 } },
+        data: { status: restoreStatus, version: { increment: 1 } },
       });
       await tx.deviceBlock.updateMany({
         where: { accountId, resolvedAt: null },
@@ -281,7 +325,7 @@ export class AdminV1DeviceLockService {
       organizationId: actor.organizationId,
       actorType: 'STAFF',
       actorId: actor.id,
-      action: 'STUDENT_DEVICE_ALLOW',
+      action: 'ADMIN_DEVICE_ALLOW',
       targetType: 'ACCOUNT',
       targetId: accountId,
       before: { status: student.status },
@@ -301,12 +345,17 @@ export class AdminV1DeviceLockService {
       accountId,
     );
     const updated = await db.$transaction(async (tx: any) => {
+      const openBlock = await tx.deviceBlock.findFirst({
+        where: { accountId, resolvedAt: null },
+        orderBy: { blockedAt: 'desc' },
+      });
+      const restoreStatus = openBlock?.previousStatus || 'ACTIVE';
       await tx.studentDevice.deleteMany({
         where: { accountId },
       });
       const account = await tx.account.update({
         where: { id: accountId },
-        data: { status: 'ACTIVE', version: { increment: 1 } },
+        data: { status: restoreStatus, version: { increment: 1 } },
       });
       await tx.deviceBlock.updateMany({
         where: { accountId, resolvedAt: null },
@@ -322,7 +371,7 @@ export class AdminV1DeviceLockService {
       organizationId: actor.organizationId,
       actorType: 'STAFF',
       actorId: actor.id,
-      action: 'STUDENT_DEVICE_RESET_PRIMARY',
+      action: 'ADMIN_DEVICE_RESET',
       targetType: 'ACCOUNT',
       targetId: accountId,
       before: { status: student.status },

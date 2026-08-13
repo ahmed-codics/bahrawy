@@ -31,6 +31,7 @@ function safeNextPath() {
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,7 @@ export default function LoginPage() {
       await fetchCsrfToken();
       const response = await fetchApi('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ phone: identifier, password }),
+        body: JSON.stringify({ phone: identifier, password, rememberMe }),
       });
       await fetchCsrfToken();
       let dest: string;
@@ -216,6 +217,16 @@ export default function LoginPage() {
                   </button>
                 </div>
               </motion.div>
+
+              <label className="academy-login-remember">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  disabled={loading}
+                />
+                <span>تذكرني على هذا الجهاز</span>
+              </label>
 
               <button
                 className="academy-login-submit"

@@ -31,11 +31,15 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   });
   const studentHeaders = (csrf: string = studentCsrf) => ({
     cookie: studentCookies,
+    'x-device-fingerprint': 'e2e-shared-seed-device',
     ...(csrf ? { 'x-csrf-token': csrf } : {}),
   });
 
   test.beforeAll(async ({ browser }) => {
     studentPage = await browser.newPage();
+    await studentPage.addInitScript(() => {
+      window.localStorage.setItem('bahrawy-device-fingerprint', 'e2e-shared-seed-device');
+    });
     staffPage = await browser.newPage();
   });
 
@@ -81,6 +85,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   test('Step 4: Student logs in via API and gets session', async ({ request }) => {
     const res = await request.post('http://localhost:3000/auth/login', {
       data: { phone: '01000000001', password: 'student_secret' },
+      headers: { 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(res.ok()).toBeTruthy();
     studentCookies = res.headers()['set-cookie'];
@@ -173,7 +178,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
 
   test('Step 12: Student queries catalog via API', async ({ request }) => {
     const res = await request.get('http://localhost:3000/catalog/products', {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(res.ok()).toBeTruthy();
     const products = await res.json();
@@ -218,7 +223,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
   test('Step 16: Student views support ticket reply (API)', async ({ request }) => {
     if (ticketId) {
       const res = await request.get(`http://localhost:3000/support/${ticketId}`, {
-        headers: { cookie: studentCookies },
+        headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
       });
       expect(res.ok()).toBeTruthy();
     }
@@ -289,7 +294,7 @@ test.describe.serial('Bahrawy Academy 30-Step E2E Suite', () => {
 
   test('Step 28: API check - List Products (Student)', async ({ request }) => {
     const res = await request.get('http://localhost:3000/catalog/products', {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(res.ok()).toBeTruthy();
   });
@@ -317,14 +322,14 @@ test.describe.serial('Lesson Lock Flow (End-of-Lesson Quiz Gating)', () => {
 
   const studentHeaders = (csrf: string = sharedStudentCsrf) => ({
     cookie: sharedStudentCookies,
-    'x-device-fingerprint': 'e2e-lock-flow-device',
+    'x-device-fingerprint': 'e2e-shared-seed-device',
     ...(csrf ? { 'x-csrf-token': csrf } : {}),
   });
 
   test.beforeAll(async ({ browser }) => {
     studentPage = await browser.newPage();
     await studentPage.addInitScript(() => {
-      window.localStorage.setItem('bahrawy-device-fingerprint', 'e2e-lock-flow-device');
+      window.localStorage.setItem('bahrawy-device-fingerprint', 'e2e-shared-seed-device');
     });
   });
 
@@ -336,6 +341,7 @@ test.describe.serial('Lesson Lock Flow (End-of-Lesson Quiz Gating)', () => {
     if (!sharedStudentCookies) {
       const res = await request.post('http://localhost:3000/auth/login', {
         data: { phone: '01000000001', password: 'student_secret' },
+        headers: { 'x-device-fingerprint': 'e2e-shared-seed-device' },
       });
       expect(res.ok()).toBeTruthy();
       sharedStudentCookies = res.headers()['set-cookie'];
@@ -347,7 +353,7 @@ test.describe.serial('Lesson Lock Flow (End-of-Lesson Quiz Gating)', () => {
     }
 
     const me = await request.get('http://localhost:3000/auth/me', {
-      headers: { cookie: sharedStudentCookies },
+      headers: { cookie: sharedStudentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(me.ok()).toBeTruthy();
     const meData = (await me.json()).data;
@@ -491,7 +497,7 @@ test.describe.serial('Lesson Lock Flow (End-of-Lesson Quiz Gating)', () => {
 
   test('Unit detail does not leak locked lesson content', async ({ request }) => {
     const res = await request.get(`http://localhost:3000/catalog/units/${unitId}`, {
-      headers: { cookie: sharedStudentCookies },
+      headers: { cookie: sharedStudentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(res.ok()).toBeTruthy();
     const items = (await res.json()).data.contentItems;
@@ -555,6 +561,7 @@ test.describe.serial('Lesson Lock Flow (End-of-Lesson Quiz Gating)', () => {
 
     const login = await request.post('http://localhost:3000/auth/login', {
       data: { phone: '01000000001', password: 'student_secret' },
+      headers: { 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(login.ok()).toBeTruthy();
     const freshCookies = login.headers()['set-cookie'];
@@ -562,7 +569,7 @@ test.describe.serial('Lesson Lock Flow (End-of-Lesson Quiz Gating)', () => {
     const second = await request.get(`http://localhost:3000/catalog/lessons/${lesson2Id}`, {
       headers: {
         cookie: freshCookies,
-        'x-device-fingerprint': 'e2e-lock-flow-device',
+        'x-device-fingerprint': 'e2e-shared-seed-device',
       },
     });
     expect(second.ok()).toBeTruthy();

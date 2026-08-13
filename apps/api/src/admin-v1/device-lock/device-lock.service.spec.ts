@@ -91,10 +91,25 @@ describe('AdminV1DeviceLockService', () => {
       ]);
       (db.deviceBlock.findMany as jest.Mock).mockResolvedValue([
         {
+          id: 'block-2',
+          accountId: 'student-1',
+          deviceFingerprint: 'another-fingerprint-999999',
+          reason: 'SESSION_DEVICE_MISMATCH',
+          ipAddress: '10.0.0.6',
+          userAgent: 'Mozilla/5.0',
+          previousStatus: 'ACTIVE',
+          blockedAt: new Date('2026-08-02T10:00:00Z'),
+          resolvedAt: null,
+          resolution: null,
+        },
+        {
           id: 'block-1',
           accountId: 'student-1',
           deviceFingerprint: 'unknown-fingerprint-abcdef',
           reason: 'UNKNOWN_DEVICE',
+          ipAddress: '10.0.0.5',
+          userAgent: 'Mozilla/5.0',
+          previousStatus: 'ACTIVE',
           blockedAt: new Date('2026-08-01T10:00:00Z'),
           resolvedAt: null,
           resolution: null,
@@ -110,19 +125,108 @@ describe('AdminV1DeviceLockService', () => {
       expect(result.items).toHaveLength(1);
       const item = result.items[0];
       expect(item.accountId).toBe('student-1');
-      expect(item.primaryDevice.fingerprint).toBe('primary-fi…3456');
-      expect(item.attemptedDevice.fingerprint).toBe('unknown-f…bcdef');
-      expect(item.blockReason).toBe('UNKNOWN_DEVICE');
+      expect(item.primaryDevice!.fingerprint).toBe('primary-…3456');
+      expect(item.attemptedDevice!.fingerprint).toBe('another-…9999');
+      expect(item.blockReason).toBe('SESSION_DEVICE_MISMATCH');
+      expect(item.gradeName).toBe('الصف الثالث الثانوي');
+      expect(item.ipAddress).toBe('10.0.0.6');
+      expect(item.userAgent).toBe('Mozilla/5.0');
+      expect(item.previousStatus).toBe('ACTIVE');
+      expect(item.attemptCount).toBe(2);
       expect(result.meta.total).toBe(1);
       expect(result.grades).toEqual([
         { id: 'grade-1', nameAr: 'الصف الثالث الثانوي' },
       ]);
     });
+
+    it('filters by reason, status and blocked date range', async () => {
+      (db.studentProfile.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'sp-1',
+          studentNumber: 10200,
+          displayName: 'أحمد محمد',
+          gradeId: 'grade-1',
+          account: {
+            id: 'student-1',
+            status: 'DEVICE_BLOCKED',
+            version: 2,
+            createdAt: new Date('2026-08-01T10:00:00Z'),
+            updatedAt: new Date('2026-08-01T10:00:00Z'),
+          },
+        },
+      ]);
+      (db.grade.findMany as jest.Mock).mockResolvedValue([]);
+      (db.studentDevice.findMany as jest.Mock).mockResolvedValue([]);
+      (db.deviceBlock.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'block-1',
+          accountId: 'student-1',
+          deviceFingerprint: 'unknown-fingerprint-abcdef',
+          reason: 'UNKNOWN_DEVICE',
+          ipAddress: null,
+          userAgent: null,
+          previousStatus: 'ACTIVE',
+          blockedAt: new Date('2026-08-01T10:00:00Z'),
+          resolvedAt: null,
+          resolution: null,
+        },
+      ]);
+
+      const result = await service.list('org-1', {
+        page: 1,
+        pageSize: 25,
+        reason: 'SESSION_DEVICE_MISMATCH',
+      });
+      expect(result.items).toHaveLength(0);
+    });
   });
 
   describe('unlock', () => {
-    it('sets ACTIVE, resolves open blocks and audits', async () => {
+    it('restores the previous status instead of blindly forcing ACTIVE', async () => {
       (db.account.findFirst as jest.Mock).mockResolvedValue(blockedAccount);
+      (db.deviceBlock.findFirst as jest.Mock).mockResolvedValue({
+        id: 'block-1',
+        deviceFingerprint: 'fp-x',
+        previousStatus: 'SUSPENDED',
+        blockedAt: new Date(),
+      });
+      (db.account.update as jest.Mock).mockResolvedValue({
+        id: 'student-1',
+        status: 'SUSPENDED',
+        version: 3,
+      });
+      (db.deviceBlock.updateMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
+
+      const result = await service.unlock(actor, 'student-1');
+
+      expect(result.status).toBe('SUSPENDED');
+      expect(db.account.update).toHaveBeenCalledWith({
+        where: { id: 'student-1' },
+        data: expect.objectContaining({ status: 'SUSPENDED' }),
+      });
+      expect(db.deviceBlock.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ resolvedAt: null }),
+        }),
+      );
+      expect(audit.logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ADMIN_DEVICE_UNLOCK',
+          actorId: 'staff-1',
+        }),
+      );
+    });
+
+    it('restores ACTIVE when the account was active before the block', async () => {
+      (db.account.findFirst as jest.Mock).mockResolvedValue(blockedAccount);
+      (db.deviceBlock.findFirst as jest.Mock).mockResolvedValue({
+        id: 'block-1',
+        deviceFingerprint: 'fp-x',
+        previousStatus: 'ACTIVE',
+        blockedAt: new Date(),
+      });
       (db.account.update as jest.Mock).mockResolvedValue({
         id: 'student-1',
         status: 'ACTIVE',
@@ -135,21 +239,6 @@ describe('AdminV1DeviceLockService', () => {
       const result = await service.unlock(actor, 'student-1');
 
       expect(result.status).toBe('ACTIVE');
-      expect(db.account.update).toHaveBeenCalledWith({
-        where: { id: 'student-1' },
-        data: expect.objectContaining({ status: 'ACTIVE' }),
-      });
-      expect(db.deviceBlock.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ resolvedAt: null }),
-        }),
-      );
-      expect(audit.logEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'STUDENT_DEVICE_UNLOCK',
-          actorId: 'staff-1',
-        }),
-      );
     });
 
     it('rejects a student that is not DEVICE_BLOCKED', async () => {
@@ -165,20 +254,21 @@ describe('AdminV1DeviceLockService', () => {
 
     it('rejects an account in another organization', async () => {
       (db.account.findFirst as jest.Mock).mockResolvedValue(null);
-      await expect(service.unlock(actor, 'student-other')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.unlock(actor, 'student-other'),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(db.account.update).not.toHaveBeenCalled();
     });
   });
 
   describe('allowDevice', () => {
-    it('promotes the attempted device, activates the account and audits', async () => {
+    it('promotes the attempted device, restores status and audits', async () => {
       (db.account.findFirst as jest.Mock).mockResolvedValue(blockedAccount);
       (db.deviceBlock.findFirst as jest.Mock).mockResolvedValue({
         id: 'block-1',
         deviceFingerprint: 'fp-attempted',
         reason: 'UNKNOWN_DEVICE',
+        previousStatus: 'ACTIVE',
         blockedAt: new Date(),
         resolvedAt: null,
       });
@@ -199,7 +289,7 @@ describe('AdminV1DeviceLockService', () => {
       );
       expect(result.status).toBe('ACTIVE');
       expect(audit.logEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'STUDENT_DEVICE_ALLOW' }),
+        expect.objectContaining({ action: 'ADMIN_DEVICE_ALLOW' }),
       );
     });
 
@@ -214,8 +304,14 @@ describe('AdminV1DeviceLockService', () => {
   });
 
   describe('resetPrimary', () => {
-    it('clears devices, activates the account and audits', async () => {
+    it('clears devices, restores status and audits', async () => {
       (db.account.findFirst as jest.Mock).mockResolvedValue(blockedAccount);
+      (db.deviceBlock.findFirst as jest.Mock).mockResolvedValue({
+        id: 'block-1',
+        deviceFingerprint: 'fp-x',
+        previousStatus: 'ACTIVE',
+        blockedAt: new Date(),
+      });
       (db.studentDevice.deleteMany as jest.Mock).mockResolvedValue({
         count: 1,
       });
@@ -235,7 +331,7 @@ describe('AdminV1DeviceLockService', () => {
       });
       expect(result.status).toBe('ACTIVE');
       expect(audit.logEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'STUDENT_DEVICE_RESET_PRIMARY' }),
+        expect.objectContaining({ action: 'ADMIN_DEVICE_RESET' }),
       );
     });
   });

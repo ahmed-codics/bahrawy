@@ -28,6 +28,7 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
   const studentHeaders = () => ({
     cookie: studentCookies,
     'x-csrf-token': studentCsrf,
+    'x-device-fingerprint': 'e2e-shared-seed-device',
   });
 
   test('logs in staff via API', async ({ request }) => {
@@ -45,6 +46,7 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
   test('logs in student via API and reads their grade', async ({ request }) => {
     const login = await request.post(`${API}/auth/login`, {
       data: { phone: '01000000001', password: 'student_secret' },
+      headers: { 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(login.ok()).toBeTruthy();
     studentCookies = login.headers()['set-cookie'];
@@ -54,7 +56,7 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
     studentCsrf = (await csrf.json()).csrfToken;
 
     const me = await request.get(`${API}/dashboard/student`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     gradeId = (await me.json()).data?.profile?.gradeId;
   });
@@ -134,7 +136,7 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
 
   test('student catalog returns final + original prices (50% OFF)', async ({ request }) => {
     const res = await request.get(`${API}/catalog/courses`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     const courses = (await res.json()).data;
     const course = courses.find((c: any) => c.titleAr === courseTitle);
@@ -149,6 +151,9 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
 
   test('student UI shows crossed-out original + final + "50% OFF"', async ({ browser }) => {
     const page = await browser.newPage();
+    await page.addInitScript(() => {
+      window.localStorage.setItem('bahrawy-device-fingerprint', 'e2e-shared-seed-device');
+    });
     await page.goto(`${WEB}/login`);
     await page.fill('input[type="tel"], input[name="phone"]', '01000000001');
     await page.fill('input[type="password"]', 'student_secret');
@@ -165,7 +170,7 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
 
   test('student payment order uses the final price from the DB', async ({ request }) => {
     const res = await request.get(`${API}/catalog/courses`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     const course = (await res.json()).data.find((c: any) => c.titleAr === courseTitle);
     const product = course.products
@@ -206,7 +211,9 @@ test.describe.serial('Course Discount Pricing End-to-End', () => {
     expect(product.prices[0].originalAmount).toBeNull();
 
     const catalog = await (
-      await request.get(`${API}/catalog/products`, { headers: { cookie: studentCookies } })
+      await request.get(`${API}/catalog/products`, {
+        headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
+      })
     ).json();
     const seen = catalog.data.find((p: any) => p.id === product.id);
     expect(seen.prices[0].originalAmount).toBeNull();

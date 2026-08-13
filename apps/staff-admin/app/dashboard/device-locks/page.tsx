@@ -2,13 +2,20 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { MonitorSmartphone, RotateCcw, ShieldBan, UnlockKeyhole } from 'lucide-react';
+import {
+  Globe,
+  MonitorSmartphone,
+  RotateCcw,
+  ShieldBan,
+  UnlockKeyhole,
+} from 'lucide-react';
 import {
   Badge,
   Button,
   DataTable,
   ErrorState,
   FilterBar,
+  Input,
   PageHeader,
   PageSkeleton,
   Select,
@@ -29,6 +36,7 @@ type DeviceLockRow = {
   studentNumber: number;
   displayName: string;
   gradeId: string | null;
+  gradeName: string | null;
   accountStatus: string;
   version: number;
   createdAt: string;
@@ -40,6 +48,10 @@ type DeviceLockRow = {
   } | null;
   blockedAt: string | null;
   blockReason: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  previousStatus: string | null;
+  attemptCount: number;
   attemptedDevice: {
     fingerprint: string;
     reason: string;
@@ -61,6 +73,12 @@ const REASON_LABELS: Record<string, string> = {
   SESSION_DEVICE_MISMATCH: 'تعارض الجهاز مع الجلسة',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  DEVICE_BLOCKED: 'موقوف بسبب الجهاز',
+  ACTIVE: 'نشط',
+  SUSPENDED: 'موقوف',
+};
+
 function formatDateTime(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('ar-EG', {
@@ -78,6 +96,9 @@ export default function DeviceLocksPage() {
   const [search, setSearch] = useState('');
   const [gradeId, setGradeId] = useState('');
   const [reason, setReason] = useState('');
+  const [status, setStatus] = useState('');
+  const [blockedFrom, setBlockedFrom] = useState('');
+  const [blockedTo, setBlockedTo] = useState('');
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [total, setTotal] = useState(0);
@@ -99,6 +120,10 @@ export default function DeviceLocksPage() {
       query.set('pageSize', '25');
       if (search.trim()) query.set('search', search.trim());
       if (gradeId) query.set('gradeId', gradeId);
+      if (reason) query.set('reason', reason);
+      if (status) query.set('status', status);
+      if (blockedFrom) query.set('blockedFrom', blockedFrom);
+      if (blockedTo) query.set('blockedTo', blockedTo);
       const response = await fetchApi<DeviceLocksResponse>(
         `/admin/v1/device-locks?${query}`,
       );
@@ -116,11 +141,11 @@ export default function DeviceLocksPage() {
     } finally {
       setLoading(false);
     }
-  }, [gradeId, page, search]);
+  }, [blockedFrom, blockedTo, gradeId, page, reason, search, status]);
 
   useEffect(() => {
     setPage(1);
-  }, [gradeId, reason, search]);
+  }, [blockedFrom, blockedTo, gradeId, reason, search, status]);
 
   useEffect(() => {
     const timeout = setTimeout(() => void load(), 250);
@@ -172,11 +197,10 @@ export default function DeviceLocksPage() {
     );
   }
 
-  const filtered = Boolean(search.trim() || gradeId || reason);
-  const visibleItems = reason
-    ? items.filter((row) => row.blockReason === reason)
-    : items;
-  const withoutPrimary = visibleItems.filter((row) => !row.primaryDevice).length;
+  const filtered = Boolean(
+    search.trim() || gradeId || reason || status || blockedFrom || blockedTo,
+  );
+  const withoutPrimary = items.filter((row) => !row.primaryDevice).length;
 
   const openAction = (
     action: 'unlock' | 'allow-device' | 'reset-primary',
@@ -221,7 +245,7 @@ export default function DeviceLocksPage() {
         />
         <StatCard
           label="إجمالي الحسابات المفعلة"
-          value={visibleItems.filter((row) => row.accountStatus === 'ACTIVE').length}
+          value={items.filter((row) => row.accountStatus === 'ACTIVE').length}
           hint="في هذه الصفحة"
           icon={<UnlockKeyhole className="size-6" />}
           tone="cyan"
@@ -247,6 +271,18 @@ export default function DeviceLocksPage() {
               ))}
             </Select>
             <Select
+              aria-label="تصفية بالحالة"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="">كل الحالات</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+            <Select
               aria-label="تصفية بالمرحلة الدراسية"
               value={gradeId}
               onChange={(event) => setGradeId(event.target.value)}
@@ -258,6 +294,18 @@ export default function DeviceLocksPage() {
                 </option>
               ))}
             </Select>
+            <Input
+              type="date"
+              aria-label="تاريخ الإيقاف من"
+              value={blockedFrom}
+              onChange={(event) => setBlockedFrom(event.target.value)}
+            />
+            <Input
+              type="date"
+              aria-label="تاريخ الإيقاف إلى"
+              value={blockedTo}
+              onChange={(event) => setBlockedTo(event.target.value)}
+            />
           </>
         }
       />
@@ -277,7 +325,7 @@ export default function DeviceLocksPage() {
             ? 'لا توجد حالات مطابقة للبحث'
             : 'لا توجد حسابات موقوفة بسبب الجهاز حالياً'
         }
-        data={visibleItems}
+        data={items}
         keyExtractor={(row) => row.accountId}
         page={page}
         pageCount={pageCount}
@@ -293,6 +341,15 @@ export default function DeviceLocksPage() {
                   #{row.studentNumber}
                 </p>
               </div>
+            ),
+          },
+          {
+            id: 'grade',
+            header: 'الصف',
+            cell: (row: DeviceLockRow) => (
+              <span className="whitespace-nowrap text-xs text-ink-2">
+                {row.gradeName ?? '—'}
+              </span>
             ),
           },
           {
@@ -342,6 +399,41 @@ export default function DeviceLocksPage() {
               ) : (
                 <span className="text-xs text-ink-3">—</span>
               ),
+          },
+          {
+            id: 'ip',
+            header: 'IP',
+            cell: (row: DeviceLockRow) => (
+              <span
+                className="whitespace-nowrap font-mono text-xs text-ink-2"
+                dir="ltr"
+              >
+                {row.ipAddress ?? '—'}
+              </span>
+            ),
+          },
+          {
+            id: 'userAgent',
+            header: 'المتصفح',
+            cell: (row: DeviceLockRow) => (
+              <span
+                className="block max-w-52 truncate text-xs text-ink-2"
+                title={row.userAgent ?? undefined}
+              >
+                {row.userAgent ?? '—'}
+              </span>
+            ),
+          },
+          {
+            id: 'attempts',
+            header: 'عدد المحاولات',
+            align: 'center',
+            cell: (row: DeviceLockRow) => (
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink-2">
+                <Globe className="size-3" aria-hidden="true" />
+                {row.attemptCount}
+              </span>
+            ),
           },
           {
             id: 'reason',

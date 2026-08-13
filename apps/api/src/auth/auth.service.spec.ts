@@ -22,6 +22,7 @@ jest.mock('@bahrawy/db', () => {
     },
     authSession: {
       create: jest.fn(),
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -64,7 +65,9 @@ describe('AuthService', () => {
           provide: DeviceLeaseService,
           useValue: {
             validateOrRegisterDevice: jest.fn().mockResolvedValue(undefined),
-            blockAccountForDevice: jest.fn().mockRejectedValue(new Error('blocked')),
+            blockAccountForDevice: jest
+              .fn()
+              .mockRejectedValue(new Error('blocked')),
           },
         },
       ],
@@ -208,6 +211,144 @@ describe('AuthService', () => {
         expect.objectContaining({
           where: expect.objectContaining({ kind: { not: 'STAFF' } }),
         }),
+      );
+    });
+  });
+
+  describe('remember-me session policy', () => {
+    const pass = 'SuperSecretPassphrase123';
+
+    const mockAccount = (overrides: Record<string, unknown> = {}) => ({
+      id: 'acc-rm',
+      kind: 'STUDENT',
+      phoneHmac: securityService.generatePhoneHmac('01012345678'),
+      passwordHash: null,
+      status: 'ACTIVE',
+      organizationId: 'org-1',
+      totpFactor: null,
+      ...overrides,
+    });
+
+    beforeEach(async () => {
+      const hash = await securityService.hashPassword(pass);
+      const account = mockAccount({ passwordHash: hash });
+      (db.account.findFirst as jest.Mock).mockResolvedValue(account);
+      (db.authSession.create as jest.Mock).mockImplementation(({ data }) =>
+        Promise.resolve({ id: 'sess-rm', ...data }),
+      );
+    });
+
+    it('creates a normal 1h-idle / 7d-absolute session by default (rememberMe=false)', async () => {
+      await service.login('01012345678', pass);
+
+      expect(db.authSession.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            rememberMe: false,
+          }),
+        }),
+      );
+      const { data } = (db.authSession.create as jest.Mock).mock.calls[0][0];
+      const now = Date.now();
+      expect(data.idleExpiresAt.getTime() - now).toBeLessThanOrEqual(
+        1000 * 60 * 60 * 1 + 5000,
+      );
+      expect(data.idleExpiresAt.getTime() - now).toBeGreaterThanOrEqual(
+        1000 * 60 * 60 * 1 - 5000,
+      );
+      expect(data.absoluteExpiresAt.getTime() - now).toBeLessThanOrEqual(
+        1000 * 60 * 60 * 24 * 7 + 5000,
+      );
+      expect(data.absoluteExpiresAt.getTime() - now).toBeGreaterThanOrEqual(
+        1000 * 60 * 60 * 24 * 7 - 5000,
+      );
+    });
+
+    it('creates a persistent 30d-idle / 30d-absolute session when rememberMe=true', async () => {
+      await service.login(
+        '01012345678',
+        pass,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+
+      const { data } = (db.authSession.create as jest.Mock).mock.calls[0][0];
+      expect(data.rememberMe).toBe(true);
+      const now = Date.now();
+      expect(data.idleExpiresAt.getTime() - now).toBeGreaterThan(
+        1000 * 60 * 60 * 24 * 7,
+      );
+      expect(data.absoluteExpiresAt.getTime() - now).toBeGreaterThan(
+        1000 * 60 * 60 * 24 * 7,
+      );
+      expect(data.idleExpiresAt.getTime() - now).toBeLessThanOrEqual(
+        1000 * 60 * 60 * 24 * 30 + 5000,
+      );
+      expect(data.absoluteExpiresAt.getTime() - now).toBeLessThanOrEqual(
+        1000 * 60 * 60 * 24 * 30 + 5000,
+      );
+    });
+
+    it('keeps staff sessions persistent when rememberMe=true', async () => {
+      const hash = await securityService.hashPassword(pass);
+      const staff = mockAccount({
+        id: 'staff-rm',
+        kind: 'STAFF',
+        emailHmac: securityService.generateEmailHmac('admin@bahrawy.test'),
+        passwordHash: hash,
+        totpFactor: null,
+      });
+      (db.account.findFirst as jest.Mock).mockResolvedValue(staff);
+
+      await service.staffLogin(
+        'admin@bahrawy.test',
+        pass,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+
+      const { data } = (db.authSession.create as jest.Mock).mock.calls[0][0];
+      expect(data.rememberMe).toBe(true);
+      expect(data.absoluteExpiresAt.getTime() - Date.now()).toBeGreaterThan(
+        1000 * 60 * 60 * 24 * 7,
+      );
+    });
+
+    it('slides a remember-me session idle expiry to 30 days on validateSession', async () => {
+      const rememberSession = {
+        id: 'sess-rm-live',
+        tokenHash: 'h-rm',
+        revokedAt: null,
+        rememberMe: true,
+        lastSeenAt: new Date(Date.now() - 10 * 60 * 1000),
+        idleExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        absoluteExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 29),
+        account: mockAccount(),
+      };
+      (db.authSession.findFirst as jest.Mock).mockResolvedValue(
+        rememberSession,
+      );
+      (db.authSession.update as jest.Mock).mockImplementation(({ data }) =>
+        Promise.resolve({ ...rememberSession, ...data }),
+      );
+
+      await service.validateSession('plain-token-rm');
+
+      expect(db.authSession.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            idleExpiresAt: expect.any(Date),
+          }),
+        }),
+      );
+      const { data } = (db.authSession.update as jest.Mock).mock.calls[0][0];
+      expect(data.idleExpiresAt.getTime() - Date.now()).toBeGreaterThan(
+        1000 * 60 * 60 * 24 * 7,
       );
     });
   });

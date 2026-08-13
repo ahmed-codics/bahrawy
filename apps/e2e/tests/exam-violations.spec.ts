@@ -40,8 +40,16 @@ const student2Headers = (csrf = student2Csrf) => ({
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 
-const login = async (request, path: string, body: Record<string, string>) => {
-  const res = await request.post(`${API}${path}`, { data: body });
+const login = async (
+  request,
+  path: string,
+  body: Record<string, string>,
+  device?: string,
+) => {
+  const res = await request.post(`${API}${path}`, {
+    data: body,
+    ...(device ? { headers: { 'x-device-fingerprint': device } } : {}),
+  });
   expect(res.ok()).toBeTruthy();
   const cookies = res.headers()['set-cookie'];
   const csrfRes = await request.get(`${API}/auth/csrf-token`, {
@@ -92,18 +100,18 @@ test.describe.serial('Exam FAILED rows + admin unlock (exams violations section)
     const s1 = await login(request, '/auth/login', {
       phone: student1Phone,
       password: 'student_secret',
-    });
+    }, 'fail-unlock-device');
     studentCookies = s1.cookies;
     studentCsrf = s1.csrf;
     const s2 = await login(request, '/auth/login', {
       phone: student2Phone,
       password: 'student_secret',
-    });
+    }, 'fail-unlock-device-2');
     student2Cookies = s2.cookies;
     student2Csrf = s2.csrf;
 
     const me1 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'fail-unlock-device' },
     });
     accountId1 = (await me1.json()).data.accountId;
     student1Name = (await me1.json()).data.name;
@@ -160,7 +168,7 @@ test.describe.serial('Exam FAILED rows + admin unlock (exams violations section)
     const productId = (await product.json()).data.id;
 
     const me2 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: student2Cookies },
+      headers: { cookie: student2Cookies, 'x-device-fingerprint': 'fail-unlock-device-2' },
     });
     for (const profileId of [(await me1.json()).data.profileId, (await me2.json()).data.profileId]) {
       const grant = await request.post(`${API}/admin/v1/students/${profileId}/entitlements`, {

@@ -29,6 +29,7 @@ describe('Exam Results Reporting (admin-v1) - E2E', () => {
 
     const studentLogin = await request(app.getHttpServer())
       .post('/auth/login')
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .send({ phone: '+201000000001', password: 'student_secret' });
     if (studentLogin.status === 201 || studentLogin.status === 200) {
       studentCookie = studentLogin.headers['set-cookie']?.[0];
@@ -51,6 +52,7 @@ describe('Exam Results Reporting (admin-v1) - E2E', () => {
     await request(app.getHttpServer())
       .get('/admin/v1/exam-results')
       .set('Cookie', studentCookie)
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .expect(403);
   });
 

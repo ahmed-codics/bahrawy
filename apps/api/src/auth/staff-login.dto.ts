@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -18,4 +19,8 @@ export class StaffLoginDto {
   @IsString()
   @Length(6, 6)
   totpToken?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 }

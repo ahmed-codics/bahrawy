@@ -15,6 +15,7 @@ import { AdminV1ExamResultsModule } from './exam-results/exam-results.module';
 import { AdminV1ExamViolationsModule } from './exam-violations/exam-violations.module';
 import { AdminV1StudentProgressModule } from './student-progress/student-progress.module';
 import { AdminV1DeviceLockModule } from './device-lock/device-lock.module';
+import { AdminV1OfflineCodesModule } from './offline-codes/offline-codes.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AdminV1DeviceLockModule } from './device-lock/device-lock.module';
     AdminV1ExamViolationsModule,
     AdminV1StudentProgressModule,
     AdminV1DeviceLockModule,
+    AdminV1OfflineCodesModule,
   ],
   providers: [AdminAuditService],
   exports: [AdminAuditService],

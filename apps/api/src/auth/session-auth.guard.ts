@@ -55,7 +55,10 @@ export class SessionAuthGuard implements CanActivate {
    * - Unbound session (pre-device-lock sessions): revoked, force re-login.
    * - Header differs from the bound device: the account is blocked.
    */
-  private async enforceStudentDevice(request: any, session: any): Promise<void> {
+  private async enforceStudentDevice(
+    request: any,
+    session: any,
+  ): Promise<void> {
     const account = session.account;
     if (!account || account.kind !== 'STUDENT') return;
 
@@ -67,8 +70,7 @@ export class SessionAuthGuard implements CanActivate {
     }
 
     const header = request.headers['x-device-fingerprint'];
-    const fingerprint =
-      typeof header === 'string' ? header.trim() : '';
+    const fingerprint = typeof header === 'string' ? header.trim() : '';
     if (!fingerprint) {
       throw new UnauthorizedException(
         'Device fingerprint header required (X-Device-Fingerprint)',
@@ -86,10 +88,16 @@ export class SessionAuthGuard implements CanActivate {
     }
 
     if (fingerprint !== session.deviceFingerprint) {
+      const userAgent =
+        typeof request.headers['user-agent'] === 'string'
+          ? request.headers['user-agent']
+          : undefined;
       await this.deviceLeaseService.blockAccountForDevice(
         account,
         fingerprint,
         'SESSION_DEVICE_MISMATCH',
+        userAgent,
+        request.ip,
       );
     }
   }

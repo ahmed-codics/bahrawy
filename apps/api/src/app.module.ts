@@ -21,6 +21,7 @@ import { AdminAssessmentModule } from './admin-assessment/admin-assessment.modul
 import { AdminContentModule } from './admin-content/admin-content.module';
 import { AdminV1Module } from './admin-v1/admin-v1.module';
 import { CsrfModule } from './csrf/csrf.module';
+import { OfflineCodesModule } from './offline-codes/offline-codes.module';
 
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './rbac/audit.interceptor';
@@ -52,6 +53,7 @@ import {
     AdminContentModule,
     AdminV1Module,
     CsrfModule,
+    OfflineCodesModule,
   ],
   controllers: [AppController],
   providers: [

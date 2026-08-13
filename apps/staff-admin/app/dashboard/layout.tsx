@@ -15,6 +15,7 @@ import {
   ShieldBan,
   ShieldCheck,
   ShoppingBag,
+  KeyRound,
   Users,
   Trophy,
 } from 'lucide-react';
@@ -158,6 +159,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       href: '/dashboard/device-locks',
       isActive: pathname.startsWith('/dashboard/device-locks'),
       icon: <ShieldBan className="size-5" />,
+      permission: 'STUDENT_MANAGE',
+    },
+    {
+      label: 'أكواد الأوفلاين',
+      href: '/dashboard/offline-codes',
+      isActive: pathname.startsWith('/dashboard/offline-codes'),
+      icon: <KeyRound className="size-5" />,
       permission: 'STUDENT_MANAGE',
     },
     {

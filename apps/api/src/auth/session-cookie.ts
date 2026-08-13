@@ -43,6 +43,20 @@ export const SESSION_COOKIE_OPTIONS: {
   path: '/',
 };
 
+// Persistent (remember-me) sessions get a Max-Age cookie so the browser keeps
+// it across restarts. Normal sessions stay as session cookies (no Max-Age)
+// and are dropped when the browser closes.
+export const SESSION_COOKIE_REMEMBER_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+export function getSessionCookieOptions(
+  rememberMe = false,
+): typeof SESSION_COOKIE_OPTIONS & { maxAge?: number } {
+  if (!rememberMe) return SESSION_COOKIE_OPTIONS;
+  // Express cookie `maxAge` is in milliseconds; the Set-Cookie Max-Age
+  // attribute (seconds) is derived from it by cookie-parser.
+  return { ...SESSION_COOKIE_OPTIONS, maxAge: SESSION_COOKIE_REMEMBER_MS };
+}
+
 export function getSessionTokenFromCookies(req: any): string | null {
   const preferredCookieName = getSessionCookieName(req);
   const cookies = req.cookies ?? {};

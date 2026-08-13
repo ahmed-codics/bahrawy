@@ -11,6 +11,16 @@ import { TotpService } from '../totp/totp.service';
 import { DeviceLeaseService } from '../device-lease/device-lease.service';
 import { RegisterStudentDto } from './register.dto';
 
+// Session lifetime policy (ms). Normal sessions keep the original short
+// window: 1h idle / 7d absolute. Remember-me ("تذكرني على هذا الجهاز")
+// sessions extend both to 30 days so the user stays logged in across browser
+// restarts without weakening the other enforcement (revocation, suspension,
+// password change, device binding) that still applies to every session.
+export const NORMAL_SESSION_IDLE_MS = 1000 * 60 * 60 * 1; // 1 hour
+export const NORMAL_SESSION_ABSOLUTE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+export const REMEMBER_ME_SESSION_IDLE_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+export const REMEMBER_ME_SESSION_ABSOLUTE_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -32,6 +42,7 @@ export class AuthService {
     input: RegisterStudentDto,
     deviceFingerprint?: string,
     userAgent?: string,
+    ipAddress?: string,
   ) {
     const grade = await db.grade.findFirst({
       where: { id: input.gradeId, status: 'ACTIVE', archivedAt: null },
@@ -149,6 +160,7 @@ export class AuthService {
               result.account,
               deviceFingerprint,
               userAgent,
+              ipAddress,
             );
           } catch {
             // Registration must not fail if device registration races; the
@@ -185,6 +197,7 @@ export class AuthService {
     newPassword: string,
     deviceFingerprint?: string,
     userAgent?: string,
+    ipAddress?: string,
   ) {
     const phoneHmac = this.securityService.generatePhoneHmac(phone);
     const account = await db.account.findFirst({
@@ -250,88 +263,91 @@ export class AuthService {
     const passwordHash = await this.securityService.hashPassword(newPassword);
 
     // Atomically update account password, consume activation, and create audit/outbox events in transaction
-    return await db.$transaction(async (tx: any) => {
-      const updatedAccount = await tx.account.update({
-        where: { id: account.id },
-        data: {
-          passwordHash,
-          mustChangePassword: false,
-          status: 'ACTIVE',
-          version: { increment: 1 },
-        },
-      });
+    return await db
+      .$transaction(async (tx: any) => {
+        const updatedAccount = await tx.account.update({
+          where: { id: account.id },
+          data: {
+            passwordHash,
+            mustChangePassword: false,
+            status: 'ACTIVE',
+            version: { increment: 1 },
+          },
+        });
 
-      const { count } = await tx.accountActivation.updateMany({
-        where: { id: act.id, consumedAt: null },
-        data: { consumedAt: new Date() },
-      });
-      if (count === 0) {
-        throw new ConflictException('Activation code already consumed');
-      }
-
-      // Write audit log
-      await tx.auditEvent.create({
-        data: {
-          organizationId: account.organizationId,
-          actorType: 'STUDENT',
-          actorId: account.id,
-          action: 'ACTIVATE_ACCOUNT',
-          targetType: 'Account',
-          targetId: account.id,
-          before: { status: account.status } as any,
-          after: { status: updatedAccount.status } as any,
-          reason: 'Initial account activation',
-        },
-      });
-
-      // Create provider-neutral outbox event
-      const eventId = this.securityService.generateRandomToken();
-      await tx.outboxEvent.create({
-        data: {
-          eventType: 'account.activated',
-          aggregateType: 'Account',
-          aggregateId: account.id,
-          payload: {
-            accountId: account.id,
-            timestamp: new Date().toISOString(),
-          } as any,
-          idempotencyKey: `activate_${account.id}_${eventId}`,
-        },
-      });
-
-      await tx.securityEvent.create({
-        data: {
-          accountId: account.id,
-          phoneHmac,
-          eventType: 'ACTIVATION',
-          outcome: 'SUCCESS',
-        },
-      });
-
-      // Create new application session
-      const session = await this.createSessionInternal(
-        account.id,
-        tx,
-        undefined,
-        userAgent,
-        deviceFingerprint,
-      );
-      return { account: updatedAccount, session };
-    }).then(async (result) => {
-      if (deviceFingerprint) {
-        try {
-          await this.deviceLeaseService.validateOrRegisterDevice(
-            result.account,
-            deviceFingerprint,
-            userAgent,
-          );
-        } catch {
-          // Session is already bound to the device fingerprint; device row
-          // registration is best-effort here.
+        const { count } = await tx.accountActivation.updateMany({
+          where: { id: act.id, consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+        if (count === 0) {
+          throw new ConflictException('Activation code already consumed');
         }
-      }
-      return result;
-    });
+
+        // Write audit log
+        await tx.auditEvent.create({
+          data: {
+            organizationId: account.organizationId,
+            actorType: 'STUDENT',
+            actorId: account.id,
+            action: 'ACTIVATE_ACCOUNT',
+            targetType: 'Account',
+            targetId: account.id,
+            before: { status: account.status } as any,
+            after: { status: updatedAccount.status } as any,
+            reason: 'Initial account activation',
+          },
+        });
+
+        // Create provider-neutral outbox event
+        const eventId = this.securityService.generateRandomToken();
+        await tx.outboxEvent.create({
+          data: {
+            eventType: 'account.activated',
+            aggregateType: 'Account',
+            aggregateId: account.id,
+            payload: {
+              accountId: account.id,
+              timestamp: new Date().toISOString(),
+            } as any,
+            idempotencyKey: `activate_${account.id}_${eventId}`,
+          },
+        });
+
+        await tx.securityEvent.create({
+          data: {
+            accountId: account.id,
+            phoneHmac,
+            eventType: 'ACTIVATION',
+            outcome: 'SUCCESS',
+          },
+        });
+
+        // Create new application session
+        const session = await this.createSessionInternal(
+          account.id,
+          tx,
+          undefined,
+          userAgent,
+          deviceFingerprint,
+        );
+        return { account: updatedAccount, session };
+      })
+      .then(async (result) => {
+        if (deviceFingerprint) {
+          try {
+            await this.deviceLeaseService.validateOrRegisterDevice(
+              result.account,
+              deviceFingerprint,
+              userAgent,
+              ipAddress,
+            );
+          } catch {
+            // Session is already bound to the device fingerprint; device row
+            // registration is best-effort here.
+          }
+        }
+        return result;
+      });
   }
 
   // 2. Authentication (Login)
@@ -342,6 +358,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
     deviceFingerprint?: string,
+    rememberMe = false,
   ) {
     const phoneHmac = this.securityService.generatePhoneHmac(phone);
     const account = await db.account.findFirst({
@@ -368,6 +385,7 @@ export class AuthService {
       phoneHmac,
       'Invalid phone number or password',
       deviceFingerprint,
+      rememberMe,
     );
   }
 
@@ -377,6 +395,7 @@ export class AuthService {
     totpToken?: string,
     ipAddress?: string,
     userAgent?: string,
+    rememberMe = false,
   ) {
     const emailHmac = this.securityService.generateEmailHmac(email);
     const account = await db.account.findFirst({
@@ -402,6 +421,8 @@ export class AuthService {
       userAgent,
       null,
       'Invalid email address or password',
+      undefined,
+      rememberMe,
     );
   }
 
@@ -414,6 +435,7 @@ export class AuthService {
     phoneHmac: string | null,
     invalidCredentialsMessage: string,
     deviceFingerprint?: string,
+    rememberMe = false,
   ) {
     const isPassMatch = await this.securityService.verifyPassword(
       account.passwordHash,
@@ -489,6 +511,7 @@ export class AuthService {
         account,
         deviceFingerprint ?? '',
         userAgent,
+        ipAddress,
       );
     }
 
@@ -498,6 +521,7 @@ export class AuthService {
       ipAddress,
       userAgent,
       account.kind === 'STUDENT' ? deviceFingerprint : undefined,
+      rememberMe,
     );
     await this.logSecurityEvent(account.id, phoneHmac, 'LOGIN', 'SUCCESS');
 
@@ -510,6 +534,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
     deviceFingerprint?: string,
+    rememberMe = false,
   ) {
     return await db.$transaction(async (tx: any) => {
       return await this.createSessionInternal(
@@ -518,6 +543,7 @@ export class AuthService {
         ipAddress,
         userAgent,
         deviceFingerprint,
+        rememberMe,
       );
     });
   }
@@ -528,14 +554,20 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
     deviceFingerprint?: string,
+    rememberMe = false,
   ) {
     const plainToken = this.securityService.generateRandomToken();
     const tokenHash = this.securityService.hashOpaqueToken(plainToken);
 
-    // Sessions absolute expire in 7 days, idle expire in 1 hour
     const now = new Date();
-    const idleExpiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 1); // 1 hour
-    const absoluteExpiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7); // 7 days
+    const idleMs = rememberMe
+      ? REMEMBER_ME_SESSION_IDLE_MS
+      : NORMAL_SESSION_IDLE_MS;
+    const absoluteMs = rememberMe
+      ? REMEMBER_ME_SESSION_ABSOLUTE_MS
+      : NORMAL_SESSION_ABSOLUTE_MS;
+    const idleExpiresAt = new Date(now.getTime() + idleMs);
+    const absoluteExpiresAt = new Date(now.getTime() + absoluteMs);
 
     const session = await tx.authSession.create({
       data: {
@@ -546,6 +578,7 @@ export class AuthService {
         ipAddress,
         userAgent,
         deviceFingerprint,
+        rememberMe,
       },
     });
 
@@ -593,7 +626,10 @@ export class AuthService {
       return session;
     }
 
-    const newIdleExpiry = new Date(now.getTime() + 1000 * 60 * 60 * 1);
+    const idleMs = session.rememberMe
+      ? REMEMBER_ME_SESSION_IDLE_MS
+      : NORMAL_SESSION_IDLE_MS;
+    const newIdleExpiry = new Date(now.getTime() + idleMs);
     const updated = await db.authSession.update({
       where: { id: session.id },
       data: {
@@ -606,11 +642,14 @@ export class AuthService {
     return updated;
   }
 
-  async rotateSession(sessionId: string) {
+  async rotateSession(sessionId: string, rememberMe = false) {
     const plainToken = this.securityService.generateRandomToken();
     const tokenHash = this.securityService.hashOpaqueToken(plainToken);
     const now = new Date();
-    const newIdleExpiry = new Date(now.getTime() + 1000 * 60 * 60 * 1);
+    const idleMs = rememberMe
+      ? REMEMBER_ME_SESSION_IDLE_MS
+      : NORMAL_SESSION_IDLE_MS;
+    const newIdleExpiry = new Date(now.getTime() + idleMs);
 
     await db.authSession.update({
       where: { id: sessionId },

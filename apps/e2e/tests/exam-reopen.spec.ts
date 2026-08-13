@@ -22,7 +22,7 @@ const staffHeaders = (csrf = staffCsrf) => ({
 });
 const studentHeaders = (csrf = studentCsrf) => ({
   cookie: studentCookies,
-  'x-device-fingerprint': 'exam-reopen-device',
+  'x-device-fingerprint': 'e2e-shared-seed-device',
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 
@@ -53,6 +53,7 @@ test.describe.serial('Exam reopen flow (staff-admin) + same-attempt/audit/securi
 
     const studentLogin = await request.post(`${API}/auth/login`, {
       data: { phone: '01000000001', password: 'student_secret' },
+      headers: { 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(studentLogin.ok()).toBeTruthy();
     studentCookies = studentLogin.headers()['set-cookie'];
@@ -63,7 +64,7 @@ test.describe.serial('Exam reopen flow (staff-admin) + same-attempt/audit/securi
     expect(studentCsrf).toBeTruthy();
 
     const me = await request.get(`${API}/auth/me`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(me.ok()).toBeTruthy();
     studentProfileId = (await me.json()).data.profileId;
@@ -324,7 +325,7 @@ test.describe.serial('Exam reopen flow (staff-admin) + same-attempt/audit/securi
   }) => {
     const studentPage = await browser.newPage();
     await studentPage.addInitScript(() => {
-      window.localStorage.setItem('bahrawy-device-fingerprint', 'exam-reopen-ui-device');
+      window.localStorage.setItem('bahrawy-device-fingerprint', 'e2e-shared-seed-device');
     });
     try {
       await studentPage.goto('http://localhost:3001/login');

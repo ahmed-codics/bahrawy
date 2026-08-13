@@ -36,6 +36,10 @@ export class AdminV1DeviceLockController {
     return this.deviceLock.list(request.account.organizationId, {
       search: query.search,
       gradeId: query.gradeId,
+      reason: query.reason,
+      status: query.status,
+      blockedFrom: query.blockedFrom,
+      blockedTo: query.blockedTo,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 25,
     });

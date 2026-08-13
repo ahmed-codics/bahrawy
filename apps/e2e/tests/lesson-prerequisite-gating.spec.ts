@@ -34,8 +34,16 @@ const student2Headers = (csrf = student2Csrf) => ({
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 
-const login = async (request, path: string, body: Record<string, string>) => {
-  const res = await request.post(`${API}${path}`, { data: body });
+const login = async (
+  request,
+  path: string,
+  body: Record<string, string>,
+  device?: string,
+) => {
+  const res = await request.post(`${API}${path}`, {
+    data: body,
+    ...(device ? { headers: { 'x-device-fingerprint': device } } : {}),
+  });
   expect(res.ok()).toBeTruthy();
   const cookies = res.headers()['set-cookie'];
   const csrfRes = await request.get(`${API}/auth/csrf-token`, {
@@ -126,14 +134,14 @@ test.describe.serial('Per-lesson requiresPreviousLessonPass gating', () => {
     const s1 = await login(request, '/auth/login', {
       phone: student1Phone,
       password: 'student_secret',
-    });
+    }, 'prereq-gate-device');
     studentCookies = s1.cookies;
     studentCsrf = s1.csrf;
 
     const s2 = await login(request, '/auth/login', {
       phone: student2Phone,
       password: 'student_secret',
-    });
+    }, 'prereq-gate-device-2');
     student2Cookies = s2.cookies;
     student2Csrf = s2.csrf;
 
@@ -208,10 +216,10 @@ test.describe.serial('Per-lesson requiresPreviousLessonPass gating', () => {
     const productId = (await product.json()).data.id;
 
     const me1 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'prereq-gate-device' },
     });
     const me2 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: student2Cookies },
+      headers: { cookie: student2Cookies, 'x-device-fingerprint': 'prereq-gate-device-2' },
     });
     const student1ProfileId = (await me1.json()).data.profileId;
     const student2ProfileId = (await me2.json()).data.profileId;

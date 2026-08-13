@@ -16,7 +16,7 @@ const staffHeaders = (csrf = staffCsrf) => ({
 });
 const studentHeaders = (csrf = '') => ({
   cookie: studentCookies,
-  'x-device-fingerprint': 'exam-publish-device',
+  'x-device-fingerprint': 'e2e-shared-seed-device',
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 
@@ -36,6 +36,7 @@ test.describe.serial('Exam publish cascades to parent lesson', () => {
 
     const s1 = await request.post(`${API}/auth/login`, {
       data: { phone: '01000000001', password: 'student_secret' },
+      headers: { 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     expect(s1.ok()).toBeTruthy();
     studentCookies = s1.headers()['set-cookie'];
@@ -93,7 +94,7 @@ test.describe.serial('Exam publish cascades to parent lesson', () => {
     });
     const productId = (await product.json()).data.id;
     const me = await request.get(`${API}/auth/me`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     const profileId = (await me.json()).data.profileId;
     const grant = await request.post(`${API}/admin/v1/students/${profileId}/entitlements`, {

@@ -64,6 +64,8 @@ model Organization {
   accounts      Account[]
   courses       Course[]
   products      Product[]
+  offlineAccessCodes  OfflineAccessCode[]
+  offlineCodeBatches  OfflineAccessCodeBatch[]
 }
 
 model Branch {
@@ -121,6 +123,8 @@ model Grade {
   courses         Course[]
   products        Product[]
   studentProfiles StudentProfile[]
+  offlineAccessCodes  OfflineAccessCode[]
+  offlineCodeBatches  OfflineAccessCodeBatch[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -278,6 +282,9 @@ model Account {
   supportTickets        SupportTicket[]
   notifications         InAppNotification[]
   supportMessages       SupportMessage[]
+  offlineCodesCreated   OfflineAccessCode[]       @relation("OfflineCodeCreatedBy")
+  offlineCodesConsumed  OfflineAccessCode[]       @relation("OfflineCodeAccount")
+  offlineBatchesCreated OfflineAccessCodeBatch[]  @relation("OfflineBatchCreatedBy")
 
   @@unique([organizationId, phoneHmac])
   @@unique([organizationId, emailHmac])
@@ -379,6 +386,7 @@ model AuthSession {
   ipAddress         String?
   userAgent         String?
   deviceFingerprint String?
+  rememberMe        Boolean   @default(false)
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -520,6 +528,9 @@ model DeviceBlock {
   accountId         String
   deviceFingerprint String
   reason            String
+  ipAddress         String?
+  userAgent         String?
+  previousStatus    String?
   blockedAt         DateTime  @default(now())
   resolvedAt        DateTime?
   resolution        String?
@@ -586,6 +597,8 @@ model Course {
   prerequisites   CoursePrerequisite[] @relation("CourseToPrerequisite")
   prerequisiteFor CoursePrerequisite[] @relation("PrerequisiteToCourse")
   assessments     Assessment[]
+  offlineAccessCodes  OfflineAccessCode[]
+  offlineCodeBatches  OfflineAccessCodeBatch[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -1140,4 +1153,64 @@ model SupportMessage {
 
   @@index([ticketId])
   @@index([authorAccountId])
+}
+
+model OfflineAccessCode {
+  id                  String    @id @default(uuid())
+  organizationId      String
+  batchId             String
+  codeHash            String
+  codePrefix          String
+  codeEncrypted       String
+  status              String    @default("ACTIVE")
+  courseId            String
+  gradeId             String?
+  accountId           String?
+  createdByAccountId  String
+  maxUses             Int       @default(1)
+  useCount            Int       @default(0)
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  activatedAt         DateTime?
+  disabledAt          DateTime?
+  disabledByAccountId String?
+  deletedAt           DateTime?
+  version             Int       @default(1)
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  batch        OfflineAccessCodeBatch  @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  course       Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  grade        Grade?                  @relation(fields: [gradeId], references: [id], onDelete: Restrict)
+  account      Account?                @relation("OfflineCodeAccount", fields: [accountId], references: [id], onDelete: SetNull)
+  createdBy    Account                 @relation("OfflineCodeCreatedBy", fields: [createdByAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, codeHash])
+  @@index([organizationId, status])
+  @@index([organizationId, courseId])
+  @@index([organizationId, gradeId])
+  @@index([organizationId, batchId])
+  @@index([organizationId, accountId])
+}
+
+model OfflineAccessCodeBatch {
+  id                 String   @id @default(uuid())
+  organizationId     String
+  createdByAccountId String
+  courseId           String
+  gradeId            String?
+  quantity           Int
+  maxUses            Int      @default(1)
+  expiresAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    Account                @relation("OfflineBatchCreatedBy", fields: [createdByAccountId], references: [id], onDelete: Restrict)
+  course       Course                 @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  grade        Grade?                 @relation(fields: [gradeId], references: [id], onDelete: Restrict)
+  codes        OfflineAccessCode[]
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
 }

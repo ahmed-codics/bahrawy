@@ -39,7 +39,7 @@ const staffHeaders = (csrf = staffCsrf) => ({
 });
 const studentHeaders = (csrf = studentCsrf) => ({
   cookie: studentCookies,
-  'x-device-fingerprint': 'exam-unlock-device',
+  'x-device-fingerprint': 'e2e-shared-seed-device',
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 const student2Headers = (csrf = student2Csrf) => ({
@@ -52,8 +52,12 @@ const login = async (
   request: any,
   path: string,
   body: Record<string, string>,
+  device?: string,
 ) => {
-  const res = await request.post(`${API}${path}`, { data: body });
+  const res = await request.post(`${API}${path}`, {
+    data: body,
+    ...(device ? { headers: { 'x-device-fingerprint': device } } : {}),
+  });
   expect(res.ok()).toBeTruthy();
   const cookies = res.headers()['set-cookie'];
   const csrfRes = await request.get(`${API}/auth/csrf-token`, {
@@ -82,12 +86,12 @@ test.describe.serial('FAILED admin unlock (ExamGrant) flow', () => {
     const s1 = await login(request, '/auth/login', {
       phone: '01000000001',
       password: 'student_secret',
-    });
+    }, 'e2e-shared-seed-device');
     studentCookies = s1.cookies;
     studentCsrf = s1.csrf;
 
     const me1 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     const me1Body = (await me1.json()).data;
     studentProfileId = me1Body.profileId;
@@ -115,11 +119,11 @@ test.describe.serial('FAILED admin unlock (ExamGrant) flow', () => {
     const s2 = await login(request, '/auth/login', {
       phone: student2Phone,
       password: 'student_secret',
-    });
+    }, 'exam-unlock-device-2');
     student2Cookies = s2.cookies;
     student2Csrf = s2.csrf;
     const me2 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: student2Cookies },
+      headers: { cookie: student2Cookies, 'x-device-fingerprint': 'exam-unlock-device-2' },
     });
     const me2Body = (await me2.json()).data;
     student2ProfileId = me2Body.profileId;

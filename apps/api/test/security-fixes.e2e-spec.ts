@@ -105,6 +105,7 @@ describe('Security fixes H1-H5 (admin-v1) - E2E', () => {
     ownerCookie = await login('admin@bahrawy.test', 'owner_secret');
     const studentLogin = await request(app.getHttpServer())
       .post('/auth/login')
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .send({ phone: '+201000000001', password: 'student_secret' });
     studentCookie = (studentLogin.headers['set-cookie']?.[0] ?? '').split(
       ';',
@@ -123,6 +124,7 @@ describe('Security fixes H1-H5 (admin-v1) - E2E', () => {
     await request(app.getHttpServer())
       .get('/admin/v1/dashboard')
       .set('Cookie', studentCookie || 'invalid')
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .expect(403);
 
     const roles = await request(app.getHttpServer())

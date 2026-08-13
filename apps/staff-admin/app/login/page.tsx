@@ -9,6 +9,7 @@ import { fetchApi, refreshCsrfToken } from '../../lib/api';
 export default function StaffLoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function StaffLoginPage() {
         body: JSON.stringify({
           email: identifier,
           password,
+          rememberMe,
         }),
       });
       await refreshCsrfToken();
@@ -84,6 +86,16 @@ export default function StaffLoginPage() {
               directionMode="ltr"
               leadingIcon={<LockKeyhole className="size-4" />}
             />
+            <label className="flex items-center gap-2 text-sm text-ink-2">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+                disabled={loading}
+                className="size-4 rounded border-border accent-[var(--color-accent)]"
+              />
+              تذكرني على هذا الجهاز
+            </label>
             <Button type="submit" size="lg" className="w-full" loading={loading}>
               تسجيل الدخول
             </Button>

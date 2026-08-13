@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
@@ -23,6 +23,7 @@ import { MagneticButton } from '../../components/dashboard/MagneticButton';
 import { ProgressOrbit } from '../../components/dashboard/ProgressOrbit';
 import { API_BASE, fetchApi } from '../../lib/api';
 import { getGreetingByTime } from '../../lib/greeting';
+import { OfflineCodeActivation } from '../../components/OfflineCodeActivation';
 
 type Course = {
   id: string;
@@ -74,6 +75,23 @@ export default function StudentDashboard() {
       .catch(() => router.push('/login'))
       .finally(() => setLoading(false));
   }, [router]);
+
+  const reloadDashboard = useCallback(async () => {
+    try {
+      const response = await fetchApi('/dashboard/student');
+      setData(response.data);
+    } catch {
+      router.push('/login');
+    }
+  }, [router]);
+
+  const handleActivated = useCallback(
+    (courseId: string) => {
+      void reloadDashboard();
+      setTimeout(() => router.push(`/student/courses/${courseId}`), 1200);
+    },
+    [reloadDashboard, router],
+  );
 
   const courses = useMemo(() => data?.enrolledCourses || [], [data]);
   const completed = courses.reduce((total, course) => total + (course.completedLessons || 0), 0);
@@ -234,6 +252,10 @@ export default function StudentDashboard() {
           accent="amber"
           float="c"
         />
+      </section>
+
+      <section className="mx-auto w-full max-w-md">
+        <OfflineCodeActivation onActivated={handleActivated} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">

@@ -30,7 +30,7 @@ const staffHeaders = (csrf = staffCsrf) => ({
 });
 const studentHeaders = (csrf = studentCsrf) => ({
   cookie: studentCookies,
-  'x-device-fingerprint': 'lock-gating-device',
+  'x-device-fingerprint': 'e2e-shared-seed-device',
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 const student2Headers = (csrf = student2Csrf) => ({
@@ -39,8 +39,16 @@ const student2Headers = (csrf = student2Csrf) => ({
   ...(csrf ? { 'x-csrf-token': csrf } : {}),
 });
 
-const login = async (request, path: string, body: Record<string, string>) => {
-  const res = await request.post(`${API}${path}`, { data: body });
+const login = async (
+  request,
+  path: string,
+  body: Record<string, string>,
+  device?: string,
+) => {
+  const res = await request.post(`${API}${path}`, {
+    data: body,
+    ...(device ? { headers: { 'x-device-fingerprint': device } } : {}),
+  });
   expect(res.ok()).toBeTruthy();
   const cookies = res.headers()['set-cookie'];
   const csrfRes = await request.get(`${API}/auth/csrf-token`, {
@@ -56,7 +64,7 @@ test.describe.serial('End-of-Lesson Quiz Gating (3-lesson regression)', () => {
   test.beforeAll(async ({ browser }) => {
     studentPage = await browser.newPage();
     await studentPage.addInitScript(() => {
-      window.localStorage.setItem('bahrawy-device-fingerprint', 'lock-gating-device');
+      window.localStorage.setItem('bahrawy-device-fingerprint', 'e2e-shared-seed-device');
     });
   });
 
@@ -77,7 +85,7 @@ test.describe.serial('End-of-Lesson Quiz Gating (3-lesson regression)', () => {
     const s1 = await login(request, '/auth/login', {
       phone: '01000000001',
       password: 'student_secret',
-    });
+    }, 'e2e-shared-seed-device');
     studentCookies = s1.cookies;
     studentCsrf = s1.csrf;
 
@@ -102,7 +110,7 @@ test.describe.serial('End-of-Lesson Quiz Gating (3-lesson regression)', () => {
     const s2 = await login(request, '/auth/login', {
       phone: student2Phone,
       password: 'student_secret',
-    });
+    }, 'lock-gating-device-2');
     student2Cookies = s2.cookies;
     student2Csrf = s2.csrf;
 
@@ -169,10 +177,10 @@ test.describe.serial('End-of-Lesson Quiz Gating (3-lesson regression)', () => {
     const productId = (await product.json()).data.id;
 
     const me1 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: studentCookies },
+      headers: { cookie: studentCookies, 'x-device-fingerprint': 'e2e-shared-seed-device' },
     });
     const me2 = await request.get(`${API}/auth/me`, {
-      headers: { cookie: student2Cookies },
+      headers: { cookie: student2Cookies, 'x-device-fingerprint': 'lock-gating-device-2' },
     });
     const student1ProfileId = (await me1.json()).data.profileId;
     const student2ProfileId = (await me2.json()).data.profileId;

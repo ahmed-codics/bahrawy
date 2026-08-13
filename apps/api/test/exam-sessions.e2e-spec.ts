@@ -51,6 +51,7 @@ describe('Exam Sessions & Violations - E2E', () => {
 
     const studentLogin = await request(app.getHttpServer())
       .post('/auth/login')
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .send({ phone: '+201000000001', password: 'student_secret' });
     if ([200, 201].includes(studentLogin.status)) {
       studentCookie = studentLogin.headers['set-cookie']?.[0];
@@ -61,6 +62,7 @@ describe('Exam Sessions & Violations - E2E', () => {
     const me = await request(app.getHttpServer())
       .get('/auth/me')
       .set('Cookie', studentCookie!)
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .expect(200);
     studentAccountId = (me.body.data ?? me.body).accountId as string;
     expect(studentAccountId).toBeTruthy();
@@ -240,6 +242,7 @@ describe('Exam Sessions & Violations - E2E', () => {
     const res = await request(app.getHttpServer())
       .post(`/assessments/${assessmentId}/start`)
       .set('Cookie', studentCookie)
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .set('x-csrf-token', token)
       .send({ newAttempt })
       .expect(201);
@@ -252,6 +255,7 @@ describe('Exam Sessions & Violations - E2E', () => {
     return request(app.getHttpServer())
       .post(`/assessments/attempt/${attemptId}/exam-session/violations`)
       .set('Cookie', studentCookie)
+      .set('x-device-fingerprint', 'e2e-shared-seed-device')
       .set('x-csrf-token', token)
       .send({ reason });
   }
@@ -332,6 +336,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       await request(app.getHttpServer())
         .get('/admin/v1/exam-violations')
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .expect(403);
     });
 
@@ -399,6 +404,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .get(`/assessments/attempt/${attemptId}/exam-session`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .expect(200);
       const data = res.body.data;
       expect(data.id).toBe(sessionId);
@@ -440,6 +446,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/${assessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: true })
         .expect(403);
@@ -451,6 +458,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .get(`/assessments/attempt/${attemptId}`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .expect(403);
       expect(res.body.message).toBeDefined();
     });
@@ -461,6 +469,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/attempt/${attemptId}/autosave`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ answers: { '1': 'أ' } })
         .expect(403);
@@ -473,6 +482,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/attempt/${attemptId}/submit`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({})
         .expect(403);
@@ -498,6 +508,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const denied = await request(app.getHttpServer())
         .post(`/admin/v1/exam-violations/${sessId}/reopen`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({});
       expect([401, 403]).toContain(denied.status);
@@ -572,6 +583,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const save = await request(app.getHttpServer())
         .post(`/assessments/attempt/${attId}/autosave`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ answers: { [questionId]: '1' } });
       expect([200, 201]).toContain(save.status);
@@ -579,6 +591,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const submit = await request(app.getHttpServer())
         .post(`/assessments/attempt/${attId}/submit`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({});
       expect([200, 201]).toContain(submit.status);
@@ -604,7 +617,9 @@ describe('Exam Sessions & Violations - E2E', () => {
       if (!studentCookie) return;
       const read = await request(app.getHttpServer())
         .get(`/assessments/attempt/${attId}`)
-        .set('Cookie', studentCookie);
+        .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
+        .then();
       expect([403, 409]).toContain(read.status);
 
       const session = await db.examSession.findUnique({
@@ -616,6 +631,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const save = await request(app.getHttpServer())
         .post(`/assessments/attempt/${attId}/autosave`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ answers: { [questionId]: '1' } });
       expect([403, 409]).toContain(save.status);
@@ -627,6 +643,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/attempt/${attId}/submit`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({});
       expect(res.status).toBe(409);
@@ -679,6 +696,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/${assessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: true });
       expect(res.status).toBe(409);
@@ -706,6 +724,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const first = await request(app.getHttpServer())
         .post(`/assessments/${freshAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false })
         .expect(201);
@@ -719,6 +738,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const submitted = await request(app.getHttpServer())
         .post(`/assessments/attempt/${firstAttempt.id}/submit`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({});
       expect([200, 201]).toContain(submitted.status);
@@ -726,6 +746,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const second = await request(app.getHttpServer())
         .post(`/assessments/${freshAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: true })
         .expect(201);
@@ -746,6 +767,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/${freshAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: true });
       expect([200, 201]).toContain(res.status);
@@ -776,6 +798,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/${reopenAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false });
       expect([200, 201]).toContain(res.status);
@@ -814,6 +837,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const start2 = await request(app.getHttpServer())
         .post(`/assessments/${reopenAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: true });
       expect([200, 201]).toContain(start2.status);
@@ -828,6 +852,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/${reopenAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false });
       expect([200, 201]).toContain(res.status);
@@ -868,6 +893,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const start2 = await request(app.getHttpServer())
         .post(`/assessments/${reopenAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false });
       expect([200, 201]).toContain(start2.status);
@@ -890,6 +916,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const res = await request(app.getHttpServer())
         .post(`/assessments/${refreshAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false })
         .expect(201);
@@ -898,6 +925,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const refresh = await request(app.getHttpServer())
         .post(`/assessments/${refreshAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false })
         .expect(201);
@@ -922,6 +950,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const first = await request(app.getHttpServer())
         .post(`/assessments/${timerAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: false })
         .expect(201);
@@ -960,6 +989,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       await request(app.getHttpServer())
         .post(`/assessments/attempt/${firstData.id}/submit`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({})
         .expect([200, 201]);
@@ -967,6 +997,7 @@ describe('Exam Sessions & Violations - E2E', () => {
       const second = await request(app.getHttpServer())
         .post(`/assessments/${timerAssessmentId}/start`)
         .set('Cookie', studentCookie)
+        .set('x-device-fingerprint', 'e2e-shared-seed-device')
         .set('x-csrf-token', token)
         .send({ newAttempt: true })
         .expect(201);

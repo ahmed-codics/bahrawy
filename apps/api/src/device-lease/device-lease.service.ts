@@ -21,6 +21,7 @@ export class DeviceLeaseService {
     account: DeviceAccount,
     deviceFingerprint: string,
     userAgent?: string,
+    ipAddress?: string,
   ): Promise<void> {
     const fingerprint = this.normalizeFingerprint(deviceFingerprint);
     const existing = await db.studentDevice.findUnique({
@@ -40,6 +41,7 @@ export class DeviceLeaseService {
           fingerprint,
           'NON_PRIMARY_DEVICE',
           userAgent,
+          ipAddress,
         );
         return;
       }
@@ -57,7 +59,7 @@ export class DeviceLeaseService {
         });
         if (primary) {
           if (primary.deviceFingerprint !== fingerprint) {
-            throw new BlockDeviceSignal(fingerprint, userAgent);
+            throw new BlockDeviceSignal(fingerprint, userAgent, ipAddress);
           }
           await tx.studentDevice.update({
             where: { id: primary.id },
@@ -75,6 +77,18 @@ export class DeviceLeaseService {
               : 'Registered Device',
           },
         });
+        await tx.auditEvent.create({
+          data: {
+            organizationId: account.organizationId,
+            actorType: 'SYSTEM',
+            actorId: account.id,
+            action: 'DEVICE_REGISTERED',
+            targetType: 'ACCOUNT',
+            targetId: account.id,
+            after: { status: 'ACTIVE' },
+            reason: `Primary device registered: ${fingerprint}`,
+          },
+        });
       });
     } catch (error) {
       if (error instanceof BlockDeviceSignal) {
@@ -83,6 +97,7 @@ export class DeviceLeaseService {
           error.deviceFingerprint,
           'UNKNOWN_DEVICE',
           error.userAgent,
+          error.ipAddress,
         );
         return;
       }
@@ -108,6 +123,7 @@ export class DeviceLeaseService {
               fingerprint,
               'UNKNOWN_DEVICE',
               userAgent,
+              ipAddress,
             );
             return;
           }
@@ -133,6 +149,7 @@ export class DeviceLeaseService {
     deviceFingerprint: string,
     reason: string,
     userAgent?: string,
+    ipAddress?: string,
   ): Promise<never> {
     const fingerprint = this.normalizeFingerprint(deviceFingerprint);
     const label = userAgent ? String(userAgent).substring(0, 100) : null;
@@ -154,18 +171,22 @@ export class DeviceLeaseService {
         update: { lastUsedAt: new Date() },
       });
 
+      const current = await tx.account.findUnique({
+        where: { id: account.id },
+        select: { status: true },
+      });
+
       await tx.deviceBlock.create({
         data: {
           accountId: account.id,
           deviceFingerprint: fingerprint,
           reason,
+          ipAddress: ipAddress ? String(ipAddress).substring(0, 64) : null,
+          userAgent: userAgent ? String(userAgent).substring(0, 300) : null,
+          previousStatus: current?.status ?? 'ACTIVE',
         },
       });
 
-      const current = await tx.account.findUnique({
-        where: { id: account.id },
-        select: { status: true },
-      });
       if (current?.status !== 'DEVICE_BLOCKED') {
         await tx.account.update({
           where: { id: account.id },
@@ -196,11 +217,13 @@ export class DeviceLeaseService {
       await tx.securityEvent.create({
         data: {
           accountId: account.id,
-          eventType: 'DEVICE_BLOCK',
+          eventType: 'DEVICE_MISMATCH',
           outcome: 'FAILED_UNKNOWN_DEVICE',
           metadata: {
             reason,
             attemptedDeviceId: resolved.id,
+            ipAddress: ipAddress ? String(ipAddress).substring(0, 64) : null,
+            userAgent: userAgent ? String(userAgent).substring(0, 300) : null,
           } as Prisma.InputJsonValue,
         },
       });
@@ -238,7 +261,11 @@ export class DeviceLeaseService {
           isPrimary: true,
           label,
         },
-        update: { isPrimary: true, lastUsedAt: new Date(), ...(label ? { label } : {}) },
+        update: {
+          isPrimary: true,
+          lastUsedAt: new Date(),
+          ...(label ? { label } : {}),
+        },
       });
     });
   }
@@ -344,5 +371,6 @@ class BlockDeviceSignal {
   constructor(
     readonly deviceFingerprint: string,
     readonly userAgent?: string,
+    readonly ipAddress?: string,
   ) {}
 }
