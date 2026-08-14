@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer';
+import { AnimatedWatermark } from './AnimatedWatermark';
 
 export type VideoPlayback = {
   provider: 'YOUTUBE' | 'R2' | 'LOCAL';
@@ -11,6 +12,7 @@ export type VideoPlayback = {
   defaultQuality?: string;
   sources?: Array<{ quality: string; url: string }>;
   processingStatus?: string;
+  watermark?: string;
 };
 
 export type ProviderVideoPlayerProps = {
@@ -35,6 +37,7 @@ export function ProviderVideoPlayer({
         videoId={playback.videoId}
         className={className}
         initialTime={initialTime}
+        watermark={playback.watermark}
         onEnded={onEnded}
         onProgress={onProgress}
       />
@@ -49,6 +52,7 @@ export function ProviderVideoPlayer({
         defaultQuality={playback.defaultQuality}
         className={className}
         initialTime={initialTime}
+        watermark={playback.watermark}
         onEnded={onEnded}
         onProgress={onProgress}
       />
@@ -62,6 +66,7 @@ type YouTubePlayerProps = {
   videoId: string;
   className: string;
   initialTime: number;
+  watermark?: string;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
 };
@@ -71,6 +76,8 @@ type YouTubePlayerInstance = {
   getCurrentTime: () => number;
   getDuration: () => number;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  pauseVideo: () => void;
+  playVideo: () => void;
 };
 
 type YouTubeNamespace = {
@@ -129,6 +136,7 @@ function YouTubePlayer({
   videoId,
   className,
   initialTime,
+  watermark,
   onEnded,
   onProgress,
 }: YouTubePlayerProps) {
@@ -209,12 +217,27 @@ function YouTubePlayer({
     };
   }, [initialTime, videoId]);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const player = playerRef.current;
+      if (!player) return;
+      if (document.hidden) {
+        player.pauseVideo();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   return (
     <div
-      className={`aspect-video w-full overflow-hidden rounded-[var(--radius-xl)] bg-black ${className}`}
+      className={`relative aspect-video w-full overflow-hidden rounded-[var(--radius-xl)] bg-black ${className}`}
       style={{ aspectRatio }}
+      onContextMenu={(event) => event.preventDefault()}
     >
       <div ref={mountRef} className="h-full w-full" />
+      {watermark && <AnimatedWatermark text={watermark} />}
     </div>
   );
 }

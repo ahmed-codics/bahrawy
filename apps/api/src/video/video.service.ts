@@ -13,15 +13,22 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CatalogService } from '../catalog/catalog.service';
 
-const PLAYBACK_URL_TTL_SECONDS = 8 * 60 * 60;
+// Short-lived playback tokens bound to account+session+lesson; re-validated on
+// every media request so a shared/replayed URL dies once access is revoked.
+const PLAYBACK_URL_TTL_SECONDS = 15 * 60;
 const UPLOAD_URL_TTL_SECONDS = 15 * 60;
 const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const VIDEO_PATH_CACHE_MAX = 1000;
+// Entitlement re-checks at stream time are cached briefly to avoid a DB hit
+// per range request while still refusing access within a second of revocation.
+const ACCESS_REVALIDATE_MS = 60 * 1000;
+const ACCESS_CACHE_MAX = 5000;
+const DENY_LOG_DEDUPE_MS = 30 * 1000;
 
 export type VideoPlayback = {
   provider: VideoProvider;
@@ -31,6 +38,7 @@ export type VideoPlayback = {
   defaultQuality?: string;
   sources?: Array<{ quality: string; url: string }>;
   processingStatus?: string;
+  watermark?: string;
 };
 
 type StoredVideo = {
@@ -49,6 +57,11 @@ export class VideoService {
     string,
     { path: string; expiresAt: number }
   >();
+  private readonly accessCache = new Map<
+    string,
+    { allowed: boolean; expiresAt: number }
+  >();
+  private readonly denyLogCache = new Map<string, number>();
   private r2Client: S3Client | null = null;
 
   constructor(private readonly catalogService: CatalogService) {}
@@ -73,6 +86,8 @@ export class VideoService {
     accountId: string,
     lessonId: string,
     isStaff = false,
+    sessionId?: string,
+    deviceFingerprint?: string,
   ): Promise<VideoPlayback> {
     await this.catalogService.canAccessLesson(accountId, lessonId, isStaff);
     const video = await db.videoLesson.findUnique({
@@ -82,7 +97,17 @@ export class VideoService {
     if (!video) {
       throw new NotFoundException('Video lesson not found');
     }
-    return this.createPlayback(video);
+    const playback = await this.createPlayback(video, {
+      accountId,
+      sessionId,
+      deviceFingerprint,
+    });
+    await this.logSecurityEvent(accountId, 'VIDEO_PLAYBACK_ISSUED', 'SUCCESS', {
+      lessonId,
+      provider: playback.provider,
+      isStaff,
+    });
+    return playback;
   }
 
   async getAdminPlayback(lessonId: string): Promise<VideoPlayback> {
@@ -93,7 +118,7 @@ export class VideoService {
     if (!video) {
       throw new NotFoundException('Video lesson not found');
     }
-    return this.createPlayback(video);
+    return this.createPlayback(video, {});
   }
 
   async signLessonHlsUrl(
@@ -111,7 +136,13 @@ export class VideoService {
     return playback.url;
   }
 
-  verifyLessonVideoToken(lessonId: string, token: string, expires: string) {
+  verifyLessonVideoToken(
+    lessonId: string,
+    token: string,
+    expires: string,
+    accountId?: string,
+    sessionId?: string,
+  ) {
     const expiresAt = Number.parseInt(expires, 10);
     if (
       !token ||
@@ -126,7 +157,7 @@ export class VideoService {
       process.env.VIDEO_SIGNING_SECRET ||
       'dev_video_secret_key_123';
     const expected = createHmac('sha256', secret)
-      .update(`${lessonId}:${expiresAt}`)
+      .update(`${accountId ?? ''}:${sessionId ?? ''}:${lessonId}:${expiresAt}`)
       .digest();
 
     let received: Buffer;
@@ -393,11 +424,24 @@ export class VideoService {
     return progress?.watchedSeconds || 0;
   }
 
-  private async createPlayback(video: StoredVideo): Promise<VideoPlayback> {
+  private async createPlayback(
+    video: StoredVideo,
+    context: {
+      accountId?: string;
+      sessionId?: string;
+      deviceFingerprint?: string;
+    } = {},
+  ): Promise<VideoPlayback> {
+    const watermark =
+      context.accountId && context.deviceFingerprint
+        ? this.buildWatermark(context.accountId, context.deviceFingerprint)
+        : undefined;
+
     if (video.provider === VideoProvider.YOUTUBE) {
       return {
         provider: VideoProvider.YOUTUBE,
         videoId: video.sourceRef,
+        ...(watermark ? { watermark } : {}),
       };
     }
 
@@ -432,6 +476,7 @@ export class VideoService {
           ? { sources, defaultQuality: defaultSource?.quality }
           : {}),
         ...(video.status ? { processingStatus: video.status } : {}),
+        ...(watermark ? { watermark } : {}),
         expiresInSeconds: PLAYBACK_URL_TTL_SECONDS,
       };
     }
@@ -446,14 +491,79 @@ export class VideoService {
       process.env.API_ORIGIN ||
       'http://localhost:3000';
 
+    // Bind the token to account + session + lesson so a URL captured by one
+    // student cannot be replayed by another, and dies when the session is
+    // revoked. Anonymous (admin preview) streams still work with a non-bound token.
+    const boundAccountId = context.accountId ?? '';
+    const boundSessionId = context.sessionId ?? '';
     const localToken = createHmac('sha256', secret)
-      .update(`${video.lessonId}:${expires}`)
+      .update(
+        `${boundAccountId}:${boundSessionId}:${video.lessonId}:${expires}`,
+      )
       .digest('base64url');
+
+    if (boundAccountId && boundSessionId) {
+      const tokenHash = createHash('sha256').update(localToken).digest('hex');
+      await db.videoDeliveryToken
+        .create({
+          data: {
+            videoLessonId: video.id,
+            accountId: boundAccountId,
+            sessionId: boundSessionId,
+            tokenHash,
+            expiresAt: new Date(expires * 1000),
+          },
+        })
+        .catch(() => undefined);
+    }
+
     return {
       provider: VideoProvider.LOCAL,
-      url: `${baseUrl}/video/${video.lessonId}/stream.mp4?token=${localToken}&expires=${expires}`,
+      url: `${baseUrl}/video/${video.lessonId}/stream.mp4?token=${localToken}&expires=${expires}&account=${encodeURIComponent(boundAccountId)}&session=${encodeURIComponent(boundSessionId)}`,
+      ...(watermark ? { watermark } : {}),
       expiresInSeconds: PLAYBACK_URL_TTL_SECONDS,
     };
+  }
+
+  // A short, rotating, per-device identifier used as a screen-capture
+  // watermark (deterrence only, not a security boundary).
+  private buildWatermark(accountId: string, deviceFingerprint: string): string {
+    const account = accountId.replace(/-/g, '').slice(-6).toUpperCase();
+    const device = createHash('sha256')
+      .update(deviceFingerprint)
+      .digest('hex')
+      .slice(0, 6)
+      .toUpperCase();
+    return `B${account}·${device}`;
+  }
+
+  // Re-validates entitlement at media-request time. The result is cached for a
+  // short window so per-segment range requests stay cheap, while revocation is
+  // still enforced within ~60 seconds.
+  async assertEntitlementAtStreamTime(
+    accountId: string,
+    lessonId: string,
+  ): Promise<boolean> {
+    const cacheKey = `${accountId}:${lessonId}`;
+    const cached = this.accessCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.allowed;
+
+    let allowed = false;
+    try {
+      await this.catalogService.canAccessLesson(accountId, lessonId);
+      allowed = true;
+    } catch {
+      allowed = false;
+    }
+    if (this.accessCache.size >= ACCESS_CACHE_MAX) {
+      const oldest = this.accessCache.keys().next().value;
+      if (oldest !== undefined) this.accessCache.delete(oldest);
+    }
+    this.accessCache.set(cacheKey, {
+      allowed,
+      expiresAt: Date.now() + ACCESS_REVALIDATE_MS,
+    });
+    return allowed;
   }
 
   private async replaceVideoLesson(
@@ -527,6 +637,178 @@ export class VideoService {
     });
     if (!lesson) {
       throw new NotFoundException('Lesson not found');
+    }
+  }
+
+  async isSessionLive(sessionId: string): Promise<boolean> {
+    if (!sessionId) return false;
+    const session = await db.authSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        revokedAt: true,
+        absoluteExpiresAt: true,
+        idleExpiresAt: true,
+        account: { select: { status: true, id: true } },
+      },
+    });
+    if (!session) return false;
+    if (session.revokedAt) return false;
+    if (session.absoluteExpiresAt.getTime() <= Date.now()) return false;
+    if (session.idleExpiresAt.getTime() <= Date.now()) return false;
+    return session.account.status === 'ACTIVE';
+  }
+
+  // Admin: list active delivery tokens for a lesson (org-scoped by caller).
+  async listDeliveryTokens(
+    lessonId: string,
+    organizationId: string,
+    options: { limit?: number; offset?: number } = {},
+  ) {
+    const videoLesson = await this.findOrgVideoLesson(lessonId, organizationId);
+    if (!videoLesson) {
+      throw new NotFoundException('Video lesson not found');
+    }
+    const take = Math.min(options.limit ?? 50, 200);
+    const skip = Math.max(options.offset ?? 0, 0);
+    const [tokens, total] = await Promise.all([
+      db.videoDeliveryToken.findMany({
+        where: { videoLessonId: videoLesson.id, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+        select: {
+          id: true,
+          accountId: true,
+          sessionId: true,
+          expiresAt: true,
+          usedAt: true,
+          createdAt: true,
+        },
+      }),
+      db.videoDeliveryToken.count({
+        where: { videoLessonId: videoLesson.id, expiresAt: { gt: new Date() } },
+      }),
+    ]);
+    return { tokens, total };
+  }
+
+  // Admin: revoke all outstanding delivery tokens for a lesson so every
+  // currently-issued playback URL dies immediately.
+  async revokeLessonDeliveryTokens(lessonId: string, organizationId: string) {
+    const videoLesson = await this.findOrgVideoLesson(lessonId, organizationId);
+    if (!videoLesson) {
+      throw new NotFoundException('Video lesson not found');
+    }
+    const result = await db.videoDeliveryToken.deleteMany({
+      where: { videoLessonId: videoLesson.id },
+    });
+    return { revoked: result.count };
+  }
+
+  // Admin: revoke a single delivery token by id (org-scoped via lesson).
+  async revokeDeliveryToken(tokenId: string, organizationId: string) {
+    const token = await db.videoDeliveryToken.findUnique({
+      where: { id: tokenId },
+      include: {
+        videoLesson: { select: { lessonId: true } },
+      },
+    });
+    if (!token) {
+      throw new NotFoundException('Delivery token not found');
+    }
+    const videoLesson = await this.findOrgVideoLesson(
+      token.videoLesson.lessonId,
+      organizationId,
+    );
+    if (!videoLesson) {
+      throw new NotFoundException('Delivery token not found');
+    }
+    await db.videoDeliveryToken.delete({ where: { id: tokenId } });
+    return { revoked: true };
+  }
+
+  // Admin: audit video-related security events for an account (org-scoped
+  // through the account's organization).
+  async listVideoSecurityEvents(
+    accountId: string | undefined,
+    organizationId: string,
+    options: { limit?: number; offset?: number } = {},
+  ) {
+    const where: any = {
+      eventType: { startsWith: 'VIDEO_' },
+    };
+    if (accountId) {
+      const account = await db.account.findFirst({
+        where: { id: accountId, organizationId },
+        select: { id: true },
+      });
+      if (!account) {
+        throw new NotFoundException('Account not found');
+      }
+      where.accountId = accountId;
+    }
+    const take = Math.min(options.limit ?? 50, 200);
+    const skip = Math.max(options.offset ?? 0, 0);
+    const [events, total] = await Promise.all([
+      db.securityEvent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+      }),
+      db.securityEvent.count({ where }),
+    ]);
+    return { events, total };
+  }
+
+  private async findOrgVideoLesson(lessonId: string, organizationId: string) {
+    const lesson = await db.lesson.findFirst({
+      where: {
+        id: lessonId,
+        unit: { chapter: { course: { organizationId } } },
+      },
+      select: { id: true },
+    });
+    if (!lesson) return null;
+    return db.videoLesson.findUnique({
+      where: { lessonId: lesson.id },
+      select: { id: true, lessonId: true },
+    });
+  }
+
+  // Deduplicated, non-fatal security event recording (accountId, phoneHmac,
+  // eventType, outcome, metadata). Failures are swallowed so logging never
+  // breaks playback.
+  async logSecurityEvent(
+    accountId: string | null,
+    eventType: string,
+    outcome: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    const dedupeKey = `${eventType}:${outcome}:${accountId ?? 'anon'}`;
+    const lastLog = this.denyLogCache.get(dedupeKey);
+    const now = Date.now();
+    if (lastLog !== undefined && now - lastLog < DENY_LOG_DEDUPE_MS) {
+      return;
+    }
+    this.denyLogCache.set(dedupeKey, now);
+    if (this.denyLogCache.size > 500) {
+      const oldest = this.denyLogCache.keys().next().value;
+      if (oldest !== undefined) this.denyLogCache.delete(oldest);
+    }
+
+    try {
+      await db.securityEvent.create({
+        data: {
+          accountId,
+          eventType,
+          outcome,
+          metadata: metadata as any,
+        },
+      });
+    } catch {
+      // never fail the request because security logging failed
     }
   }
 

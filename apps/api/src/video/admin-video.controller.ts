@@ -12,6 +12,7 @@ import {
   Body,
   Req,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -130,6 +131,68 @@ export class AdminVideoController {
     const data = await this.videoService.setYouTubeVideo(
       lessonId,
       body.youtubeUrl,
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Get('delivery-tokens/:lessonId')
+  async listDeliveryTokens(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
+    const data = await this.videoService.listDeliveryTokens(
+      lessonId,
+      request.account.organizationId,
+      {
+        limit: limit ? Number(limit) : undefined,
+        offset: offset ? Number(offset) : undefined,
+      },
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Post('delivery-tokens/:lessonId/revoke')
+  async revokeLessonDeliveryTokens(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+  ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
+    const data = await this.videoService.revokeLessonDeliveryTokens(
+      lessonId,
+      request.account.organizationId,
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Post('delivery-tokens/revoke/:tokenId')
+  async revokeDeliveryToken(
+    @Req() request: AdminRequest,
+    @Param('tokenId') tokenId: string,
+  ) {
+    const data = await this.videoService.revokeDeliveryToken(
+      tokenId,
+      request.account.organizationId,
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Get('security-events')
+  async listVideoSecurityEvents(
+    @Req() request: AdminRequest,
+    @Query('accountId') accountId?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const data = await this.videoService.listVideoSecurityEvents(
+      accountId,
+      request.account.organizationId,
+      {
+        limit: limit ? Number(limit) : undefined,
+        offset: offset ? Number(offset) : undefined,
+      },
     );
     return { status: 'SUCCESS', data };
   }

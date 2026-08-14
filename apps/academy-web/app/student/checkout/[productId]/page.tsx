@@ -173,7 +173,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ productId: 
           {orgSettings?.paymentWallet && (
             <PaymentInstruction
               method="Wallet"
-              title="حوّل محفظة إلكترونية إلى"
+              title="حوّل فودافون كاش إلى"
               value={orgSettings.paymentWallet}
             />
           )}

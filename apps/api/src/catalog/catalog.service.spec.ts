@@ -595,6 +595,95 @@ describe('CatalogService', () => {
     });
   });
 
+  describe('getLessonDetail', () => {
+    const lessonRow = {
+      id: 'lesson-1',
+      unitId: 'unit-1',
+      titleAr: 'الدرس الأول',
+      titleEn: 'Lesson One',
+      contentType: 'VIDEO',
+      content: null,
+      contentUrl: '/storage/secret.mp4',
+      attachedPdfUrl: '/pdfs/secret.pdf',
+      homeworkPdfUrl: '/pdfs/homework.pdf',
+      durationSeconds: 600,
+      sort: 2,
+      status: 'PUBLISHED',
+      publishAt: new Date('2026-01-01'),
+      unpublishAt: null,
+      archivedAt: null,
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-01'),
+      version: 3,
+      requiresPreviousLessonPass: false,
+      unit: {
+        id: 'unit-1',
+        titleAr: 'الوحدة',
+        titleEn: 'Unit',
+        chapter: { id: 'chapter-1', titleAr: 'الفصل', titleEn: 'Chapter' },
+      },
+    };
+
+    beforeEach(() => {
+      jest.spyOn(service, 'canAccessLesson').mockResolvedValue(true);
+      jest.spyOn(service, 'isQuizGatePassed').mockResolvedValue(false);
+      (db.lesson.findUnique as jest.Mock).mockResolvedValue(lessonRow);
+      (db.assessment.findFirst as jest.Mock).mockResolvedValue(null);
+      (db.assessmentAttempt.findFirst as jest.Mock).mockResolvedValue(null);
+      (db.chapter.findMany as jest.Mock).mockResolvedValue([]);
+    });
+
+    it('strips internal fields and video URLs from the student response', async () => {
+      const result = await service.getLessonDetail('lesson-1', 'acc-1');
+      const lesson = result.lesson;
+
+      expect(lesson.contentType).toBe('VIDEO');
+      expect(lesson.id).toBe('lesson-1');
+      expect(lesson.titleAr).toBe('الدرس الأول');
+      expect(lesson.contentUrl).toBeNull();
+      expect(lesson.attachedPdfUrl).toBeNull();
+      expect(lesson.homeworkPdfUrl).toBeNull();
+      expect(lesson).not.toHaveProperty('status');
+      expect(lesson).not.toHaveProperty('publishAt');
+      expect(lesson).not.toHaveProperty('unpublishAt');
+      expect(lesson).not.toHaveProperty('version');
+      expect(lesson).not.toHaveProperty('sort');
+      expect(lesson).not.toHaveProperty('archivedAt');
+      expect(lesson).not.toHaveProperty('createdAt');
+      expect(lesson).not.toHaveProperty('updatedAt');
+      expect(lesson.unit).toEqual({
+        id: 'unit-1',
+        titleAr: 'الوحدة',
+        titleEn: 'Unit',
+        chapter: { id: 'chapter-1', titleAr: 'الفصل', titleEn: 'Chapter' },
+      });
+    });
+
+    it('keeps URL fields for non-video (PDF/TEXT) content types', async () => {
+      (db.lesson.findUnique as jest.Mock).mockResolvedValue({
+        ...lessonRow,
+        contentType: 'PDF',
+        contentUrl: '/pdfs/lesson.pdf',
+        attachedPdfUrl: '/pdfs/attached.pdf',
+        homeworkPdfUrl: '/pdfs/homework.pdf',
+      });
+
+      const result = await service.getLessonDetail('lesson-1', 'acc-1');
+      const lesson = result.lesson;
+
+      expect(lesson.contentType).toBe('PDF');
+      expect(lesson.contentUrl).toBe('/pdfs/lesson.pdf');
+      expect(lesson.attachedPdfUrl).toBe('/pdfs/attached.pdf');
+      expect(lesson.homeworkPdfUrl).toBe('/pdfs/homework.pdf');
+      expect(lesson).not.toHaveProperty('status');
+    });
+
+    it('returns the full staff row for staff callers', async () => {
+      const result = await service.getLessonDetail('lesson-1', 'staff-1', true);
+      expect(result.lesson).toEqual(lessonRow);
+    });
+  });
+
   describe('getBundleDetail', () => {
     it('returns an assigned published course even when it has no published units', async () => {
       (db.product.findUnique as jest.Mock).mockResolvedValue({

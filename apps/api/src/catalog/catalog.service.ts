@@ -7,6 +7,14 @@ import { db } from '@bahrawy/db';
 
 @Injectable()
 export class CatalogService {
+  // Public (unauthenticated) catalog endpoints resolve a single primary
+  // organization and scope every query to it, so no tenant can ever enumerate
+  // or access another tenant's published courses, products, or lesson IDs.
+  private async getPrimaryOrganizationId(): Promise<string | null> {
+    const org = await db.organization.findFirst({ select: { id: true } });
+    return org?.id ?? null;
+  }
+
   async hasEntitlementToProduct(
     accountId: string,
     productId: string,
@@ -87,7 +95,11 @@ export class CatalogService {
     const unit = await db.unit.findUnique({
       where: { id: unitId },
       include: {
-        chapter: true,
+        chapter: {
+          include: {
+            course: { select: { id: true, organizationId: true } },
+          },
+        },
         prerequisiteAssessment: {
           select: {
             id: true,
@@ -102,6 +114,9 @@ export class CatalogService {
       throw new NotFoundException('Unit not found');
     }
 
+    const courseId = unit.chapter.courseId;
+    const organizationId = unit.chapter.course.organizationId;
+
     const now = new Date();
     const entitlement = await db.entitlement.findFirst({
       where: {
@@ -109,14 +124,15 @@ export class CatalogService {
         status: 'ACTIVE',
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
         product: {
+          organizationId,
           OR: [
             {
               type: 'BUNDLE',
-              courses: { some: { courseId: unit.chapter.courseId } },
+              courses: { some: { courseId } },
             },
             {
               type: 'COURSE',
-              courses: { some: { courseId: unit.chapter.courseId } },
+              courses: { some: { courseId } },
             },
             {
               type: 'LESSON',
@@ -131,16 +147,17 @@ export class CatalogService {
     if (!entitlement) {
       const freeProduct = await db.product.findFirst({
         where: {
+          organizationId,
           status: { in: ['ACTIVE', 'PUBLISHED'] },
           prices: { some: { status: 'ACTIVE', amount: 0 } },
           OR: [
             {
               type: 'BUNDLE',
-              courses: { some: { courseId: unit.chapter.courseId } },
+              courses: { some: { courseId } },
             },
             {
               type: 'COURSE',
-              courses: { some: { courseId: unit.chapter.courseId } },
+              courses: { some: { courseId } },
             },
             { type: 'LESSON', unitEntries: { some: { unitId } } },
           ],
@@ -461,7 +478,10 @@ export class CatalogService {
   }
 
   async getGrades(): Promise<any[]> {
+    const organizationId = await this.getPrimaryOrganizationId();
+    if (!organizationId) return [];
     return db.grade.findMany({
+      where: { organizationId },
       orderBy: { sort: 'asc' },
     });
   }
@@ -475,8 +495,11 @@ export class CatalogService {
   }
 
   async getPublicProducts(gradeId?: string): Promise<any[]> {
+    const organizationId = await this.getPrimaryOrganizationId();
+    if (!organizationId) return [];
     return db.product.findMany({
       where: {
+        organizationId,
         status: { in: ['ACTIVE', 'PUBLISHED'] },
         ...(gradeId
           ? {
@@ -568,8 +591,12 @@ export class CatalogService {
   }
 
   async getPublicProduct(id: string): Promise<any> {
-    const product = await db.product.findUnique({
-      where: { id },
+    const organizationId = await this.getPrimaryOrganizationId();
+    if (!organizationId) {
+      throw new NotFoundException('Product not found');
+    }
+    const product = await db.product.findFirst({
+      where: { id, organizationId },
       include: {
         prices: { where: { status: 'ACTIVE' } },
         courses: {
@@ -593,8 +620,11 @@ export class CatalogService {
   }
 
   async getBundlesForGrade(gradeId: string) {
+    const organizationId = await this.getPrimaryOrganizationId();
+    if (!organizationId) return [];
     const products = await db.product.findMany({
       where: {
+        organizationId,
         type: 'BUNDLE',
         status: { in: ['ACTIVE', 'PUBLISHED'] },
         OR: [
@@ -644,10 +674,14 @@ export class CatalogService {
   }
 
   async getUnitsForGrade(gradeId: string) {
+    const organizationId = await this.getPrimaryOrganizationId();
+    if (!organizationId) return [];
     const units = await db.unit.findMany({
       where: {
         status: 'PUBLISHED',
-        chapter: { course: { gradeId, status: 'PUBLISHED' } },
+        chapter: {
+          course: { organizationId, gradeId, status: 'PUBLISHED' },
+        },
       },
       include: {
         chapter: { include: { course: true } },
@@ -1207,6 +1241,8 @@ export class CatalogService {
       };
     }
 
+    const safeLesson = this.toStudentLesson(lesson);
+
     const courseId = lesson.unit.chapter.courseId;
     const orderedLessons = await this.getCourseOrderedLessons(courseId);
     const currentIndex = orderedLessons.findIndex(
@@ -1225,7 +1261,7 @@ export class CatalogService {
     }
 
     return {
-      lesson,
+      lesson: safeLesson,
       endOfLessonQuiz: {
         ...gateConfig,
         passed: latestAttempt ? passedGate : false,
@@ -1233,6 +1269,43 @@ export class CatalogService {
       },
       nextLesson: nextLesson
         ? { id: nextLesson.id, titleAr: nextLesson.titleAr, locked: nextLocked }
+        : null,
+    };
+  }
+
+  /**
+   * Student-facing projection of a Lesson. Never leaks internal/admin fields
+   * (status, publish windows, version, sort, archivedAt, createdAt, updatedAt)
+   * or raw content URLs unless the content type genuinely requires them
+   * (PDF/TEXT lessons are rendered from `contentUrl`/`content`; VIDEO lessons
+   * are delivered through the protected /video flow, so no URL is exposed).
+   */
+  private toStudentLesson(lesson: any): any {
+    const isVideo = lesson.contentType === 'VIDEO';
+    return {
+      id: lesson.id,
+      titleAr: lesson.titleAr,
+      titleEn: lesson.titleEn ?? null,
+      contentType: lesson.contentType,
+      content: lesson.content ?? null,
+      durationSeconds: lesson.durationSeconds ?? 0,
+      requiresPreviousLessonPass: lesson.requiresPreviousLessonPass ?? false,
+      contentUrl: isVideo ? null : (lesson.contentUrl ?? null),
+      attachedPdfUrl: isVideo ? null : (lesson.attachedPdfUrl ?? null),
+      homeworkPdfUrl: isVideo ? null : (lesson.homeworkPdfUrl ?? null),
+      unit: lesson.unit
+        ? {
+            id: lesson.unit.id,
+            titleAr: lesson.unit.titleAr,
+            titleEn: lesson.unit.titleEn ?? null,
+            chapter: lesson.unit.chapter
+              ? {
+                  id: lesson.unit.chapter.id,
+                  titleAr: lesson.unit.chapter.titleAr,
+                  titleEn: lesson.unit.chapter.titleEn ?? null,
+                }
+              : null,
+          }
         : null,
     };
   }

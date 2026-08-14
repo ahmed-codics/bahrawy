@@ -131,12 +131,7 @@ export default function LearnPage({
         return [
           item.lessonId!,
           {
-            playback:
-              video.data ?? {
-                provider: video.provider ?? 'LOCAL',
-                url: video.signedUrl,
-                videoId: video.videoId,
-              },
+            playback: video.data,
             resumePosition: Number.isFinite(savedPosition) ? savedPosition : 0,
           },
         ] as const;

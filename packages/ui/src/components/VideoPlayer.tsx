@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { MobileSheet } from './MobileSheet';
 import { useDataSaver } from './DataSaverProvider';
+import { AnimatedWatermark } from './AnimatedWatermark';
 
 export interface VideoPlayerProps {
   src: string;
@@ -23,6 +24,7 @@ export interface VideoPlayerProps {
   poster?: string;
   className?: string;
   initialTime?: number;
+  watermark?: string;
   onEnded?: () => void;
   onTimeUpdate?: (time: number) => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
@@ -83,6 +85,7 @@ export function VideoPlayer({
   poster,
   className = '',
   initialTime = 0,
+  watermark,
   onEnded,
   onTimeUpdate,
   onProgress,
@@ -329,6 +332,18 @@ export function VideoPlayer({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const video = videoRef.current;
+      if (document.hidden && video && !video.paused && !video.ended) {
+        video.pause();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   const togglePlay = async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -456,6 +471,8 @@ export function VideoPlayer({
       />
 
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.3),transparent_30%,transparent_55%,rgba(0,0,0,0.86))]" />
+
+      {watermark && <AnimatedWatermark text={watermark} />}
 
       {error && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 p-5 text-center text-white">

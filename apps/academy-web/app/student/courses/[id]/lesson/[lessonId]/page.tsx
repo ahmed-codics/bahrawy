@@ -89,13 +89,7 @@ export default function LessonDetailPage({
           lastReported.current = Number.isFinite(savedPosition)
             ? Math.floor(savedPosition)
             : 0;
-          setPlayback(
-            video.data ?? {
-              provider: video.provider ?? 'LOCAL',
-              url: video.signedUrl,
-              videoId: video.videoId,
-            },
-          );
+          setPlayback(video.data);
         }
       })
       .catch(async (requestError) => {

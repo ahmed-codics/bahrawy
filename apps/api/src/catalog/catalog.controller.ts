@@ -114,8 +114,17 @@ export class CatalogController {
 
   @Get('courses')
   async getPublishedCourses(@Query('gradeId') gradeId?: string) {
+    // Public catalog is scoped to the primary organization so it can never
+    // enumerate another tenant's published courses or lesson IDs.
+    const primaryOrg = await db.organization.findFirst({
+      select: { id: true },
+    });
+    if (!primaryOrg) {
+      return { status: 'SUCCESS', data: [] };
+    }
     const data = await db.course.findMany({
       where: {
+        organizationId: primaryOrg.id,
         status: 'PUBLISHED',
         archivedAt: null,
         ...(gradeId ? { gradeId } : {}),
