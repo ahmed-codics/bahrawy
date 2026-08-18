@@ -24,7 +24,6 @@ import { VideoAccessService } from '../video-access/video-access.grants.service'
 // every media request so a shared/replayed URL dies once access is revoked.
 const PLAYBACK_URL_TTL_SECONDS = 15 * 60;
 const UPLOAD_URL_TTL_SECONDS = 15 * 60;
-const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const VIDEO_PATH_CACHE_MAX = 1000;
 // Entitlement re-checks at stream time are cached briefly to avoid a DB hit
 // per range request while still refusing access within a second of revocation.
@@ -285,11 +284,10 @@ export class VideoService {
     }
     if (
       !Number.isSafeInteger(fileSizeBytes) ||
-      fileSizeBytes <= 0 ||
-      fileSizeBytes > MAX_VIDEO_UPLOAD_BYTES
+      fileSizeBytes <= 0
     ) {
       throw new BadRequestException(
-        'Video size must be between 1 byte and 2 GB',
+        'Video size must be at least 1 byte',
       );
     }
 
@@ -699,6 +697,18 @@ export class VideoService {
       await this.deleteStoredSource(previous).catch(() => undefined);
     }
     return videoLesson;
+  }
+
+  async deleteVideo(lessonId: string) {
+    const previous = await db.videoLesson.findUnique({
+      where: { lessonId },
+      include: { renditions: true },
+    });
+    if (!previous) return;
+
+    await db.videoLesson.delete({ where: { lessonId } });
+    await this.deleteStoredSource(previous).catch(() => undefined);
+    this.videoPathCache.delete(lessonId);
   }
 
   private async deleteStoredSource(video: StoredVideo) {

@@ -135,6 +135,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: https://${ADMIN_HOST}/api
     restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-../.env.production}
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0

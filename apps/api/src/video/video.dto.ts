@@ -8,8 +8,6 @@ import {
   Min,
 } from 'class-validator';
 
-const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
-
 export class YouTubeVideoDto {
   @IsString()
   @IsNotEmpty()
@@ -31,7 +29,6 @@ export class CreateR2UploadDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(MAX_VIDEO_UPLOAD_BYTES)
   fileSizeBytes!: number;
 }
 
@@ -51,3 +48,5 @@ export class ConfirmR2UploadDto {
   @MaxLength(150)
   mimeType!: string;
 }
+
+export class DeleteVideoDto {}

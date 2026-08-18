@@ -30,10 +30,9 @@ import {
   CreateR2UploadDto,
   YouTubeVideoDto,
 } from './video.dto';
+import { Delete } from '@nestjs/common';
 import { StaffPermission } from '@bahrawy/types';
 import { db } from '@bahrawy/db';
-
-const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
 type AdminRequest = Request & {
   account: { id: string; organizationId: string };
@@ -61,9 +60,7 @@ export class AdminVideoController {
           );
         },
       }),
-      limits: {
-        fileSize: MAX_VIDEO_UPLOAD_BYTES,
-      },
+      
       fileFilter: (_req, file, callback) => {
         if (!file.mimetype.startsWith('video/')) {
           callback(
@@ -216,6 +213,16 @@ export class AdminVideoController {
     }
     const filePath = await this.videoService.getVideoFilePath(lessonId);
     return streamVideoFile(filePath, range, res);
+  }
+
+  @Delete(':lessonId')
+  async deleteVideo(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+  ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
+    await this.videoService.deleteVideo(lessonId);
+    return { status: 'SUCCESS', message: 'Video deleted' };
   }
 
   private async assertLessonAccess(organizationId: string, lessonId: string) {

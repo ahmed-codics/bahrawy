@@ -2,13 +2,11 @@
 
 import { ChangeEvent, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle2, Cloud, HardDrive, PlayCircle, Upload } from 'lucide-react';
+import { CheckCircle2, Cloud, HardDrive, PlayCircle, Upload, Trash2 } from 'lucide-react';
 import { fetchApi } from '../../../../../lib/api';
 import type { ContentItem } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-const MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
-
 type VideoProvider = 'YOUTUBE' | 'R2' | 'LOCAL';
 
 type VideoUploadAreaProps = {
@@ -107,10 +105,6 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
       toast.error('يجب إنشاء درس الفيديو أولا');
       return;
     }
-    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
-      toast.error('حجم الفيديو يجب ألا يتجاوز 2 GB');
-      return;
-    }
     if (provider === 'R2' && file.type !== 'video/mp4') {
       toast.error('فيديو R2 يجب أن يكون بصيغة MP4');
       return;
@@ -172,6 +166,20 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
   const handlePreview = () => {
     if (!videoItem) return;
     window.open(`${API_BASE}/admin/v1/video/${videoItem.id}/preview`, '_blank');
+  };
+
+  const handleDelete = async () => {
+    if (!videoItem) return;
+    if (!window.confirm('هل أنت متأكد من حذف هذا الفيديو؟')) return;
+    try {
+      await fetchApi(`/admin/v1/video/${videoItem.id}`, {
+        method: 'DELETE',
+      });
+      toast.success('تم حذف الفيديو بنجاح');
+      await onReload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل حذف الفيديو');
+    }
   };
 
   return (
@@ -273,19 +281,29 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
             <span className="text-sm text-text-muted">
               {provider === 'R2' ? 'رفع مباشر وآمن إلى R2' : 'رفع إلى خادم التطوير المحلي'}
             </span>
-            <span className="text-xs text-text-muted/70">MP4 - حتى 2 GB</span>
+            <span className="text-xs text-text-muted/70">MP4</span>
           </span>
         </label>
       )}
 
       {currentVideo && (
-        <button
-          type="button"
-          onClick={handlePreview}
-          className="self-start text-xs font-bold text-interactive underline hover:text-interactive/80"
-        >
-          معاينة الفيديو الحالي
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePreview}
+            className="text-xs font-bold text-interactive underline hover:text-interactive/80"
+          >
+            معاينة الفيديو الحالي
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="flex items-center gap-1 text-xs font-bold text-danger hover:text-danger/80"
+          >
+            <Trash2 className="size-3.5" />
+            حذف
+          </button>
+        </div>
       )}
     </div>
   );

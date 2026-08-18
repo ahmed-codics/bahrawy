@@ -13,6 +13,18 @@ function apiCspOrigins(): string[] {
       // Ignore malformed values rather than crashing every request.
     }
   }
+  const r2Endpoint = process.env.R2_ENDPOINT;
+  if (r2Endpoint) {
+    try {
+      const { protocol, host } = new URL(r2Endpoint);
+      if (protocol && host) {
+        origins.push(`${protocol}//${host}`);
+        origins.push(`${protocol}//*.${host}`);
+      }
+    } catch {
+      // Ignore malformed values
+    }
+  }
   return origins;
 }
 

@@ -1,6 +1,7 @@
 {
-	email {$ACME_EMAIL}
-	admin off
+ 	email ahmed-codics@users.noreply.github.com
+ 	admin off
+
 }
 
 (security_headers) {
@@ -41,6 +42,54 @@
 
 	handle {
 		reverse_proxy staff-admin:3002
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+kavvi.io, www.kavvi.io, kavvi.31-97-182-119.sslip.io {
+	import security_headers
+
+	# Compressing text/event-stream lets the encoder buffer the first token,
+	# which defeats streaming no matter how fast the model is.
+	#
+	# This cannot be expressed by putting a handle block above `encode`:
+	# Caddy sorts directives by its own built-in order and hoists `encode`
+	# above every handle, so an earlier-written bypass still runs inside the
+	# encoder. Check with `caddy adapt`, not by reading this file top to
+	# bottom. Excluding the request at the encoder is what actually works.
+	#
+	# Matched on Accept alone, deliberately. This was previously also scoped to
+	# `path /api/chat/threads/*/messages`, which left every other stream
+	# compressed - including /api/planning-sessions/*/events, the feed that
+	# reports upload, analysis and planning progress. Its events sat in the
+	# encoder's buffer, so the page only showed progress when the learner
+	# reloaded and refetched.
+	#
+	# The path condition added nothing: EventSource always sends
+	# `Accept: text/event-stream`, and a plain GET returning JSON on the same
+	# path does not, so ordinary responses are still compressed. Dropping it
+	# covers every SSE endpoint, including ones added later.
+	@notsse not header Accept *text/event-stream*
+	encode @notsse zstd gzip
+
+	handle /api/* {
+		reverse_proxy kavvi-api-1:5000 {
+			flush_interval -1
+			transport http {
+				dial_timeout 30s
+				response_header_timeout 300s
+			}
+		}
+	}
+
+	handle {
+		# The compose-managed release container. Was kavvi-preview, a container
+		# started by hand from an image built outside version control.
+		reverse_proxy kavvi-web-1:8080
 	}
 
 	log {
