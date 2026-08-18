@@ -282,6 +282,8 @@ model Account {
   supportTickets        SupportTicket[]
   notifications         InAppNotification[]
   supportMessages       SupportMessage[]
+  videoAccessRequests   VideoAccessRequest[]
+  videoAccessGrants     VideoAccessGrant[]
   offlineCodesCreated   OfflineAccessCode[]       @relation("OfflineCodeCreatedBy")
   offlineCodesConsumed  OfflineAccessCode[]       @relation("OfflineCodeAccount")
   offlineBatchesCreated OfflineAccessCodeBatch[]  @relation("OfflineBatchCreatedBy")
@@ -859,6 +861,22 @@ enum VideoProvider {
   R2
 }
 
+enum VideoAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum VideoAccessGrantDuration {
+  SESSION
+  ONE_DAY
+  THREE_DAYS
+  SEVEN_DAYS
+  CUSTOM
+}
+
 model VideoLesson {
   id               String        @id @default(uuid())
   lessonId         String        @unique
@@ -910,6 +928,28 @@ model VideoDeliveryToken {
 
   @@index([accountId])
   @@index([tokenHash])
+}
+
+// Short-lived playback issuance records. Created on every authorized playback
+// request and tied to the account + session + lesson so access can be audited
+// and revoked centrally. The media itself is re-validated live on each request
+// (entitlement or an active grant), so a session is an audit/revocation record,
+// not a bypass.
+model VideoPlaybackSession {
+  id        String        @id @default(uuid())
+  lessonId  String
+  accountId String
+  sessionId String
+  provider  VideoProvider
+  status    String        @default("ACTIVE")
+  issuedAt  DateTime      @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([accountId, issuedAt])
+  @@index([sessionId])
+  @@index([lessonId, status])
 }
 
 model LessonProgress {
@@ -1131,6 +1171,7 @@ model InAppNotification {
   accountId String
   title     String
   content   String
+  metadata  Json?
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
@@ -1213,4 +1254,57 @@ model OfflineAccessCodeBatch {
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
+}
+
+model VideoAccessRequest {
+  id              String                   @id @default(uuid())
+  organizationId  String
+  accountId       String
+  courseId        String
+  lessonId        String
+  videoId         String
+  requestedEmail  String
+  sessionId       String?
+  status          VideoAccessRequestStatus @default(PENDING)
+  requestedAt     DateTime                 @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  rejectionReason String?
+  grantExpiresAt  DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  grant  VideoAccessGrant?
+  account Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, requestedAt])
+  @@index([accountId, status])
+  @@index([lessonId, status])
+}
+
+model VideoAccessGrant {
+  id             String                    @id @default(uuid())
+  organizationId String
+  accountId      String
+  courseId       String
+  lessonId       String
+  videoId        String
+  requestId      String                    @unique
+  sessionId      String?
+  durationType   VideoAccessGrantDuration  @default(SESSION)
+  grantedBy      String
+  grantedAt      DateTime                  @default(now())
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  revokedBy      String?
+  revokedReason  String?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  request VideoAccessRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  account Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([accountId, lessonId])
+  @@index([accountId, revokedAt])
 }

@@ -15,7 +15,9 @@ import { ExamSessionModule } from './exam-session/exam-session.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SupportModule } from './support/support.module';
 import { NotificationModule } from './notification/notification.module';
+import { MailModule } from './mail/mail.module';
 import { VideoModule } from './video/video.module';
+import { VideoAccessModule } from './video-access/video-access.module';
 import { AdminCatalogModule } from './admin-catalog/admin-catalog.module';
 import { AdminAssessmentModule } from './admin-assessment/admin-assessment.module';
 import { AdminContentModule } from './admin-content/admin-content.module';
@@ -47,7 +49,9 @@ import {
     DashboardModule,
     SupportModule,
     NotificationModule,
+    MailModule,
     VideoModule,
+    VideoAccessModule,
     AdminCatalogModule,
     AdminAssessmentModule,
     AdminContentModule,

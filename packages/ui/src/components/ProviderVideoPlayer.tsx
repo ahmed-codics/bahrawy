@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { VideoPlayer } from './VideoPlayer';
-import { AnimatedWatermark } from './AnimatedWatermark';
+import { VideoFocusOverlay } from './VideoFocusOverlay';
 
 export type VideoPlayback = {
   provider: 'YOUTUBE' | 'R2' | 'LOCAL';
@@ -12,61 +12,110 @@ export type VideoPlayback = {
   defaultQuality?: string;
   sources?: Array<{ quality: string; url: string }>;
   processingStatus?: string;
-  watermark?: string;
 };
 
 export type ProviderVideoPlayerProps = {
   playback: VideoPlayback;
   className?: string;
   initialTime?: number;
+  focusMode?: boolean;
+  onExitFocus?: () => void;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
+};
+
+export type VideoControlHandle = {
+  play: () => void;
+  pause: () => void;
+  getPlaying: () => boolean;
 };
 
 export function ProviderVideoPlayer({
   playback,
   className = '',
   initialTime = 0,
+  focusMode = false,
+  onExitFocus,
   onEnded,
   onProgress,
 }: ProviderVideoPlayerProps) {
-  if (playback.provider === 'YOUTUBE' && playback.videoId) {
-    return (
-      <YouTubePlayer
-        key={playback.videoId}
-        videoId={playback.videoId}
-        className={className}
-        initialTime={initialTime}
-        watermark={playback.watermark}
-        onEnded={onEnded}
-        onProgress={onProgress}
-      />
-    );
-  }
+  const controlRef = useRef<VideoControlHandle | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  if (playback.url) {
-    return (
-      <VideoPlayer
-        src={playback.url}
-        sources={playback.sources}
-        defaultQuality={playback.defaultQuality}
-        className={className}
-        initialTime={initialTime}
-        watermark={playback.watermark}
-        onEnded={onEnded}
-        onProgress={onProgress}
-      />
-    );
-  }
+  const syncPlaying = useCallback(() => {
+    setIsPlaying(controlRef.current?.getPlaying() ?? false);
+  }, []);
 
-  return null;
+  const handleTogglePlay = useCallback(() => {
+    const control = controlRef.current;
+    if (!control) return;
+    if (control.getPlaying()) {
+      control.pause();
+    } else {
+      control.play();
+    }
+    syncPlaying();
+  }, [syncPlaying]);
+
+  const renderPlayer = () => {
+    if (playback.provider === 'YOUTUBE' && playback.videoId) {
+      return (
+        <YouTubePlayer
+          key={playback.videoId}
+          videoId={playback.videoId}
+          className={className}
+          initialTime={initialTime}
+          controlRef={controlRef}
+          blockNativeControls={focusMode && playback.provider === 'YOUTUBE'}
+          onPlayingChange={syncPlaying}
+          onEnded={onEnded}
+          onProgress={onProgress}
+        />
+      );
+    }
+
+    if (playback.url) {
+      return (
+        <VideoPlayer
+          src={playback.url}
+          sources={playback.sources}
+          defaultQuality={playback.defaultQuality}
+          className={className}
+          initialTime={initialTime}
+          onEnded={onEnded}
+          onProgress={onProgress}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const player = renderPlayer();
+  if (!player) return null;
+
+  if (!focusMode) return player;
+
+  return (
+    <VideoFocusOverlay
+      focusMode={focusMode}
+      onExitFocus={() => onExitFocus?.()}
+      isPlaying={isPlaying}
+      onTogglePlay={handleTogglePlay}
+      showCustomControls={playback.provider === 'YOUTUBE'}
+    >
+      {player}
+    </VideoFocusOverlay>
+  );
 }
 
 type YouTubePlayerProps = {
   videoId: string;
   className: string;
   initialTime: number;
-  watermark?: string;
+  controlRef: React.MutableRefObject<VideoControlHandle | null>;
+  blockNativeControls?: boolean;
+  onPlayingChange?: () => void;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
 };
@@ -78,6 +127,7 @@ type YouTubePlayerInstance = {
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   pauseVideo: () => void;
   playVideo: () => void;
+  getPlayerState: () => number;
 };
 
 type YouTubeNamespace = {
@@ -103,6 +153,13 @@ declare global {
     onYouTubeIframeAPIReady?: () => void;
   }
 }
+
+const YOUTUBE_PLAYER_STATE = {
+  ENDED: 0,
+  PLAYING: 1,
+  PAUSED: 2,
+  BUFFERING: 3,
+};
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
 
@@ -136,21 +193,31 @@ function YouTubePlayer({
   videoId,
   className,
   initialTime,
-  watermark,
+  controlRef,
+  blockNativeControls = false,
+  onPlayingChange,
   onEnded,
   onProgress,
 }: YouTubePlayerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onEndedRef = useRef(onEnded);
   const onProgressRef = useRef(onProgress);
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  const [iframeOffsets, setIframeOffsets] = useState<{
+    top: number;
+    bottom: number;
+  } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const aspectRatio = YOUTUBE_ASPECT_RATIOS[videoId] ?? '16 / 9';
 
   useEffect(() => {
     onEndedRef.current = onEnded;
     onProgressRef.current = onProgress;
-  }, [onEnded, onProgress]);
+    onPlayingChangeRef.current = onPlayingChange;
+  }, [onEnded, onProgress, onPlayingChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,15 +255,22 @@ function YouTubePlayer({
         },
         events: {
           onReady: () => {
+            controlRef.current = {
+              play: () => playerRef.current?.playVideo(),
+              pause: () => playerRef.current?.pauseVideo(),
+              getPlaying: () =>
+                playerRef.current?.getPlayerState() === YOUTUBE_PLAYER_STATE.PLAYING,
+            };
             const player = playerRef.current;
             const duration = player?.getDuration() ?? 0;
             if (player && initialTime > 1 && duration > 0 && initialTime < duration - 10) {
               player.seekTo(initialTime, true);
-              return;
             }
             reportProgress();
+            onPlayingChangeRef.current?.();
           },
           onStateChange: ({ data }) => {
+            onPlayingChangeRef.current?.();
             if (data === 1 && !progressTimerRef.current) {
               progressTimerRef.current = setInterval(reportProgress, 5000);
             } else if (data !== 1) {
@@ -214,8 +288,9 @@ function YouTubePlayer({
       stopProgressTimer();
       playerRef.current?.destroy();
       playerRef.current = null;
+      controlRef.current = null;
     };
-  }, [initialTime, videoId]);
+  }, [initialTime, videoId, controlRef]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -230,14 +305,155 @@ function YouTubePlayer({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
+  useEffect(() => {
+    const getFullscreenElement = () => {
+      const webkitDoc = document as Document & { webkitFullscreenElement?: Element };
+      return document.fullscreenElement ?? webkitDoc.webkitFullscreenElement ?? null;
+    };
+    const handleFullscreenChange = () => {
+      const container = containerRef.current;
+      const element = getFullscreenElement();
+      setIsFullscreen(
+        !!container &&
+          !!element &&
+          (element === container ||
+            container.contains(element) ||
+            element.contains(container)),
+      );
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    let raf = 0;
+    const syncFrame = () => {
+      const container = containerRef.current;
+      const frame = container ? container.querySelector('iframe') : null;
+      if (!container || !frame) return;
+      frame.allowFullscreen = true;
+      const r = container.getBoundingClientRect();
+      frame.style.setProperty('position', 'absolute', 'important');
+      frame.style.setProperty('left', '0px', 'important');
+      frame.style.setProperty('top', '0px', 'important');
+      frame.style.setProperty('width', `${r.width}px`, 'important');
+      frame.style.setProperty('height', `${r.height}px`, 'important');
+      const currentAllow = frame.getAttribute('allow') || '';
+      if (!/\bfullscreen\b/.test(currentAllow)) {
+        frame.setAttribute(
+          'allow',
+          `${currentAllow ? `${currentAllow}; ` : ''}fullscreen`,
+        );
+      }
+    };
+    const run = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(syncFrame);
+    };
+    const observer = new MutationObserver(run);
+    const container = containerRef.current;
+    if (container) {
+      observer.observe(container, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'width', 'height'],
+      });
+    }
+    const ro = new ResizeObserver(run);
+    if (container) ro.observe(container);
+    syncFrame();
+    return () => {
+      observer.disconnect();
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!blockNativeControls) {
+      setIframeOffsets(null);
+      return;
+    }
+
+    let iframe: HTMLIFrameElement | null = null;
+    const measure = () => {
+      const container = containerRef.current;
+      if (!container || !iframe) return;
+      const cRect = container.getBoundingClientRect();
+      const fRect = iframe.getBoundingClientRect();
+      setIframeOffsets({
+        top: fRect.top - cRect.top,
+        bottom: cRect.bottom - fRect.bottom,
+      });
+    };
+
+    const ro = new ResizeObserver(measure);
+    const mo = new MutationObserver(() => {
+      const found = containerRef.current?.querySelector('iframe') ?? null;
+      if (found !== iframe) {
+        if (iframe) ro.unobserve(iframe);
+        iframe = found;
+        if (iframe) ro.observe(iframe);
+        measure();
+      }
+    });
+
+    const found = containerRef.current?.querySelector('iframe') ?? null;
+    if (found) {
+      iframe = found;
+      ro.observe(iframe);
+    }
+    if (containerRef.current)
+      mo.observe(containerRef.current, { childList: true, subtree: true });
+    window.addEventListener('resize', measure);
+    measure();
+
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [blockNativeControls]);
+
   return (
     <div
-      className={`relative aspect-video w-full overflow-hidden rounded-[var(--radius-xl)] bg-black ${className}`}
-      style={{ aspectRatio }}
+      ref={containerRef}
+      className={`relative w-full overflow-hidden bg-black ${
+        isFullscreen ? 'h-full' : 'aspect-video rounded-[var(--radius-xl)]'
+      } ${className}`}
+      style={
+        isFullscreen
+          ? { width: '100%', height: '100%', aspectRatio: 'auto', borderRadius: 0 }
+          : { aspectRatio }
+      }
       onContextMenu={(event) => event.preventDefault()}
     >
-      <div ref={mountRef} className="h-full w-full" />
-      {watermark && <AnimatedWatermark text={watermark} />}
+      <div ref={mountRef} className="absolute inset-0" />
+      {blockNativeControls && (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 z-10 h-14 touch-none sm:h-16"
+            style={iframeOffsets ? { top: iframeOffsets.top } : undefined}
+            onPointerDown={(event) => event.preventDefault()}
+            onClick={(event) => event.preventDefault()}
+            onContextMenu={(event) => event.preventDefault()}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 z-10 h-16 touch-none sm:h-20"
+            style={iframeOffsets ? { bottom: iframeOffsets.bottom } : undefined}
+            onPointerDown={(event) => event.preventDefault()}
+            onClick={(event) => event.preventDefault()}
+            onContextMenu={(event) => event.preventDefault()}
+          />
+        </>
+      )}
     </div>
   );
 }

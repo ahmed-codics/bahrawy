@@ -17,7 +17,6 @@ describe('VideoController getSignedHlsUrl', () => {
     serviceMock.getLessonPlayback.mockResolvedValue({
       provider: 'YOUTUBE',
       videoId: 'iMZ1skkbUWI',
-      watermark: 'B123456·ABCDEF',
     });
 
     const result = await controller.getSignedHlsUrl(
@@ -34,7 +33,6 @@ describe('VideoController getSignedHlsUrl', () => {
       data: {
         provider: 'YOUTUBE',
         videoId: 'iMZ1skkbUWI',
-        watermark: 'B123456·ABCDEF',
       },
     });
     expect(result).not.toHaveProperty('signedUrl');

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -17,6 +18,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CatalogService } from '../catalog/catalog.service';
+import { VideoAccessService } from '../video-access/video-access.grants.service';
 
 // Short-lived playback tokens bound to account+session+lesson; re-validated on
 // every media request so a shared/replayed URL dies once access is revoked.
@@ -38,7 +40,6 @@ export type VideoPlayback = {
   defaultQuality?: string;
   sources?: Array<{ quality: string; url: string }>;
   processingStatus?: string;
-  watermark?: string;
 };
 
 type StoredVideo = {
@@ -64,7 +65,10 @@ export class VideoService {
   private readonly denyLogCache = new Map<string, number>();
   private r2Client: S3Client | null = null;
 
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(
+    private readonly catalogService: CatalogService,
+    private readonly videoAccess: VideoAccessService,
+  ) {}
 
   private cacheGet(key: string) {
     const value = this.videoPathCache.get(key);
@@ -89,7 +93,12 @@ export class VideoService {
     sessionId?: string,
     deviceFingerprint?: string,
   ): Promise<VideoPlayback> {
-    await this.catalogService.canAccessLesson(accountId, lessonId, isStaff);
+    await this.assertPlaybackAuthorized(
+      accountId,
+      lessonId,
+      isStaff,
+      sessionId,
+    );
     const video = await db.videoLesson.findUnique({
       where: { lessonId },
       include: { renditions: { orderBy: { height: 'asc' } } },
@@ -102,12 +111,80 @@ export class VideoService {
       sessionId,
       deviceFingerprint,
     });
+
+    // Record a short-lived playback session for authenticated requests
+    // (staff/admin preview streams are not tracked).
+    if (accountId && sessionId) {
+      await this.issuePlaybackSession(
+        accountId,
+        lessonId,
+        sessionId,
+        playback.provider,
+      );
+    }
+
     await this.logSecurityEvent(accountId, 'VIDEO_PLAYBACK_ISSUED', 'SUCCESS', {
       lessonId,
       provider: playback.provider,
       isStaff,
     });
     return playback;
+  }
+
+  /**
+   * Playback authorization for a student: normal catalog access (entitlement,
+   * prerequisite, quiz gates) OR an active VideoAccessGrant. Staff always pass.
+   * When only a grant would apply, that grant is required to be live — expired
+   * or revoked grants map to explicit 403 codes.
+   */
+  private async assertPlaybackAuthorized(
+    accountId: string,
+    lessonId: string,
+    isStaff: boolean,
+    sessionId?: string,
+  ): Promise<void> {
+    if (isStaff) return;
+    let normalAccess = false;
+    try {
+      await this.catalogService.canAccessLesson(accountId, lessonId);
+      normalAccess = true;
+    } catch (error: any) {
+      if (!(error instanceof ForbiddenException)) throw error;
+    }
+
+    if (normalAccess) return;
+
+    const grant = await this.videoAccess.findActiveGrant(
+      accountId,
+      lessonId,
+      sessionId,
+    );
+    if (!grant) {
+      // Distinguish an explicitly denied grant from no grant at all.
+      const record = await db.videoAccessGrant.findFirst({
+        where: { accountId, lessonId },
+        orderBy: { grantedAt: 'desc' },
+        select: { revokedAt: true, expiresAt: true },
+      });
+      if (record) {
+        if (record.revokedAt) {
+          throw new ForbiddenException({
+            code: 'VIDEO_ACCESS_REVOKED',
+            message: 'Access to this video has been revoked.',
+          });
+        }
+        if (record.expiresAt && record.expiresAt.getTime() <= Date.now()) {
+          throw new ForbiddenException({
+            code: 'VIDEO_ACCESS_EXPIRED',
+            message: 'Your video access has expired.',
+          });
+        }
+      }
+      throw new ForbiddenException({
+        code: 'VIDEO_ACCESS_NOT_GRANTED',
+        message: 'Video access has not been granted for this lesson.',
+      });
+    }
   }
 
   async getAdminPlayback(lessonId: string): Promise<VideoPlayback> {
@@ -432,16 +509,11 @@ export class VideoService {
       deviceFingerprint?: string;
     } = {},
   ): Promise<VideoPlayback> {
-    const watermark =
-      context.accountId && context.deviceFingerprint
-        ? this.buildWatermark(context.accountId, context.deviceFingerprint)
-        : undefined;
-
     if (video.provider === VideoProvider.YOUTUBE) {
       return {
         provider: VideoProvider.YOUTUBE,
         videoId: video.sourceRef,
-        ...(watermark ? { watermark } : {}),
+        expiresInSeconds: PLAYBACK_URL_TTL_SECONDS,
       };
     }
 
@@ -476,7 +548,6 @@ export class VideoService {
           ? { sources, defaultQuality: defaultSource?.quality }
           : {}),
         ...(video.status ? { processingStatus: video.status } : {}),
-        ...(watermark ? { watermark } : {}),
         expiresInSeconds: PLAYBACK_URL_TTL_SECONDS,
       };
     }
@@ -520,29 +591,48 @@ export class VideoService {
     return {
       provider: VideoProvider.LOCAL,
       url: `${baseUrl}/video/${video.lessonId}/stream.mp4?token=${localToken}&expires=${expires}&account=${encodeURIComponent(boundAccountId)}&session=${encodeURIComponent(boundSessionId)}`,
-      ...(watermark ? { watermark } : {}),
       expiresInSeconds: PLAYBACK_URL_TTL_SECONDS,
     };
   }
 
-  // A short, rotating, per-device identifier used as a screen-capture
-  // watermark (deterrence only, not a security boundary).
-  private buildWatermark(accountId: string, deviceFingerprint: string): string {
-    const account = accountId.replace(/-/g, '').slice(-6).toUpperCase();
-    const device = createHash('sha256')
-      .update(deviceFingerprint)
-      .digest('hex')
-      .slice(0, 6)
-      .toUpperCase();
-    return `B${account}·${device}`;
+  // Records a short-lived playback issuance bound to account + session +
+  // lesson. Purges this account's already-expired sessions on each issuance so
+  // the table stays small. Issuance is best-effort: logging/audit failures must
+  // never break playback.
+  private async issuePlaybackSession(
+    accountId: string,
+    lessonId: string,
+    sessionId: string,
+    provider: VideoProvider,
+  ): Promise<void> {
+    try {
+      const now = new Date();
+      await db.videoPlaybackSession.deleteMany({
+        where: { accountId, status: 'ACTIVE', expiresAt: { lte: now } },
+      });
+      await db.videoPlaybackSession.create({
+        data: {
+          lessonId,
+          accountId,
+          sessionId,
+          provider,
+          expiresAt: new Date(
+            Date.now() + PLAYBACK_URL_TTL_SECONDS * 1000,
+          ),
+        },
+      });
+    } catch {
+      // never fail the request because session recording failed
+    }
   }
 
-  // Re-validates entitlement at media-request time. The result is cached for a
-  // short window so per-segment range requests stay cheap, while revocation is
-  // still enforced within ~60 seconds.
+  // Re-validates entitlement (or an active video-access grant) at media-request
+  // time. The result is cached for a short window so per-segment range requests
+  // stay cheap, while revocation is still enforced within ~60 seconds.
   async assertEntitlementAtStreamTime(
     accountId: string,
     lessonId: string,
+    sessionId?: string,
   ): Promise<boolean> {
     const cacheKey = `${accountId}:${lessonId}`;
     const cached = this.accessCache.get(cacheKey);
@@ -553,7 +643,12 @@ export class VideoService {
       await this.catalogService.canAccessLesson(accountId, lessonId);
       allowed = true;
     } catch {
-      allowed = false;
+      const grant = await this.videoAccess.findActiveGrant(
+        accountId,
+        lessonId,
+        sessionId,
+      );
+      allowed = Boolean(grant);
     }
     if (this.accessCache.size >= ACCESS_CACHE_MAX) {
       const oldest = this.accessCache.keys().next().value;
@@ -703,6 +798,10 @@ export class VideoService {
     const result = await db.videoDeliveryToken.deleteMany({
       where: { videoLessonId: videoLesson.id },
     });
+    await db.videoPlaybackSession.updateMany({
+      where: { lessonId: videoLesson.lessonId, status: 'ACTIVE' },
+      data: { status: 'REVOKED', revokedAt: new Date() },
+    });
     return { revoked: result.count };
   }
 
@@ -725,6 +824,15 @@ export class VideoService {
       throw new NotFoundException('Delivery token not found');
     }
     await db.videoDeliveryToken.delete({ where: { id: tokenId } });
+    await db.videoPlaybackSession.updateMany({
+      where: {
+        lessonId: token.videoLesson.lessonId,
+        accountId: token.accountId,
+        sessionId: token.sessionId,
+        status: 'ACTIVE',
+      },
+      data: { status: 'REVOKED', revokedAt: new Date() },
+    });
     return { revoked: true };
   }
 

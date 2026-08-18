@@ -190,6 +190,7 @@ async function main() {
     'SUPPORT_MANAGE',
     'STAFF_MANAGE',
     'ASSESSMENT_MANAGE',
+    'VIDEO_ACCESS_MANAGE',
   ];
 
   const permissionByCode = new Map<string, string>();
@@ -221,7 +222,7 @@ async function main() {
     },
     ASSISTANT: {
       description: 'Student operations assistant',
-      permissions: ['STUDENT_MANAGE', 'SUPPORT_MANAGE'],
+      permissions: ['STUDENT_MANAGE', 'SUPPORT_MANAGE', 'VIDEO_ACCESS_MANAGE'],
     },
     FINANCE: {
       description: 'Payment reviewer',
@@ -229,7 +230,7 @@ async function main() {
     },
     SUPPORT: {
       description: 'Student support specialist',
-      permissions: ['SUPPORT_MANAGE', 'STUDENT_MANAGE'],
+      permissions: ['SUPPORT_MANAGE', 'STUDENT_MANAGE', 'VIDEO_ACCESS_MANAGE'],
     },
     READ_ONLY_AUDITOR: {
       description: 'Governance auditor with no mutation permissions',

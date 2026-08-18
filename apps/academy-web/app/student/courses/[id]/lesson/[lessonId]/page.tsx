@@ -69,7 +69,9 @@ export default function LessonDetailPage({
   const [resumePosition, setResumePosition] = useState(0);
   const [accessError, setAccessError] = useState('');
   const [locked, setLocked] = useState<{ titleAr?: string } | null>(null);
+  const [videoAccessBlocked, setVideoAccessBlocked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [videoFocused, setVideoFocused] = useState(true);
   const lastReported = useRef(0);
 
   useEffect(() => {
@@ -100,6 +102,15 @@ export default function LessonDetailPage({
           setAccessError(
             'وصل هذا الحساب إلى الحد الأقصى للأجهزة. أعد تحميل الصفحة بعد إعادة ضبط الأجهزة من الإدارة.',
           );
+          return;
+        }
+        if (
+          /MISSING_ENTITLEMENT|VIDEO_ACCESS_NOT_GRANTED|VIDEO_ACCESS_REVOKED|VIDEO_ACCESS_EXPIRED/.test(
+            code || '',
+          ) ||
+          /فيديو|video access|granted|revoked/i.test(message)
+        ) {
+          setVideoAccessBlocked(true);
           return;
         }
         if (code === 'LESSON_LOCKED' || /quiz|اختبار|LESSON_LOCKED/i.test(message)) {
@@ -208,7 +219,13 @@ export default function LessonDetailPage({
                   initialTime={resumePosition}
                   className="aspect-video rounded-none shadow-none"
                   onProgress={reportProgress}
+                  focusMode={videoFocused}
+                  onExitFocus={() => setVideoFocused(false)}
                 />
+              ) : videoAccessBlocked ? (
+                <div className="flex aspect-video items-center justify-center text-white/65">
+                  الفيديو غير متاح حالياً.
+                </div>
               ) : (
                 <div className="flex aspect-video items-center justify-center text-white/65">
                   الفيديو غير متاح حالياً.
@@ -281,6 +298,19 @@ export default function LessonDetailPage({
           titleAr={locked.titleAr}
           onBack={() => router.push(`/student/courses/${id}`)}
         />
+      ) : videoAccessBlocked ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <LockKeyhole className="mx-auto size-8 text-brand-600" />
+            <h2 className="mt-4 font-heading text-2xl font-black">الفيديو غير متاح حالياً</h2>
+            <p className="mt-2 text-sm leading-6 text-text-muted">
+              هذا الفيديو غير متاح لك في الوقت الحالي. يمكنك التواصل مع الدعم إذا كانت لديك مشكلة في الوصول.
+            </p>
+            <Button className="mt-5" variant="outline" onClick={() => router.push(`/student/courses/${id}`)}>
+              العودة للكورس
+            </Button>
+          </CardContent>
+        </Card>
       ) : preview ? (
         <LockedLesson
           preview={preview}

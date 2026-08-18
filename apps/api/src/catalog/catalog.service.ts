@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from '@bahrawy/db';
+import { VideoAccessService } from '../video-access/video-access.grants.service';
 
 @Injectable()
 export class CatalogService {
+  constructor(private readonly videoAccess: VideoAccessService) {}
   // Public (unauthenticated) catalog endpoints resolve a single primary
   // organization and scope every query to it, so no tenant can ever enumerate
   // or access another tenant's published courses, products, or lesson IDs.
@@ -1182,11 +1184,24 @@ export class CatalogService {
     accountId: string,
     isStaff = false,
   ): Promise<any> {
-    const canAccess = await this.canAccessLesson(accountId, lessonId, isStaff);
-    if (!canAccess) {
-      throw new ForbiddenException('Access denied');
+    let viaGrant = false;
+    try {
+      await this.canAccessLesson(accountId, lessonId, isStaff);
+    } catch (error: any) {
+      if (isStaff) throw error;
+      const code = (error?.getResponse?.() as any)?.code;
+      // A valid video-access grant lets a student view a video lesson they
+      // don't own. Quiz/prerequisite gates are NOT bypassed by grants.
+      if (code !== 'MISSING_ENTITLEMENT') throw error;
+      const lessonRow = await db.lesson.findUnique({
+        where: { id: lessonId },
+        select: { contentType: true },
+      });
+      if (lessonRow?.contentType !== 'VIDEO') throw error;
+      const grant = await this.videoAccess.findActiveGrant(accountId, lessonId);
+      if (!grant) throw error;
+      viaGrant = true;
     }
-
     const lesson = await db.lesson.findUnique({
       where: { id: lessonId },
       include: { unit: { include: { chapter: true } } },

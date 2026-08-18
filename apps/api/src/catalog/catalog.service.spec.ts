@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CatalogService } from './catalog.service';
+import { VideoAccessService } from '../video-access/video-access.grants.service';
 import { db } from '@bahrawy/db';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
@@ -51,7 +52,16 @@ describe('CatalogService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CatalogService],
+      providers: [
+        CatalogService,
+        {
+          provide: VideoAccessService,
+          useValue: {
+            findActiveGrant: jest.fn().mockResolvedValue(null),
+            createRequest: jest.fn(),
+          },
+        },
+      ],
     }).compile();
     service = module.get<CatalogService>(CatalogService);
   });

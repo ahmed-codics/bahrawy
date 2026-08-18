@@ -142,6 +142,7 @@ export class VideoController {
         await this.videoService.assertEntitlementAtStreamTime(
           accountId,
           lessonId,
+          sessionId,
         );
       if (!sessionValid || !stillAllowed) {
         await this.videoService.logSecurityEvent(

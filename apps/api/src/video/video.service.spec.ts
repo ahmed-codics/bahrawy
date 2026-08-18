@@ -4,6 +4,7 @@ import { createHmac } from 'crypto';
 import { db, VideoProvider } from '@bahrawy/db';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { CatalogService } from '../catalog/catalog.service';
+import { VideoAccessService } from '../video-access/video-access.grants.service';
 import { VideoService } from './video.service';
 
 jest.mock('@aws-sdk/s3-request-presigner', () => ({
@@ -78,6 +79,7 @@ describe('VideoService', () => {
       providers: [
         VideoService,
         { provide: CatalogService, useValue: mockCatalogService },
+        { provide: VideoAccessService, useValue: { findActiveGrant: jest.fn() } },
       ],
     }).compile();
     service = module.get<VideoService>(VideoService);
@@ -121,7 +123,6 @@ describe('VideoService', () => {
       expect(playback.url).toContain('expires=');
       expect(playback.url).toContain('account=acc-1');
       expect(playback.url).toContain('session=sess-1');
-      expect(playback.watermark).toMatch(/^B[A-Z0-9]{1,6}·[0-9A-F]{6}$/);
       expect(playback.expiresInSeconds).toBe(900);
       expect(db.videoDeliveryToken.create).toHaveBeenCalledWith(
         expect.objectContaining({
