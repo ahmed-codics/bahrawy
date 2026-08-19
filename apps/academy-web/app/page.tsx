@@ -15,7 +15,6 @@ import {
   NotebookPen,
   Play,
   RotateCcw,
-  Sparkles,
   Target,
   TrendingUp,
 } from 'lucide-react';
@@ -252,10 +251,6 @@ export default async function Home() {
         <section className="academy-hero">
           <div className="academy-container academy-hero-grid">
             <div className="academy-hero-copy">
-              <span className="academy-eyebrow">
-                <Sparkles aria-hidden="true" />
-                English على المنهج المصري
-              </span>
               <h1>
                 <span className="academy-hero-line">منصة</span>
                 <HeroBrandHalo>البحراوي</HeroBrandHalo>
