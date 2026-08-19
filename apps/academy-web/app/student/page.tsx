@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'motion/react';
 import {
   ArrowLeft,
   BookOpen,
@@ -17,10 +16,6 @@ import {
 } from 'lucide-react';
 import { Badge, Button, EmptyState, PageSkeleton, ProgressBar } from '@bahrawy/ui';
 import { MotivationBanner } from '../../components/MotivationBanner';
-import { BackgroundFX } from '../../components/dashboard/BackgroundFX';
-import { HeroHolograms } from '../../components/dashboard/HeroHolograms';
-import { MagneticButton } from '../../components/dashboard/MagneticButton';
-import { ProgressOrbit } from '../../components/dashboard/ProgressOrbit';
 import { API_BASE, fetchApi } from '../../lib/api';
 import { getGreetingByTime } from '../../lib/greeting';
 import { OfflineCodeActivation } from '../../components/OfflineCodeActivation';
@@ -106,57 +101,41 @@ export default function StudentDashboard() {
   if (loading) return <PageSkeleton cards={5} />;
 
   return (
-    <BackgroundFX>
-      <div className="relative z-10 space-y-8">
-        <section className="student-hero student-entrance glass-reflect px-4 py-6 sm:px-9 sm:py-10 lg:px-12">
-          <HeroHolograms />
-          <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-center">
-            <div>
-              <motion.h1
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              className="ba-heading mt-4 max-w-3xl text-3xl font-black leading-[1.2] text-brand-700 dark:text-brand-300 sm:mt-5 sm:text-5xl"
-            >
+    <div className="relative z-10 space-y-8">
+      <section className="student-hero px-4 py-6 sm:px-9 sm:py-10 lg:px-12">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-center">
+          <div>
+            <h1 className="ba-heading mt-4 max-w-3xl text-3xl font-black leading-[1.2] text-brand-700 dark:text-brand-300 sm:mt-5 sm:text-5xl">
               {greetingPrefix}
               <span className="academy-text-gradient">{firstName}</span>
               {greetingSuffix}
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.45, delay: 0.15, ease: 'easeOut' }}
-              className="mt-3 max-w-2xl text-sm font-medium leading-7 text-text-muted sm:mt-4 sm:text-base sm:leading-8"
-            >
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm font-medium leading-7 text-text-muted sm:mt-4 sm:text-base sm:leading-8">
               {greeting.subtitle}
-            </motion.p>
+            </p>
             <div className="mt-5 grid gap-2 sm:mt-7 sm:flex sm:flex-wrap sm:gap-3">
-              <MagneticButton>
-                <Button
-                  className="w-full sm:w-auto"
-                  variant="accent"
-                  leadingIcon={<Play className="size-4 fill-current" />}
-                  onClick={() =>
-                    router.push(
-                      activeCourse ? `/student/courses/${activeCourse.id}` : '/student/courses',
-                    )
-                  }
-                >
-                  {activeCourse ? 'كمّل مذاكرتك' : 'استكشف الكورسات'}
-                </Button>
-              </MagneticButton>
-              <MagneticButton>
-                <Button
-                  className="w-full sm:w-auto"
-                  variant="outline"
-                  onClick={() => router.push('/student/products')}
-                >
-                  شوف الباقات
-                </Button>
-              </MagneticButton>
+              <Button
+                className="w-full sm:w-auto"
+                variant="accent"
+                leadingIcon={<Play className="size-4 fill-current" />}
+                onClick={() =>
+                  router.push(
+                    activeCourse ? `/student/courses/${activeCourse.id}` : '/student/courses',
+                  )
+                }
+              >
+                {activeCourse ? 'كمّل مذاكرتك' : 'استكشف الكورسات'}
+              </Button>
+              <Button
+                className="w-full sm:w-auto"
+                variant="outline"
+                onClick={() => router.push('/student/products')}
+              >
+                شوف الباقات
+              </Button>
             </div>
           </div>
-          <div className="student-entrance-late glass-reflect rounded-[1.6rem] border border-border-default bg-surface/85 p-5 shadow-sm">
+          <div className="rounded-[1.6rem] border border-border-default bg-surface/85 p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-text-muted">تقدمك الكلي</p>
@@ -165,12 +144,11 @@ export default function StudentDashboard() {
               <div
                 className="relative flex size-20 items-center justify-center rounded-full"
                 style={{
-                  background: `conic-gradient(#38bdf8 ${overall * 3.6}deg, var(--orbit-track, rgba(9,35,63,.12)) 0)`,
+                  background: `conic-gradient(#38bdf8 ${overall * 3.6}deg, rgba(148, 163, 184, 0.35) 0)`,
                 }}
               >
-                <ProgressOrbit />
                 <div className="flex size-14 items-center justify-center rounded-full bg-surface-soft">
-                  <Target className="float-icon float-icon-b size-6 text-brand-600" />
+                  <Target className="size-6 text-brand-600" />
                 </div>
               </div>
             </div>
@@ -193,7 +171,7 @@ export default function StudentDashboard() {
       {data?.activeAssessments && data.activeAssessments.length > 0 && (
         <section className="rounded-[1.6rem] border border-warning/20 bg-warning/5 p-6 sm:p-8">
           <div className="mb-5 flex items-center gap-3">
-            <span className="float-icon float-icon-a flex size-10 items-center justify-center rounded-xl bg-warning/20 text-amber-800 dark:bg-warning/10 dark:text-amber-300">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-warning/20 text-amber-800 dark:bg-warning/10 dark:text-amber-300">
               <Clock3 className="size-5" />
             </span>
             <div>
@@ -209,7 +187,7 @@ export default function StudentDashboard() {
             {data.activeAssessments.map((attempt) => (
               <article
                 key={attempt.id}
-                className="living-card glass-reflect flex flex-col justify-between rounded-xl border border-warning/10 bg-surface p-5 shadow-sm"
+                className="flex flex-col justify-between rounded-xl border border-warning/10 bg-surface p-5 shadow-sm"
               >
                 <div>
                   <p className="text-sm font-black text-amber-700 dark:text-amber-400">تنبيه</p>
@@ -236,21 +214,18 @@ export default function StudentDashboard() {
           label="كورساتك"
           value={number.format(courses.length)}
           accent="cyan"
-          float="a"
         />
         <Metric
           icon={<CheckCircle2 className="size-5" />}
           label="دروس خلصتها"
           value={number.format(completed)}
           accent="green"
-          float="b"
         />
         <Metric
           icon={<Clock3 className="size-5" />}
           label="الخطوة الجاية"
           value={activeCourse ? 'كمّل' : 'ابدأ'}
           accent="amber"
-          float="c"
         />
       </section>
 
@@ -305,13 +280,13 @@ export default function StudentDashboard() {
             </div>
           )}
         </div>
-        <aside className="student-panel living-card glass-reflect p-5 sm:p-6">
+        <aside className="student-panel p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-black text-brand-700 dark:text-brand-300">آخر التحديثات</p>
               <h2 className="ba-heading mt-1 text-2xl">مهم ليك</h2>
             </div>
-            <span className="float-icon float-icon-c flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
               <Sparkles className="size-5" />
             </span>
           </div>
@@ -339,7 +314,6 @@ export default function StudentDashboard() {
         </aside>
       </section>
     </div>
-    </BackgroundFX>
   );
 }
 
@@ -348,13 +322,11 @@ function Metric({
   label,
   value,
   accent,
-  float = 'a',
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   accent: 'cyan' | 'green' | 'amber';
-  float?: 'a' | 'b' | 'c';
 }) {
   const color =
     accent === 'green'
@@ -363,10 +335,8 @@ function Metric({
         ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300'
         : 'bg-brand-100 text-brand-700 dark:bg-brand-950/35 dark:text-brand-200';
   return (
-    <div className="student-panel living-card glass-reflect flex min-h-28 items-center gap-4 p-5">
-      <span
-        className={`float-icon float-icon-${float} flex size-11 items-center justify-center rounded-xl ${color}`}
-      >
+    <div className="student-panel flex min-h-28 items-center gap-4 p-5">
+      <span className={`flex size-11 items-center justify-center rounded-xl ${color}`}>
         {icon}
       </span>
       <div>
@@ -380,7 +350,7 @@ function Metric({
 function ContinueCard({ course, onOpen }: { course: Course; onOpen: () => void }) {
   const progress = Math.round(course.progressPercentage || 0);
   return (
-    <article className="student-course-card living-card glass-reflect grid overflow-hidden md:min-h-72 md:grid-cols-[minmax(16rem,40%)_1fr]">
+    <article className="student-course-card grid overflow-hidden md:min-h-72 md:grid-cols-[minmax(16rem,40%)_1fr]">
       <div className="student-cover student-continue-cover relative aspect-video w-full overflow-hidden md:aspect-auto md:min-h-72">
         {course.coverImageUrl ? (
           <Image
@@ -407,15 +377,13 @@ function ContinueCard({ course, onOpen }: { course: Course; onOpen: () => void }
           {number.format(course.totalLessons || 0)} درس
         </p>
         <ProgressBar className="mt-4" value={progress} />
-        <MagneticButton className="mt-6 block">
-          <Button
-            className="w-full sm:w-fit"
-            trailingIcon={<ArrowLeft className="size-4" />}
-            onClick={onOpen}
-          >
-            افتح الكورس
-          </Button>
-        </MagneticButton>
+        <Button
+          className="mt-6 w-full sm:w-fit"
+          trailingIcon={<ArrowLeft className="size-4" />}
+          onClick={onOpen}
+        >
+          افتح الكورس
+        </Button>
       </div>
     </article>
   );
@@ -451,7 +419,7 @@ function OrderCard({ order, onReload }: { order: PaymentOrder; onReload?: () => 
   };
 
   return (
-    <article className="living-card glass-reflect flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border-default bg-surface p-4 shadow-sm hover:shadow-md transition-shadow">
+    <article className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border-default bg-surface p-4 shadow-sm hover:shadow-md transition-shadow">
       <div>
         <p className="text-sm font-bold text-text">{order.product?.titleAr || 'عنصر غير معروف'}</p>
         <p className="mt-1 text-xs text-text-muted">

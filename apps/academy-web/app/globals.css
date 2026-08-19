@@ -1530,8 +1530,6 @@
     radial-gradient(circle at 0% 50%, rgb(56 189 248 / 10%), transparent 12rem),
     linear-gradient(135deg, rgb(255 255 255 / 78%), rgb(239 246 255 / 52%));
   box-shadow: 0 10px 30px rgb(9 35 63 / 6%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   transition:
     transform 200ms ease,
     border-color 200ms ease,
@@ -1554,15 +1552,10 @@
   place-items: center;
   border-radius: 0.9rem;
   background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 25%, #3b82f6 45%, #38bdf8 70%, #7dd3fc 100%);
-  background-size: 200% 200%;
   color: #ffffff;
   box-shadow:
     0 8px 20px rgb(37 99 235 / 30%),
     inset 0 1px 0 rgb(255 255 255 / 45%);
-  animation:
-    motivation-pulse 2.6s ease-in-out infinite,
-    gradient-flow 11s ease-in-out infinite;
-  will-change: transform;
 }
 
 .motivation-icon svg {
@@ -1571,17 +1564,6 @@
 
 .motivation-card:hover .motivation-icon svg {
   transform: rotate(-12deg) scale(1.08);
-}
-
-@keyframes motivation-pulse {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  50% {
-    transform: translateY(-2px) scale(1.05);
-  }
 }
 
 .dark .motivation-card {
@@ -1863,6 +1845,15 @@
     padding: 1rem max(1rem, calc((100% - 74rem) / 2));
     font-size: 0.78rem;
     text-align: center;
+  }
+
+  .academy-public-footer-bottom a {
+    color: var(--academy-cyan-strong);
+    font-weight: 700;
+  }
+
+  .academy-public-footer-bottom a:hover {
+    text-decoration: underline;
   }
 
   .academy-footer-social-col {
@@ -5127,269 +5118,7 @@ textarea {
 
 /* ═══════════ Student Dashboard Atmosphere ═══════════ */
 
-/* 1 · Mouse Light — soft radial spotlight that follows the cursor */
-.mouse-light {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  z-index: 60;
-  width: 680px;
-  height: 680px;
-  margin: -340px 0 0 -340px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgb(56 189 248 / 0.16) 0%,
-    rgb(125 211 252 / 0.1) 42%,
-    transparent 70%
-  );
-  filter: blur(50px);
-  mix-blend-mode: screen;
-  opacity: 0;
-  pointer-events: none;
-  will-change: transform;
-  transition: opacity 600ms ease;
-}
-
-/* 2 + 3 · Holographic education space — 4 parallax depth layers */
-.holo-field {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.holo-layer {
-  position: absolute;
-  inset: 0;
-  will-change: transform;
-}
-
-.holo-object {
-  position: absolute;
-  color: #3b82f6;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0;
-  opacity: 0.045;
-  filter: blur(1px);
-  text-shadow: 0 0 26px rgb(56 189 248 / 0.4);
-  user-select: none;
-  rotate: var(--holo-rot, 0deg);
-  will-change: transform;
-  animation: holo-float 12s ease-in-out infinite alternate;
-}
-
-.dark .holo-object {
-  color: #7dd3fc;
-}
-
-@keyframes holo-float {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(0, -16px, 0);
-  }
-}
-
-/* 11 · Ambient breathing glow around the dashboard */
-.ambient-field {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(42rem at 16% -4%, rgb(56 189 248 / 0.07), transparent 60%),
-    radial-gradient(36rem at 86% 14%, rgb(37 99 235 / 0.06), transparent 62%),
-    radial-gradient(40rem at 55% 108%, rgb(56 189 248 / 0.05), transparent 60%);
-  animation: ambient-breathe 9s ease-in-out infinite;
-}
-
-@keyframes ambient-breathe {
-  0%,
-  100% {
-    opacity: 0.94;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* 4 + 12 · Living dashboard cards — tilt, lift, cursor glow, spring return */
-.living-card {
-  position: relative;
-  transform-style: preserve-3d;
-  will-change: transform;
-  transition:
-    box-shadow 400ms ease,
-    border-color 300ms ease;
-}
-
-.living-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: inherit;
-  background: radial-gradient(
-    260px at var(--mx, 50%) var(--my, 50%),
-    rgb(56 189 248 / 0.14),
-    transparent 70%
-  );
-  opacity: 0;
-  transition: opacity 300ms ease;
-  pointer-events: none;
-}
-
-.living-card:hover::before {
-  opacity: 1;
-}
-
-.living-card:hover {
-  box-shadow:
-    0 18px 50px rgb(9 35 63 / 0.12),
-    0 0 34px rgb(56 189 248 / 0.16);
-}
-
-/* 5 · Glass reflection — slow light traveling across the surface */
-.glass-reflect::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border-radius: inherit;
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    rgb(255 255 255 / 0.09) 30%,
-    rgb(255 255 255 / 0.04) 46%,
-    transparent 58%
-  );
-  transform: translateX(-130%) skewX(-12deg);
-  animation: glass-sweep 5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.dark .glass-reflect::after {
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    rgb(148 197 255 / 0.1) 30%,
-    rgb(148 197 255 / 0.05) 46%,
-    transparent 58%
-  );
-}
-
-@keyframes glass-sweep {
-  0% {
-    transform: translateX(-130%) skewX(-12deg);
-  }
-  55%,
-  100% {
-    transform: translateX(130%) skewX(-12deg);
-  }
-}
-
-/* 6 · Hero holographic symbols behind the greeting */
-.hero-holograms {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.hero-hologram {
-  position: absolute;
-  color: #3b82f6;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  opacity: 0.03;
-  filter: blur(2px);
-  text-shadow: 0 0 44px rgb(56 189 248 / 0.35);
-  user-select: none;
-  rotate: var(--holo-rot, 0deg);
-  will-change: transform;
-  animation: hero-float 20s ease-in-out infinite alternate;
-}
-
-.dark .hero-hologram {
-  color: #7dd3fc;
-}
-
-@keyframes hero-float {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(0, -22px, 0);
-  }
-}
-
-/* 7 · Orbiting particles around the progress ring + soft burst */
-.progress-orbit {
-  position: absolute;
-  inset: -0.85rem;
-  pointer-events: none;
-}
-
-.po-layer {
-  position: absolute;
-  inset: 0;
-  animation: orbit-spin 10s linear infinite;
-  will-change: transform;
-}
-
-.po-layer.po-b {
-  animation-duration: 15s;
-  animation-direction: reverse;
-}
-
-.po-dot {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px 0 0 -2.5px;
-  border-radius: 999px;
-  background: #38bdf8;
-  box-shadow: 0 0 10px 2px rgb(56 189 248 / 0.5);
-}
-
-.po-dot-sm {
-  width: 4px;
-  height: 4px;
-  margin: -2px 0 0 -2px;
-  background: #7dd3fc;
-  box-shadow: 0 0 8px 1px rgb(125 211 252 / 0.45);
-}
-
-@keyframes orbit-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.progress-orbit.burst {
-  animation: orbit-burst 700ms cubic-bezier(0.16, 1, 0.3, 1) 1;
-}
-
-@keyframes orbit-burst {
-  from {
-    transform: scale(0.5);
-    opacity: 0.7;
-  }
-  to {
-    transform: scale(1.15);
-    opacity: 0;
-  }
-}
-
-/* 8 · Slow gradient flow on every brand-blue gradient */
+/* Slow gradient flow on every brand-blue gradient (shared with the student topbar) */
 @keyframes gradient-flow {
   0%,
   100% {
@@ -5400,82 +5129,10 @@ textarea {
   }
 }
 
-/* 10 · Floating status icons */
-.float-icon {
-  animation: float-icon 4.5s ease-in-out infinite;
-  will-change: transform;
-}
-
-.float-icon-a {
-  animation-duration: 5.2s;
-}
-
-.float-icon-b {
-  animation-duration: 3.8s;
-  animation-delay: -1.2s;
-}
-
-.float-icon-c {
-  animation-duration: 6.1s;
-  animation-delay: -2.4s;
-}
-
-@keyframes float-icon {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
-}
-
-/* 9 · Magnetic primary buttons */
-.magnetic-btn {
-  position: relative;
-  display: inline-flex;
-  will-change: transform;
-}
-
-.magnetic-btn::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  z-index: -1;
-  border-radius: var(--radius-md);
-  background: radial-gradient(90px at var(--mx, 50%) var(--my, 50%), rgb(56 189 248 / 0.3), transparent 72%);
-  opacity: 0;
-  transition: opacity 250ms ease;
-  pointer-events: none;
-}
-
-.magnetic-btn.is-near {
-  box-shadow: 0 14px 30px rgb(37 99 235 / 0.26);
-}
-
-.magnetic-btn.is-near::after {
-  opacity: 1;
-}
-
-/* Reduced motion — disable the atmosphere gracefully */
+/* Reduced motion — disable remaining continuous animations */
 @media (prefers-reduced-motion: reduce) {
-  .mouse-light,
-  .holo-layer,
-  .holo-object,
-  .ambient-field,
-  .hero-holograms,
-  .hero-hologram,
-  .glass-reflect::after,
-  .float-icon,
-  .progress-orbit,
-  .po-layer,
-  .gradient-flow {
+  .student-topbar .student-nav-active {
     animation: none !important;
-  }
-
-  .living-card,
-  .magnetic-btn {
-    transition: none !important;
   }
 }
 
@@ -6024,42 +5681,6 @@ textarea {
   box-shadow:
     0 16px 38px rgb(0 0 0 / 0.4),
     0 0 28px rgb(56 189 248 / 0.22);
-}
-
-.dark .mouse-light {
-  background: radial-gradient(
-    circle,
-    rgb(56 189 248 / 0.16) 0%,
-    rgb(125 211 252 / 0.1) 42%,
-    transparent 70%
-  );
-}
-
-.dark .living-card:hover {
-  box-shadow:
-    0 18px 50px rgb(0 0 0 / 0.45),
-    0 0 34px rgb(56 189 248 / 0.24);
-}
-
-.dark .holo-object,
-.dark .hero-hologram {
-  color: #7dd3fc;
-  text-shadow: 0 0 30px rgb(56 189 248 / 0.55);
-}
-
-.dark .ambient-field {
-  background:
-    radial-gradient(42rem at 16% -4%, rgb(56 189 248 / 0.09), transparent 60%),
-    radial-gradient(36rem at 86% 14%, rgb(37 99 235 / 0.08), transparent 62%),
-    radial-gradient(40rem at 55% 108%, rgb(56 189 248 / 0.07), transparent 60%);
-}
-
-.dark .magnetic-btn.is-near {
-  box-shadow: 0 14px 30px rgb(37 99 235 / 0.34);
-}
-
-.dark .student-entrance-late {
-  --orbit-track: rgb(56 189 248 / 16%);
 }
 
 .dark .academy-section-heading h2,

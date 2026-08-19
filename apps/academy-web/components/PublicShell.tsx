@@ -253,7 +253,14 @@ export function PublicShell({
           <FollowUs />
         </div>
         <div className="academy-public-footer-bottom">
-          © {new Date().getFullYear()} أكاديمية السيد البحراوي. جميع الحقوق محفوظة.
+          جميع الحقوق محفوظه © {new Date().getFullYear()} | Powered By:{' '}
+          <a
+            href="https://api.whatsapp.com/send/?phone=201069789256"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            A&B Engineering
+          </a>
         </div>
       </footer>
 

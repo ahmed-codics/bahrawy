@@ -22,9 +22,9 @@ export function MotivationBanner() {
     <motion.section
       role="status"
       aria-label="رسالة تحفيزية"
-      initial={{ opacity: 0, y: 10 }}
-      animate={message ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-      transition={{ duration: 0.5, ease: 'easeOut' }}
+      initial={{ opacity: 0 }}
+      animate={message ? { opacity: 1 } : { opacity: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className="motivation-card group"
     >
       <div className="flex items-center gap-4 p-4 sm:gap-5 sm:p-5">
