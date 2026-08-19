@@ -9,7 +9,7 @@ import { API_BASE } from '../../lib/api';
 
 export const metadata: Metadata = {
   title: 'كورسات English حسب مرحلتك',
-  description: 'اختار مرحلتك وشوف كورسات وباقات أكاديمية السيد البحراوي المتاحة.',
+  description: 'اختار مرحلتك وشوف الكورسات والباقات المتاحة في منصة البحراوي - El-bahrawy English.',
 };
 
 type Grade = {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { type ReactNode, useState } from 'react';
+import React, { type ReactNode, useEffect, useState } from 'react';
 import {
   BookPlus,
   KeyRound,
@@ -69,12 +69,15 @@ function NavButton({
   item,
   onNavigate,
   compact = false,
+  variant = 'default',
 }: {
   item: NavigationItem;
   onNavigate?: (href: string) => void;
   compact?: boolean;
+  variant?: 'default' | 'vivid';
 }) {
   const reduceMotion = useReducedMotion();
+  const vivid = variant === 'vivid';
 
   return (
     <button
@@ -82,21 +85,30 @@ function NavButton({
       onClick={() => onNavigate?.(item.href)}
       aria-current={item.isActive ? 'page' : undefined}
       className={cn(
-        'ba-focus group relative flex h-10 w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-start text-sm font-medium transition-[background-color,color] duration-[var(--duration-fast)]',
-        item.isActive
-          ? 'font-semibold text-brand-600 dark:text-brand-200'
-          : 'text-ink-2 hover:bg-surface-3 hover:text-ink',
+        'ba-focus group relative flex h-11 w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 text-start text-sm transition-[background-color,color,box-shadow] duration-[var(--duration-fast)] touch-manipulation',
+        vivid
+          ? item.isActive
+            ? 'font-bold text-white shadow-[0_8px_18px_rgb(37_99_235/0.4)] bg-gradient-to-l from-brand-600 to-brand-500'
+            : 'font-medium text-brand-800 bg-brand-50/90 hover:bg-brand-100 hover:text-brand-900'
+          : item.isActive
+            ? 'font-semibold text-brand-600 dark:text-brand-200'
+            : 'text-ink-2 hover:bg-surface-3 hover:text-ink',
         compact && 'justify-center px-2',
       )}
     >
-      {item.isActive && !reduceMotion && (
+      {item.isActive && !reduceMotion && !vivid && (
         <m.span
           layoutId="active-nav"
           className="absolute inset-0 rounded-[var(--radius-md)] bg-brand-50 dark:bg-brand-950/45"
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         />
       )}
-      <span className="relative z-10 flex size-[18px] shrink-0 items-center justify-center">
+      <span
+        className={cn(
+          'relative z-10 flex size-[18px] shrink-0 items-center justify-center',
+          vivid && !item.isActive && '[&>svg]:text-brand-600',
+        )}
+      >
         {item.icon}
       </span>
       {!compact && <span className="relative z-10 flex-1 truncate">{item.label}</span>}
@@ -115,18 +127,27 @@ export function LearnerShell({
   navigation,
   onNavigate,
   onLogout,
-  focusedMode = false,
 }: BaseShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const primaryBottomHrefs = [
-    '/student',
-    '/student/courses',
-    '/student/products',
-    '/student/profile',
-  ];
-  const bottomItems = primaryBottomHrefs
-    .map((href) => navigation.find((item) => item.href === href))
-    .filter((item): item is NavigationItem => Boolean(item));
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+      previousFocus?.focus();
+    };
+  }, [menuOpen]);
 
   return (
     <div className="student-app min-h-dvh bg-canvas text-ink" dir="rtl">
@@ -137,166 +158,170 @@ export function LearnerShell({
         تخطي إلى المحتوى
       </a>
 
-      <header className="student-topbar sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-xl">
-        <div className="ba-page flex h-16 items-center justify-between gap-4 px-5 lg:h-20 lg:px-8">
-          <BrandMark className="max-w-[13rem] sm:max-w-none" />
-          <nav aria-label="التنقل الرئيسي" className="hidden items-center gap-1 lg:flex">
-            {navigation.map((item) => (
-              <button
-                key={item.href}
-                type="button"
-                onClick={() => onNavigate?.(item.href)}
-                aria-current={item.isActive ? 'page' : undefined}
-                className={cn(
-                  'ba-focus inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-bold transition-colors',
-                  item.isActive
-                    ? 'student-nav-active text-white'
-                    : 'text-ink-2 hover:bg-surface-3 hover:text-ink',
-                )}
-              >
-                <span className="flex size-4 items-center justify-center">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-2 border-l border-border pl-3 lg:flex">
-              <ThemeSelector />
-              <DataSaverToggle />
-              <button
-                type="button"
-                onClick={() => onNavigate?.('/student/profile')}
-                className="ba-focus flex items-center gap-2 rounded-xl px-2 py-1.5 text-start hover:bg-surface-3"
-              >
-                <Avatar user={user} size="sm" />
-                <span className="max-w-32 truncate text-sm font-bold">
-                  {user?.name || 'طالب البحراوي'}
-                </span>
-              </button>
-              <Button variant="ghost" size="icon" aria-label="تسجيل الخروج" onClick={onLogout}>
-                <LogOut className="size-4 text-danger" />
-              </Button>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMenuOpen(true)}
-              aria-label="فتح القائمة"
-            >
-              <Menu className="size-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <div
+        aria-hidden="true"
+        className="menu-hint-arrow pointer-events-none fixed left-[34px] top-[calc(50%-1.9rem)] z-[80] -translate-x-1/2 -translate-y-full text-brand-600 dark:text-brand-400"
+        style={{
+          opacity: reduceMotion ? 0.4 : 0.35,
+          ...(reduceMotion
+            ? {}
+            : { animation: 'menu-hint-pulse 2.4s ease-in-out 3 forwards' }),
+        }}
+      >
+        <style>{`
+          @keyframes menu-hint-pulse {
+            0%, 100% { opacity: 0.35; transform: none; }
+            50% { opacity: 0.5; transform: translateY(-3px); }
+          }
+        `}</style>
+        <svg
+          width="28"
+          height="36"
+          viewBox="0 0 28 36"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M14 3 C 21 3, 26 8, 22 13 C 18 18, 11 15, 10 10.5 C 9.3 7.4, 12 5.6, 14.5 7.4 L 14.5 26"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d="M14.5 33 L 10.5 27 L 18.5 27 Z"
+            fill="currentColor"
+            stroke="none"
+          />
+        </svg>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setMenuOpen((open) => !open)}
+        aria-label="فتح القائمة"
+        aria-expanded={menuOpen}
+        className="ba-focus fixed left-3 top-1/2 z-[80] flex size-11 -translate-y-1/2 flex-col items-center justify-center gap-[5px] rounded-full border border-brand-400 bg-gradient-to-b from-brand-600 to-brand-700 text-white shadow-[0_8px_20px_rgb(37_99_235/0.45)] transition-all touch-manipulation hover:from-brand-500 hover:to-brand-600 hover:shadow-[0_10px_24px_rgb(37_99_235/0.55)]"
+      >
+        <span className="h-[2px] w-5 rounded-full bg-current" />
+        <span className="h-[2px] w-5 rounded-full bg-current" />
+        <span className="h-[2px] w-5 rounded-full bg-current" />
+      </button>
 
       <main
         id="main-content"
         className={cn(
-          'student-main min-h-[calc(100dvh-4rem)] w-full min-w-0 px-[var(--mobile-gutter)] pt-4 sm:px-5 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-9',
-          focusedMode
-            ? 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
-            : 'pb-[calc(var(--bottom-nav-height)+1.5rem+env(safe-area-inset-bottom))]',
+          'student-main min-h-dvh w-full min-w-0 px-[var(--mobile-gutter)] pt-4 sm:px-5 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-9',
+          'pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
         )}
       >
         {children}
       </main>
 
-      {!focusedMode && (
-        <nav
-          aria-label="التنقل الرئيسي للهاتف"
-          className="student-bottom-nav fixed inset-x-0 bottom-0 z-30 flex h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] items-start justify-around border-t border-border bg-surface/97 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgb(2_22_34/0.08)] backdrop-blur-xl lg:hidden"
-        >
-        {bottomItems.map((item) => (
-          <button
-            key={item.href}
-            type="button"
-            onClick={() => onNavigate?.(item.href)}
-            aria-current={item.isActive ? 'page' : undefined}
-            className={cn(
-              'ba-focus relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[0.68rem] font-bold transition-colors',
-              item.isActive ? 'text-brand-600 dark:text-brand-400' : 'text-ink-2 dark:text-ink-3',
-            )}
-          >
-            {item.isActive && <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-brand-500" />}
-            <span className="flex size-5 items-center justify-center">{item.icon}</span>
-            <span className="max-w-full truncate">{item.label}</span>
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          className="ba-focus flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[0.68rem] font-bold text-ink-2 dark:text-ink-3"
-          aria-label="فتح المزيد"
-        >
-          <span className="flex size-5 items-center justify-center">
-            <Menu className="size-5" />
-          </span>
-          <span>المزيد</span>
-        </button>
-        </nav>
-      )}
+      <AnimatePresence>
+        {menuOpen && (
+          <LazyMotion features={domAnimation}>
+            <m.div
+              className="fixed inset-0 z-[70]"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+            >
+              <button
+                type="button"
+                className="absolute inset-0 size-full bg-black/55"
+                aria-label="إغلاق القائمة"
+                onClick={() => setMenuOpen(false)}
+              />
+              <m.aside
+                role="dialog"
+                aria-modal="true"
+                aria-label="قائمة التنقل"
+                className="absolute inset-y-0 right-0 flex max-w-[85vw] flex-col border-l border-border bg-surface shadow-[var(--shadow-xl)] overscroll-contain pt-[max(env(safe-area-inset-top),0px)] pb-[env(safe-area-inset-bottom)]"
+                style={{ width: 'min(85vw, 19rem)' }}
+                initial={reduceMotion ? false : { x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4">
+                  <BrandMark className="max-w-[11rem]" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setMenuOpen(false)}
+                    aria-label="إغلاق القائمة"
+                  >
+                    <X className="size-5" />
+                  </Button>
+                </div>
 
-      <MobileSheet
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        title="المزيد"
-        description="حسابك وإعدادات الأكاديمية"
-      >
-        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-surface-2 p-4">
-          <Avatar user={user} />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black">{user?.name || 'طالب البحراوي'}</p>
-            <p className="text-xs text-ink-3">{user?.role || 'طالب'}</p>
-          </div>
-        </div>
-        <nav className="space-y-1" aria-label="روابط الحساب">
-          {navigation.map((item) => (
-            <NavButton
-              key={item.href}
-              item={item}
-              onNavigate={(href) => {
-                setMenuOpen(false);
-                onNavigate?.(href);
-              }}
-            />
-          ))}
-        </nav>
-        <div className="my-4 h-px bg-border" />
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
-            <span className="flex items-center gap-2 text-sm font-bold">
-              <Palette className="size-4 text-brand-600" /> المظهر
-            </span>
-            <ThemeSelector />
-          </div>
-          <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
-            <span className="flex items-center gap-2 text-sm font-bold">
-              <Settings2 className="size-4 text-brand-600" /> التوفير
-            </span>
-            <DataSaverToggle />
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          className="mt-3 w-full justify-start"
-          leadingIcon={<KeyRound className="size-4" />}
-          onClick={() => {
-            setMenuOpen(false);
-            onNavigate?.('/change-password');
-          }}
-        >
-          تغيير كلمة المرور
-        </Button>
-        <Button
-          variant="ghost"
-          className="mt-1 w-full justify-start text-danger"
-          leadingIcon={<LogOut className="size-4" />}
-          onClick={onLogout}
-        >
-          تسجيل الخروج
-        </Button>
-      </MobileSheet>
+                <div className="mx-4 mt-4 flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
+                  <Avatar user={user} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black">{user?.name || 'طالب البحراوي'}</p>
+                    <p className="text-xs text-ink-3">{user?.role || 'طالب'}</p>
+                  </div>
+                </div>
+
+                <nav
+                  className="mt-4 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-2"
+                  aria-label="التنقل الرئيسي"
+                >
+                  {navigation.map((item) => (
+                    <NavButton
+                      key={item.href}
+                      item={item}
+                      variant="vivid"
+                      onNavigate={(href) => {
+                        setMenuOpen(false);
+                        onNavigate?.(href);
+                      }}
+                    />
+                  ))}
+                </nav>
+
+                <div className="border-t border-border p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
+                      <span className="flex items-center gap-2 text-sm font-bold">
+                        <Palette className="size-4 text-brand-600" /> المظهر
+                      </span>
+                      <ThemeSelector />
+                    </div>
+                    <div className="flex min-h-14 items-center justify-between rounded-xl border border-border bg-surface-2 px-3">
+                      <span className="flex items-center gap-2 text-sm font-bold">
+                        <Settings2 className="size-4 text-brand-600" /> التوفير
+                      </span>
+                      <DataSaverToggle />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="mt-3 w-full justify-start"
+                    leadingIcon={<KeyRound className="size-4" />}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onNavigate?.('/change-password');
+                    }}
+                  >
+                    تغيير كلمة المرور
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="mt-1 w-full justify-start text-danger"
+                    leadingIcon={<LogOut className="size-4" />}
+                    onClick={onLogout}
+                  >
+                    تسجيل الخروج
+                  </Button>
+                </div>
+              </m.aside>
+            </m.div>
+          </LazyMotion>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

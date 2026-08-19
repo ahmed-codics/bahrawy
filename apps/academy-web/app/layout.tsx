@@ -22,8 +22,8 @@ const marhey = Marhey({
 export const metadata: Metadata = {
   metadataBase: new URL('https://el-bahrawy.com'),
   title: {
-    default: 'Bahrawy English',
-    template: 'Bahrawy English',
+    default: 'منصة البحراوي - El-bahrawy English',
+    template: '%s | منصة البحراوي - El-bahrawy English',
   },
   description:
     'منصة مستر السيد البحراوي لتعلّم اللغة الإنجليزية لطلاب الثانوية والإعدادية في مصر، مع شروحات واختبارات ومتابعة للتقدم.',
@@ -35,10 +35,10 @@ export const metadata: Metadata = {
     'امتحانات انجليزي أونلاين',
   ],
   authors: [{ name: 'مستر السيد البحراوي', url: 'https://el-bahrawy.com' }],
-  creator: 'أكاديمية مستر السيد البحراوي',
-  publisher: 'أكاديمية مستر السيد البحراوي',
+  creator: 'منصة البحراوي - El-bahrawy English',
+  publisher: 'منصة البحراوي - El-bahrawy English',
   manifest: '/manifest.webmanifest',
-  applicationName: 'أكاديمية السيد البحراوي',
+  applicationName: 'منصة البحراوي - El-bahrawy English',
   icons: {
     icon: [
       { url: '/icon.png', type: 'image/png', sizes: '512x512' },
@@ -63,18 +63,18 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'ar_EG',
     url: 'https://el-bahrawy.com',
-    siteName: 'أكاديمية مستر السيد البحراوي',
-    title: 'أكاديمية مستر السيد البحراوي | اللغة الإنجليزية',
+    siteName: 'منصة البحراوي - El-bahrawy English',
+    title: 'منصة البحراوي - El-bahrawy English',
     description: 'شرح وتدريب واختبارات لغة إنجليزية لطلاب الثانوية والإعدادية.',
   },
   twitter: {
     card: 'summary',
-    title: 'أكاديمية مستر السيد البحراوي',
+    title: 'منصة البحراوي - El-bahrawy English',
     description: 'شرح وتدريب واختبارات لغة إنجليزية لطلاب الثانوية والإعدادية.',
   },
   appleWebApp: {
     capable: true,
-    title: 'أكاديمية البحراوي',
+    title: 'منصة البحراوي - El-bahrawy English',
     statusBarStyle: 'black-translucent',
   },
 };
@@ -101,7 +101,7 @@ export default function RootLayout({
       {
         '@type': 'EducationalOrganization',
         '@id': 'https://el-bahrawy.com/#organization',
-        name: 'أكاديمية مستر السيد البحراوي',
+        name: 'منصة البحراوي - El-bahrawy English',
         url: 'https://el-bahrawy.com',
         logo: 'https://el-bahrawy.com/icon.png',
         description: 'منصة تعليمية متخصصة في تدريس اللغة الإنجليزية لطلاب مصر.',
@@ -110,7 +110,7 @@ export default function RootLayout({
         '@type': 'WebSite',
         '@id': 'https://el-bahrawy.com/#website',
         url: 'https://el-bahrawy.com',
-        name: 'أكاديمية مستر السيد البحراوي',
+        name: 'منصة البحراوي - El-bahrawy English',
         publisher: { '@id': 'https://el-bahrawy.com/#organization' },
         inLanguage: 'ar-EG',
       },

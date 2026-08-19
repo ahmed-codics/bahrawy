@@ -21,11 +21,11 @@ const marhey = Marhey({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Bahrawy Academy Admin',
-    template: '%s | Bahrawy Academy Admin',
+    default: 'منصة البحراوي - El-bahrawy English',
+    template: '%s | منصة البحراوي - El-bahrawy English',
   },
   description:
-    'Staff portal for managing Bahrawy Academy content, students, and payments.',
+    'لوحة إدارة منصة البحراوي - El-bahrawy English لإدارة المحتوى والطلاب والمدفوعات.',
 };
 
 export default async function RootLayout({

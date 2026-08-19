@@ -28,9 +28,35 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'Bahrawy English',
   description:
     'شرح ومراجعة وتدريب على منهج اللغة الإنجليزية المصري للصف الثالث الإعدادي والصفوف الأول والثاني والثالث الثانوي.',
+  alternates: { canonical: 'https://el-bahrawy.com' },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'ar_EG',
+    url: 'https://el-bahrawy.com',
+    siteName: 'منصة البحراوي - El-bahrawy English',
+    title: 'منصة البحراوي - El-bahrawy English',
+    description:
+      'شرح ومراجعة وتدريب على منهج اللغة الإنجليزية المصري للصف الثالث الإعدادي والصفوف الأول والثاني والثالث الثانوي.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'منصة البحراوي - El-bahrawy English',
+    description:
+      'شرح ومراجعة وتدريب على منهج اللغة الإنجليزية المصري للصف الثالث الإعدادي والصفوف الأول والثاني والثالث الثانوي.',
+  },
 };
 
 export type LandingGradeSummary = {
