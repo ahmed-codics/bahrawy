@@ -22,12 +22,26 @@ export type ProviderVideoPlayerProps = {
   onExitFocus?: () => void;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
+  /** Fired whenever the underlying player's play/pause state changes. */
+  onPlayingChange?: () => void;
+  /** External control handle. When provided, it replaces the internal one so
+   *  a parent (e.g. ProtectedVideoPlayer) can drive play/pause. */
+  controlRef?: React.MutableRefObject<VideoControlHandle | null>;
+  /** Called once the underlying player is ready to accept commands. */
+  onReady?: () => void;
+  /** Called when the underlying player reports a playback error. */
+  onError?: () => void;
 };
 
 export type VideoControlHandle = {
   play: () => void;
   pause: () => void;
   getPlaying: () => boolean;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  seekTo: (seconds: number) => void;
+  getPlaybackRate: () => number;
+  setPlaybackRate: (rate: number) => void;
 };
 
 export function ProviderVideoPlayer({
@@ -38,8 +52,13 @@ export function ProviderVideoPlayer({
   onExitFocus,
   onEnded,
   onProgress,
+  onPlayingChange,
+  controlRef: controlRefProp,
+  onReady,
+  onError,
 }: ProviderVideoPlayerProps) {
-  const controlRef = useRef<VideoControlHandle | null>(null);
+  const internalRef = useRef<VideoControlHandle | null>(null);
+  const controlRef = controlRefProp ?? internalRef;
   const [isPlaying, setIsPlaying] = useState(false);
 
   const syncPlaying = useCallback(() => {
@@ -67,7 +86,9 @@ export function ProviderVideoPlayer({
           initialTime={initialTime}
           controlRef={controlRef}
           blockNativeControls={focusMode && playback.provider === 'YOUTUBE'}
-          onPlayingChange={syncPlaying}
+          onReady={onReady}
+          onError={onError}
+          onPlayingChange={onPlayingChange}
           onEnded={onEnded}
           onProgress={onProgress}
         />
@@ -115,6 +136,8 @@ type YouTubePlayerProps = {
   initialTime: number;
   controlRef: React.MutableRefObject<VideoControlHandle | null>;
   blockNativeControls?: boolean;
+  onReady?: () => void;
+  onError?: () => void;
   onPlayingChange?: () => void;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
@@ -128,6 +151,8 @@ type YouTubePlayerInstance = {
   pauseVideo: () => void;
   playVideo: () => void;
   getPlayerState: () => number;
+  getPlaybackRate: () => number;
+  setPlaybackRate: (rate: number) => void;
 };
 
 type YouTubeNamespace = {
@@ -142,6 +167,8 @@ type YouTubeNamespace = {
       events: {
         onReady: () => void;
         onStateChange: (event: { data: number }) => void;
+        onPlaybackRateChange?: (event: { data: number }) => void;
+        onError?: (event: { data: number }) => void;
       };
     },
   ) => YouTubePlayerInstance;
@@ -195,6 +222,8 @@ function YouTubePlayer({
   initialTime,
   controlRef,
   blockNativeControls = false,
+  onReady,
+  onError,
   onPlayingChange,
   onEnded,
   onProgress,
@@ -206,6 +235,8 @@ function YouTubePlayer({
   const onEndedRef = useRef(onEnded);
   const onProgressRef = useRef(onProgress);
   const onPlayingChangeRef = useRef(onPlayingChange);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   const [iframeOffsets, setIframeOffsets] = useState<{
     top: number;
     bottom: number;
@@ -217,7 +248,9 @@ function YouTubePlayer({
     onEndedRef.current = onEnded;
     onProgressRef.current = onProgress;
     onPlayingChangeRef.current = onPlayingChange;
-  }, [onEnded, onProgress, onPlayingChange]);
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+  }, [onEnded, onProgress, onPlayingChange, onReady, onError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -260,6 +293,13 @@ function YouTubePlayer({
               pause: () => playerRef.current?.pauseVideo(),
               getPlaying: () =>
                 playerRef.current?.getPlayerState() === YOUTUBE_PLAYER_STATE.PLAYING,
+              getCurrentTime: () => playerRef.current?.getCurrentTime() ?? 0,
+              getDuration: () => playerRef.current?.getDuration() ?? 0,
+              seekTo: (seconds: number) =>
+                playerRef.current?.seekTo(seconds, true),
+              getPlaybackRate: () => playerRef.current?.getPlaybackRate() ?? 1,
+              setPlaybackRate: (rate: number) =>
+                playerRef.current?.setPlaybackRate(rate),
             };
             const player = playerRef.current;
             const duration = player?.getDuration() ?? 0;
@@ -268,17 +308,22 @@ function YouTubePlayer({
             }
             reportProgress();
             onPlayingChangeRef.current?.();
+            onReadyRef.current?.();
           },
           onStateChange: ({ data }) => {
             onPlayingChangeRef.current?.();
             if (data === 1 && !progressTimerRef.current) {
-              progressTimerRef.current = setInterval(reportProgress, 5000);
+              progressTimerRef.current = setInterval(reportProgress, 1000);
             } else if (data !== 1) {
               reportProgress();
               stopProgressTimer();
             }
             if (data === 0) onEndedRef.current?.();
           },
+          onPlaybackRateChange: () => {
+            onPlayingChangeRef.current?.();
+          },
+          onError: () => onErrorRef.current?.(),
         },
       });
     });

@@ -20,7 +20,7 @@ import {
   CardContent,
   ErrorState,
   PageSkeleton,
-  ProviderVideoPlayer,
+  ProtectedVideoPlayer,
   VideoPlayback,
 } from '@bahrawy/ui';
 import { PriceTag } from '../../../../../../components/PriceTag';
@@ -214,7 +214,7 @@ export default function LessonDetailPage({
           {lesson.contentType === 'VIDEO' ? (
             <section className="overflow-hidden rounded-[1.5rem] border border-border-default bg-surface shadow-sm">
               {playback ? (
-                <ProviderVideoPlayer
+                <ProtectedVideoPlayer
                   playback={playback}
                   initialTime={resumePosition}
                   className="aspect-video rounded-none shadow-none"
