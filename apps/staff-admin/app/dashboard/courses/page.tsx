@@ -17,6 +17,7 @@ import {
   Select,
 } from '@bahrawy/ui';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { API_BASE, fetchApi } from '../../../lib/api';
 import { LifecycleDialog } from '../_components/LifecycleDialog';
 
@@ -287,11 +288,12 @@ export default function CoursesPage() {
             >
               <div className="relative aspect-video overflow-hidden bg-surface-2">
                 {course.coverImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={`${API_BASE}${course.coverImageUrl}`}
                     alt={course.titleAr}
                     className="h-full w-full object-cover"
+                    fill
+                    sizes="(max-width: 767px) 100vw, 360px"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-ink-3">

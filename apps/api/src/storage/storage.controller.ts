@@ -71,6 +71,11 @@ export class StorageController {
       finalPath = path.join(uploadDir, objectKey);
       fs.renameSync(tempFile, finalPath);
 
+      const optimized = await this.storageService.optimizeImageFile(
+        finalPath,
+        file.mimetype,
+      );
+
       const sha256 = await this.storageService.computeFileSha256(finalPath);
 
       const storedObject = await this.storageService.registerUpload({
@@ -79,8 +84,8 @@ export class StorageController {
         bucket: 'storage',
         objectKey,
         originalName: file.originalname,
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
+        mimeType: optimized.mimeType,
+        sizeBytes: optimized.sizeBytes,
         sha256,
       });
 

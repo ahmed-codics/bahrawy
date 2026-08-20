@@ -1,5 +1,5 @@
 import { usePathname } from 'next/navigation';
-import { BookOpen, Home, ShoppingBag, UserRound } from 'lucide-react';
+import { BookOpen, Home, MessageCircleQuestion, UserRound } from 'lucide-react';
 
 export function useStudentNavigation() {
   const pathname = usePathname() || '';
@@ -17,11 +17,10 @@ export function useStudentNavigation() {
       icon: <BookOpen className="size-5" />,
     },
     {
-      label: 'الباقات',
-      href: '/student/products',
-      isActive:
-        pathname.startsWith('/student/products') || pathname.startsWith('/student/checkout'),
-      icon: <ShoppingBag className="size-5" />,
+      label: 'قول سؤالك',
+      href: '/student/questions',
+      isActive: pathname.startsWith('/student/questions'),
+      icon: <MessageCircleQuestion className="size-5" />,
     },
     {
       label: 'حسابي',

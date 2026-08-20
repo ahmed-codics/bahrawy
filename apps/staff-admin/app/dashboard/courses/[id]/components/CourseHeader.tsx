@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Archive, ChevronRight, Edit3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Drawer, Input, Select } from '@bahrawy/ui';
@@ -198,11 +199,12 @@ export function CourseHeader({ course, onReload }: CourseHeaderProps) {
           <label className="block space-y-2 text-sm font-bold text-ink">
             صورة الكورس
             {course.coverImageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={`${API_BASE}${course.coverImageUrl}`}
                 alt={course.titleAr}
                 className="aspect-video w-full border border-border object-cover"
+                width={1280}
+                height={720}
               />
             )}
             <input

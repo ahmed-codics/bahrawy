@@ -14,6 +14,7 @@ import { AssessmentModule } from './assessment/assessment.module';
 import { ExamSessionModule } from './exam-session/exam-session.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SupportModule } from './support/support.module';
+import { StudentQuestionsModule } from './student-questions/student-questions.module';
 import { NotificationModule } from './notification/notification.module';
 import { MailModule } from './mail/mail.module';
 import { VideoModule } from './video/video.module';
@@ -48,6 +49,7 @@ import {
     ExamSessionModule,
     DashboardModule,
     SupportModule,
+    StudentQuestionsModule,
     NotificationModule,
     MailModule,
     VideoModule,

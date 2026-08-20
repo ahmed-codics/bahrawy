@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BookOpen, CreditCard, Headphones, Plus, Users } from 'lucide-react';
+import { ArrowLeft, BookOpen, CreditCard, Headphones, MessageCircleQuestion, Plus, Users } from 'lucide-react';
 import {
   Button,
   Card,
@@ -160,10 +160,10 @@ export default function StaffDashboard() {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                leadingIcon={<Plus className="size-4" />}
-                onClick={() => router.push('/dashboard/products?create=1')}
+                leadingIcon={<MessageCircleQuestion className="size-4" />}
+                onClick={() => router.push('/dashboard/student-questions')}
               >
-                إنشاء باقة وسعر
+                الرد على أسئلة الطلبة
               </Button>
               <Button
                 variant="outline"

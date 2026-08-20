@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
+import { promises as fs } from 'fs';
 import { db } from '@bahrawy/db';
+import sharp from 'sharp';
 
 // V1 allowed MIME types and max sizes
 const ALLOWED_MIME_TYPES = new Set([
@@ -131,6 +133,42 @@ export class StorageService {
       });
     }
     return obj;
+  }
+
+  /**
+   * Optimizes an uploaded image in place: JPEG/PNG are re-encoded to WebP
+   * (quality 80, capped at 1920px) so large originals are not stored or served
+   * as the primary web asset. EXIF orientation is applied first. Falls back to
+   * the original file untouched if processing fails.
+   */
+  async optimizeImageFile(
+    filePath: string,
+    mimeType: string,
+  ): Promise<{ mimeType: string; sizeBytes: number }> {
+    if (mimeType !== 'image/jpeg' && mimeType !== 'image/png') {
+      const info = await fs.stat(filePath);
+      return { mimeType, sizeBytes: info.size };
+    }
+    try {
+      const tmpPath = `${filePath}.opt`;
+      await sharp(filePath)
+        .rotate()
+        .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(tmpPath);
+      await fs.rename(tmpPath, filePath);
+      const info = await fs.stat(filePath);
+      this.logger.log(
+        `Optimized uploaded image ${filePath} (${mimeType} -> image/webp, ${info.size} bytes)`,
+      );
+      return { mimeType: 'image/webp', sizeBytes: info.size };
+    } catch (err) {
+      this.logger.warn(
+        `Image optimization failed for ${filePath}: ${(err as Error).message} — keeping original`,
+      );
+      const info = await fs.stat(filePath);
+      return { mimeType, sizeBytes: info.size };
+    }
   }
 }
 

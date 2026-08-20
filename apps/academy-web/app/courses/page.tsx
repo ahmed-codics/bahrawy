@@ -276,7 +276,7 @@ export default async function CoursesPage({
                     const price = product.prices?.[0];
                     const cover = publicCoverUrl(product.coverImageUrl);
                     const checkoutPath = Number(price?.amount) === 0
-                      ? `/student/products`
+                      ? `/student/courses`
                       : `/student/checkout/${product.id}`;
                     return (
                       <article className="academy-course-card" key={product.id}>

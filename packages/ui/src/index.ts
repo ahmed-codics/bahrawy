@@ -18,3 +18,7 @@ export * from './components/Motion';
 export * from './components/PageTransition';
 export * from './components/MobileSheet';
 export * from './components/AdminPrimitives';
+export * from './components/ImageViewer';
+export * from './components/ImagePicker';
+export * from './components/VoiceRecorder';
+export * from './components/VoicePlayer';

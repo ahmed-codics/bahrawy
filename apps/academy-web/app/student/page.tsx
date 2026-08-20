@@ -129,9 +129,9 @@ export default function StudentDashboard() {
               <Button
                 className="w-full sm:w-auto"
                 variant="outline"
-                onClick={() => router.push('/student/products')}
+                onClick={() => router.push('/student/questions')}
               >
-                شوف الباقات
+                قول سؤالك
               </Button>
             </div>
           </div>

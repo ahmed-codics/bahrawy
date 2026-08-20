@@ -103,6 +103,41 @@ describe('StorageService', () => {
       );
     });
   });
+
+  describe('optimizeImageFile', () => {
+    it('should convert a JPEG upload to WebP and return updated mime type', async () => {
+      const tmpDir = require('node:os').tmpdir();
+      const input = `${tmpDir}/optimize-test-${Date.now()}.jpg`;
+      const fs = require('node:fs');
+      const sharp = require('sharp');
+      await sharp({
+        create: {
+          width: 16,
+          height: 16,
+          channels: 3,
+          background: { r: 30, g: 90, b: 200 },
+        },
+      })
+        .jpeg()
+        .toFile(input);
+      const result = await service.optimizeImageFile(input, 'image/jpeg');
+      expect(result.mimeType).toBe('image/webp');
+      expect(result.sizeBytes).toBeGreaterThan(0);
+      const meta = await sharp(input).metadata();
+      expect(meta.format).toBe('webp');
+      fs.unlinkSync(input);
+    });
+
+    it('should keep non-image uploads untouched', async () => {
+      const tmpDir = require('node:os').tmpdir();
+      const input = `${tmpDir}/optimize-test-pdf-${Date.now()}.pdf`;
+      const fs = require('node:fs');
+      fs.writeFileSync(input, '%PDF-1.4 fake');
+      const result = await service.optimizeImageFile(input, 'application/pdf');
+      expect(result.mimeType).toBe('application/pdf');
+      fs.unlinkSync(input);
+    });
+  });
 });
 
 describe('ClamAvService', () => {

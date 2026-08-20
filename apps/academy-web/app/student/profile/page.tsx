@@ -14,7 +14,7 @@ import {
   School,
   Settings2,
   ShieldCheck,
-  ShoppingBag,
+  MessageCircleQuestion,
   UserRound,
 } from 'lucide-react';
 import {
@@ -415,11 +415,11 @@ export default function StudentProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-between"
-                  leadingIcon={<ShoppingBag className="size-4" />}
+                  leadingIcon={<MessageCircleQuestion className="size-4" />}
                   trailingIcon={<ChevronLeft className="size-4" />}
-                  onClick={() => router.push('/student/products')}
+                  onClick={() => router.push('/student/questions')}
                 >
-                  الباقات المتاحة
+                  قول سؤالك
                 </Button>
               </div>
             </CardContent>

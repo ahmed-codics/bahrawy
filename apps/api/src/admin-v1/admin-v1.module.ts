@@ -9,6 +9,7 @@ import { AdminV1AssessmentsModule } from './assessments/assessments.module';
 import { AdminV1StudentsModule } from './students/students.module';
 import { AdminV1PaymentsModule } from './payments/payments.module';
 import { AdminV1SupportModule } from './support/support.module';
+import { AdminV1StudentQuestionsModule } from './student-questions/student-questions.module';
 import { AdminV1ManagementModule } from './management/management.module';
 import { AdminV1LessonQuizModule } from './lesson-quiz/lesson-quiz.module';
 import { AdminV1ExamResultsModule } from './exam-results/exam-results.module';
@@ -29,6 +30,7 @@ import { AdminV1VideoAccessModule } from './video-access/video-access.module';
     AdminV1StudentsModule,
     AdminV1PaymentsModule,
     AdminV1SupportModule,
+    AdminV1StudentQuestionsModule,
     AdminV1ManagementModule,
     AdminV1LessonQuizModule,
     AdminV1ExamResultsModule,

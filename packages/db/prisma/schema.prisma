@@ -40,6 +40,17 @@ enum SupportAuthorKind {
   SYSTEM
 }
 
+enum StudentQuestionStatus {
+  PENDING_REVIEW
+  ANSWERED
+  CLOSED
+}
+
+enum StudentQuestionSenderType {
+  STUDENT
+  STAFF
+}
+
 model Organization {
   id         String    @id @default(uuid())
   name       String
@@ -66,6 +77,7 @@ model Organization {
   products      Product[]
   offlineAccessCodes  OfflineAccessCode[]
   offlineCodeBatches  OfflineAccessCodeBatch[]
+  studentQuestions    StudentQuestion[]
 }
 
 model Branch {
@@ -282,6 +294,8 @@ model Account {
   supportTickets        SupportTicket[]
   notifications         InAppNotification[]
   supportMessages       SupportMessage[]
+  studentQuestions      StudentQuestion[]
+  studentQuestionMessages StudentQuestionMessage[]
   videoAccessRequests   VideoAccessRequest[]
   videoAccessGrants     VideoAccessGrant[]
   offlineCodesCreated   OfflineAccessCode[]       @relation("OfflineCodeCreatedBy")
@@ -601,6 +615,7 @@ model Course {
   assessments     Assessment[]
   offlineAccessCodes  OfflineAccessCode[]
   offlineCodeBatches  OfflineAccessCodeBatch[]
+  studentQuestions    StudentQuestion[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -680,6 +695,7 @@ model Lesson {
 
   unit        Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
   assessments Assessment[]
+  studentQuestions StudentQuestion[]
 
   @@index([unitId])
   @@index([status, publishAt, unpublishAt])
@@ -803,6 +819,8 @@ model StoredObject {
   status         String    @default("QUARANTINE")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  studentQuestionAttachments StudentQuestionAttachment[]
 
   @@unique([bucket, objectKey])
   @@index([organizationId])
@@ -1194,6 +1212,65 @@ model SupportMessage {
 
   @@index([ticketId])
   @@index([authorAccountId])
+}
+
+model StudentQuestion {
+  id             String                @id @default(uuid())
+  organizationId String
+  accountId      String
+  courseId       String?
+  lessonId       String?
+  status         StudentQuestionStatus @default(PENDING_REVIEW)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  account      Account                   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  course       Course?                   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  lesson       Lesson?                   @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  messages     StudentQuestionMessage[]
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([courseId])
+  @@index([lessonId])
+  @@index([status])
+  @@index([organizationId, status, createdAt])
+}
+
+model StudentQuestionMessage {
+  id              String                   @id @default(uuid())
+  questionId      String
+  senderAccountId String
+  senderType      StudentQuestionSenderType
+  message         String
+  createdAt       DateTime                 @default(now())
+
+  question      StudentQuestion             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  senderAccount Account                     @relation(fields: [senderAccountId], references: [id], onDelete: Cascade)
+  attachments   StudentQuestionAttachment[]
+
+  @@index([questionId])
+  @@index([senderAccountId])
+}
+
+model StudentQuestionAttachment {
+  id              String   @id @default(uuid())
+  messageId       String
+  storedObjectId  String
+  originalName    String
+  mimeType        String
+  sizeBytes       BigInt
+  type            String   @default("IMAGE")
+  durationSeconds Int?
+  createdAt       DateTime @default(now())
+
+  message      StudentQuestionMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  storedObject StoredObject           @relation(fields: [storedObjectId], references: [id], onDelete: Restrict)
+
+  @@index([messageId])
+  @@index([storedObjectId])
+  @@index([messageId, storedObjectId])
 }
 
 model OfflineAccessCode {
