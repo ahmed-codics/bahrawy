@@ -387,21 +387,30 @@ export class VideoService {
     }
 
     const { bucket } = this.getR2Config();
+    const sortedParts = parts.sort((a, b) => a.PartNumber - b.PartNumber);
+    const completeParams = {
+      Bucket: bucket,
+      Key: objectKey,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: sortedParts,
+      },
+    };
+    
+    console.log(`[CompleteMultipartUpload] Request payload:`, JSON.stringify(completeParams, null, 2));
+
     try {
-      await this.getR2Client().send(
-        new CompleteMultipartUploadCommand({
-          Bucket: bucket,
-          Key: objectKey,
-          UploadId: uploadId,
-          MultipartUpload: {
-            Parts: parts.sort((a, b) => a.PartNumber - b.PartNumber),
-          },
-        })
-      );
+      await this.getR2Client().send(new CompleteMultipartUploadCommand(completeParams));
     } catch (error: any) {
       console.error(`[CompleteMultipartUpload] Failed for ${uploadId}. Parts provided:`, parts.length);
       console.error(`[CompleteMultipartUpload] Error detail:`, error);
-      throw new BadRequestException(`فشل تجميع الفيديو في R2. السبب: ${error?.message || 'Unknown'}`);
+      throw new BadRequestException(JSON.stringify({
+        message: 'فشل تجميع الفيديو في R2',
+        errorName: error.name,
+        errorMessage: error.message,
+        httpStatus: error.$metadata?.httpStatusCode,
+        requestId: error.$metadata?.requestId,
+      }));
     }
 
     return this.replaceVideoLesson(lessonId, {

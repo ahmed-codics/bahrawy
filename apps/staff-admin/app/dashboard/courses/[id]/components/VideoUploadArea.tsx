@@ -180,6 +180,8 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
                 
                 console.log(`[Part ${part.partNumber}] Extracted ETag (raw): ${etag}`);
 
+                const rawEtag = etag;
+
                 if (!etag) {
                   rej(new Error(`Missing ETag for part ${part.partNumber}. Headers: ${allHeaders}`));
                   return;
@@ -187,9 +189,11 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
                 
                 // Ensure it has quotes because CompleteMultipartUpload expects quoted ETags
                 etag = etag.replace(/^"|"$/g, ''); // strip first
-                etag = `"${etag}"`; // add back exactly one set of quotes
+                const normalizedEtag = `"${etag}"`; // add back exactly one set of quotes
                 
-                completedParts.push({ PartNumber: part.partNumber, ETag: etag });
+                console.log(`[PartLog] uploadId: ${uploadId} | PartNumber: ${part.partNumber} | HTTP: ${xhr.status} | Raw ETag: ${rawEtag} | Normalized ETag: ${normalizedEtag}`);
+
+                completedParts.push({ PartNumber: part.partNumber, ETag: normalizedEtag });
                 partProgress[part.partNumber] = chunk.size;
                 completedPartsCount++;
                 updateCombinedProgress();
@@ -240,6 +244,45 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
 
     setUploadStats(prev => prev ? { ...prev, statusText: 'جاري إكمال الرفع...' } : null);
 
+    // Explicit verification required by user
+    completedParts.sort((a, b) => a.PartNumber - b.PartNumber);
+    console.log(`[Complete] Verifying uploadId: ${uploadId}`);
+    console.log(`[Complete] Verifying objectKey: ${objectKey}`);
+    console.log(`[Complete] Total parts collected: ${completedParts.length} / Expected: ${partsCount}`);
+    console.log(`[Complete] Final parts array:`, JSON.stringify(completedParts, null, 2));
+
+    let verificationFailed = false;
+    const seenParts = new Map<number, string>();
+    for (let i = 0; i < completedParts.length; i++) {
+      const p = completedParts[i];
+      
+      if (seenParts.has(p.PartNumber)) {
+        console.error(`[Verify Error] Duplicate PartNumber found: ${p.PartNumber}`);
+        if (seenParts.get(p.PartNumber) !== p.ETag) {
+          console.error(`[Verify Error] Conflicting ETags for PartNumber ${p.PartNumber}!`);
+        }
+        verificationFailed = true;
+      }
+      seenParts.set(p.PartNumber, p.ETag);
+
+      if (p.PartNumber !== i + 1) {
+        console.error(`[Verify Error] PartNumber missing or out of order: expected ${i + 1}, got ${p.PartNumber}`);
+        verificationFailed = true;
+      }
+      if (!p.ETag) {
+        console.error(`[Verify Error] Missing ETag on part ${p.PartNumber}`);
+        verificationFailed = true;
+      }
+      if (!/^".*"$/.test(p.ETag)) {
+        console.error(`[Verify Error] ETag on part ${p.PartNumber} does not have required quotes: ${p.ETag}`);
+        verificationFailed = true;
+      }
+    }
+
+    if (verificationFailed) {
+      console.warn(`[Complete] Verification failed, but attempting to send to API anyway for backend testing...`);
+    }
+
     console.log(`[Complete] Sending ${completedParts.length} parts to API for uploadId ${uploadId}...`);
     try {
       const completeRes = await fetchApi(`/admin/v1/video/${lessonId}/r2/multipart/complete`, {
@@ -256,7 +299,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
       console.log('[Complete] Success:', completeRes);
     } catch (e: any) {
       console.error('[Complete] Failed:', e);
-      throw new Error(`UploadId: ${uploadId} | فشل إكمال الرفع. أجزاء تم تجميعها: ${completedParts.length}. السبب: ${e.message || 'Unknown'}`);
+      throw new Error(`UploadId: ${uploadId} | فشل التجميع. التفاصيل: ${e.message}`);
     } finally {
       setCancelUpload(null);
     }
