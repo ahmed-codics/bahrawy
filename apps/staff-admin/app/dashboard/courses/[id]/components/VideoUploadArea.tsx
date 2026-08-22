@@ -32,6 +32,14 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
   );
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadStats, setUploadStats] = useState<{
+    uploadedBytes: number;
+    totalBytes: number;
+    completedParts: number;
+    totalParts: number;
+    statusText: string;
+  } | null>(null);
+  const [cancelUpload, setCancelUpload] = useState<(() => void) | null>(null);
 
   const uploadLocalVideo = (lessonId: string, file: File) =>
     new Promise<void>((resolve, reject) => {
@@ -53,45 +61,193 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
     });
 
   const uploadR2Video = async (lessonId: string, file: File) => {
-    const response = await fetchApi(`/admin/v1/video/${lessonId}/r2/upload-url`, {
+    const CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
+    const partsCount = Math.ceil(file.size / CHUNK_SIZE);
+    
+    const response = await fetchApi(`/admin/v1/video/${lessonId}/r2/multipart/create`, {
       method: 'POST',
       timeoutMs: 60_000,
       body: JSON.stringify({
         originalFileName: file.name,
         mimeType: file.type || 'video/mp4',
         fileSizeBytes: file.size,
+        partsCount,
       }),
     });
-    const { uploadUrl, objectKey } = response.data as {
-      uploadUrl: string;
+
+    const { uploadId, objectKey, parts } = response.data as {
+      uploadId: string;
       objectKey: string;
+      parts: { partNumber: number; url: string }[];
     };
 
-    await new Promise<void>((resolve, reject) => {
-      const request = new XMLHttpRequest();
-      request.open('PUT', uploadUrl);
-      request.timeout = 0;
-      request.setRequestHeader('Content-Type', file.type || 'video/mp4');
-      request.upload.onprogress = (event) => updateProgress(event);
-      request.onload = () => {
-        if (request.status >= 200 && request.status < 300) resolve();
-        else reject(new Error('رفض R2 رفع الملف'));
-      };
-      request.onerror = () =>
-        reject(new Error('تعذر الرفع إلى R2. تحقق من إعدادات CORS الخاصة بالـ bucket.'));
-      request.onabort = () => reject(new Error('تم إلغاء رفع الفيديو'));
-      request.send(file);
+    let isCancelled = false;
+    const abortController = new AbortController();
+    
+    setCancelUpload(() => async () => {
+      isCancelled = true;
+      abortController.abort();
+      setUploadStats((prev) => prev ? { ...prev, statusText: 'جاري الإلغاء...' } : null);
+      try {
+        await fetchApi(`/admin/v1/video/${lessonId}/r2/multipart/abort`, {
+          method: 'POST',
+          body: JSON.stringify({ uploadId, objectKey }),
+        });
+      } catch (e) {
+        console.error('Failed to abort', e);
+      }
+      setUploading(false);
+      setUploadStats(null);
+      setCancelUpload(null);
+      toast.error('تم إلغاء الرفع');
     });
 
-    await fetchApi(`/admin/v1/video/${lessonId}/r2/complete`, {
-      method: 'POST',
-      timeoutMs: 60_000,
-      body: JSON.stringify({
-        objectKey,
-        originalFileName: file.name,
-        mimeType: file.type || 'video/mp4',
-      }),
+    const completedParts: { PartNumber: number; ETag: string }[] = [];
+    const partProgress: Record<number, number> = {};
+    let completedPartsCount = 0;
+    
+    setUploadStats({
+      uploadedBytes: 0,
+      totalBytes: file.size,
+      completedParts: 0,
+      totalParts: partsCount,
+      statusText: 'جاري الرفع...',
     });
+
+    const updateCombinedProgress = () => {
+      const currentUploaded = Object.values(partProgress).reduce((a, b) => a + b, 0);
+      setProgress(Math.round((currentUploaded / file.size) * 100));
+      setUploadStats(prev => prev ? {
+        ...prev,
+        uploadedBytes: currentUploaded,
+        completedParts: completedPartsCount,
+      } : null);
+    };
+
+    const CONCURRENCY = 3;
+    let activeUploads = 0;
+    let currentIndex = 0;
+
+    await new Promise<void>((resolve, reject) => {
+      const runNext = () => {
+        if (isCancelled) {
+          reject(new Error('تم إلغاء رفع الفيديو'));
+          return;
+        }
+
+        if (currentIndex >= parts.length && activeUploads === 0) {
+          resolve();
+          return;
+        }
+
+        while (activeUploads < CONCURRENCY && currentIndex < parts.length) {
+          const part = parts[currentIndex++];
+          activeUploads++;
+          uploadPart(part).finally(() => {
+            activeUploads--;
+            runNext();
+          });
+        }
+      };
+
+      const uploadPart = async (part: { partNumber: number; url: string }, retries = 0): Promise<void> => {
+        if (isCancelled) return;
+        try {
+          const start = (part.partNumber - 1) * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+
+          await new Promise<void>((res, rej) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', part.url);
+            xhr.timeout = 0;
+            
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable && !isCancelled) {
+                partProgress[part.partNumber] = e.loaded;
+                updateCombinedProgress();
+              }
+            };
+            
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                let etag = xhr.getResponseHeader('ETag');
+                if (!etag) {
+                  // Some proxies quote it, some don't. Fallback logic.
+                  etag = xhr.getAllResponseHeaders().match(/etag:\s*(.*)/i)?.[1] || null;
+                }
+                if (!etag) {
+                  rej(new Error('Missing ETag'));
+                  return;
+                }
+                // Strip quotes if they were added
+                etag = etag.replace(/^"|"$/g, '');
+                
+                completedParts.push({ PartNumber: part.partNumber, ETag: etag });
+                partProgress[part.partNumber] = chunk.size;
+                completedPartsCount++;
+                updateCombinedProgress();
+                res();
+              } else {
+                rej(new Error('Part upload failed'));
+              }
+            };
+            
+            xhr.onerror = () => rej(new Error('Network error'));
+            xhr.onabort = () => rej(new Error('Aborted'));
+            
+            const abortHandler = () => {
+              xhr.abort();
+            };
+            abortController.signal.addEventListener('abort', abortHandler);
+            
+            xhr.onloadend = () => {
+              abortController.signal.removeEventListener('abort', abortHandler);
+            };
+            
+            xhr.send(chunk);
+          });
+        } catch (error) {
+          if (isCancelled) return;
+          if (retries < 3) {
+            setUploadStats(prev => prev ? { ...prev, statusText: `فشل رفع جزء ${part.partNumber}، جاري إعادة المحاولة...` } : null);
+            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries))); // 1s, 2s, 4s
+            if (!isCancelled) {
+              setUploadStats(prev => prev ? { ...prev, statusText: 'جاري الرفع...' } : null);
+              return uploadPart(part, retries + 1);
+            }
+          } else {
+            reject(new Error(`فشل رفع الجزء ${part.partNumber} بعد عدة محاولات.`));
+          }
+        }
+      };
+
+      runNext();
+    });
+
+    if (isCancelled) {
+      throw new Error('تم إلغاء رفع الفيديو');
+    }
+
+    setUploadStats(prev => prev ? { ...prev, statusText: 'جاري إكمال الرفع...' } : null);
+
+    try {
+      await fetchApi(`/admin/v1/video/${lessonId}/r2/multipart/complete`, {
+        method: 'POST',
+        timeoutMs: 60_000,
+        body: JSON.stringify({
+          uploadId,
+          objectKey,
+          originalFileName: file.name,
+          mimeType: file.type || 'video/mp4',
+          parts: completedParts,
+        }),
+      });
+    } catch (e) {
+      throw new Error('فشل إكمال رفع الفيديو');
+    } finally {
+      setCancelUpload(null);
+    }
   };
 
   const updateProgress = (event: ProgressEvent) => {
@@ -112,6 +268,8 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
 
     setUploading(true);
     setProgress(0);
+    setUploadStats(null);
+    setCancelUpload(null);
     try {
       if (provider === 'R2') {
         await uploadR2Video(videoItem.id, file);
@@ -125,10 +283,14 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
       );
       await onReload();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'فشل رفع الفيديو');
+      if ((error as Error).message !== 'تم إلغاء رفع الفيديو') {
+        toast.error(error instanceof Error ? error.message : 'فشل رفع الفيديو');
+      }
     } finally {
       setUploading(false);
       setProgress(0);
+      setUploadStats(null);
+      setCancelUpload(null);
     }
   };
 
@@ -259,14 +421,41 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
           </button>
         </div>
       ) : uploading ? (
-        <div className="space-y-2">
-          <div className="text-sm text-text-muted">جاري الرفع... {progress}%</div>
+        <div className="space-y-3 rounded-md border border-border-default p-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-bold text-text-primary">
+              {uploadStats ? uploadStats.statusText : `جاري الرفع...`}
+            </span>
+            <span className="text-brand-600 font-bold">{progress}%</span>
+          </div>
+          
           <div className="h-1.5 overflow-hidden rounded-full bg-border-default">
             <div
-              className="h-full rounded-full bg-brand-500 transition-all"
+              className="h-full rounded-full bg-brand-500 transition-all duration-300"
               style={{ width: `${Math.max(progress, 4)}%` }}
             />
           </div>
+
+          {uploadStats && (
+            <div className="flex items-center justify-between text-xs text-text-muted mt-2">
+              <div>
+                {(uploadStats.uploadedBytes / 1024 / 1024).toFixed(1)} / {(uploadStats.totalBytes / 1024 / 1024).toFixed(1)} MB
+              </div>
+              <div>
+                الأجزاء: {uploadStats.completedParts} / {uploadStats.totalParts}
+              </div>
+            </div>
+          )}
+
+          {cancelUpload && (
+            <button
+              type="button"
+              onClick={cancelUpload}
+              className="w-full mt-2 rounded-md bg-danger/10 px-3 py-1.5 text-xs font-bold text-danger transition hover:bg-danger/20"
+            >
+              إلغاء الرفع
+            </button>
+          )}
         </div>
       ) : (
         <label className="flex cursor-pointer flex-col">

@@ -11,6 +11,10 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -310,6 +314,128 @@ export class VideoService {
       expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
     };
   }
+
+  async createR2MultipartUpload(
+    lessonId: string,
+    originalFileName: string,
+    mimeType: string,
+    fileSizeBytes: number,
+    partsCount: number,
+  ) {
+    await this.assertLessonExists(lessonId);
+    if (mimeType !== 'video/mp4') {
+      throw new BadRequestException('R2 videos must be MP4 files encoded for web playback');
+    }
+    if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes <= 0) {
+      throw new BadRequestException('Video size must be at least 1 byte');
+    }
+
+    const safeName = this.sanitizeFileName(originalFileName);
+    const objectKey = `lessons/${lessonId}/${randomUUID()}-${safeName}`;
+    const { bucket } = this.getR2Config();
+    
+    let uploadId: string;
+    try {
+      const response = await this.getR2Client().send(
+        new CreateMultipartUploadCommand({
+          Bucket: bucket,
+          Key: objectKey,
+          ContentType: mimeType,
+        })
+      );
+      if (!response.UploadId) throw new Error('No UploadId returned');
+      uploadId = response.UploadId;
+    } catch (error) {
+      throw new ServiceUnavailableException('Failed to initialize multipart upload');
+    }
+
+    const parts = await Promise.all(
+      Array.from({ length: partsCount }, async (_, i) => {
+        const partNumber = i + 1;
+        const command = new UploadPartCommand({
+          Bucket: bucket,
+          Key: objectKey,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+        });
+        const url = await getSignedUrl(this.getR2Client(), command, {
+          expiresIn: UPLOAD_URL_TTL_SECONDS * 4, // Allow more time for large multipart uploads
+        });
+        return { partNumber, url };
+      })
+    );
+
+    return {
+      provider: VideoProvider.R2,
+      uploadId,
+      objectKey,
+      parts,
+    };
+  }
+
+  async completeR2MultipartUpload(
+    lessonId: string,
+    uploadId: string,
+    objectKey: string,
+    originalFileName: string,
+    mimeType: string,
+    parts: { PartNumber: number; ETag: string }[],
+  ) {
+    await this.assertLessonExists(lessonId);
+    if (!objectKey.startsWith(`lessons/${lessonId}/`)) {
+      throw new BadRequestException('Invalid R2 object key for this lesson');
+    }
+
+    const { bucket } = this.getR2Config();
+    try {
+      await this.getR2Client().send(
+        new CompleteMultipartUploadCommand({
+          Bucket: bucket,
+          Key: objectKey,
+          UploadId: uploadId,
+          MultipartUpload: {
+            Parts: parts.sort((a, b) => a.PartNumber - b.PartNumber),
+          },
+        })
+      );
+    } catch (error) {
+      throw new BadRequestException('Failed to complete multipart upload. Parts may be invalid.');
+    }
+
+    return this.replaceVideoLesson(lessonId, {
+      provider: VideoProvider.R2,
+      sourceRef: objectKey,
+      originalFileName,
+      mimeType,
+      status: 'QUEUED',
+    });
+  }
+
+  async abortR2MultipartUpload(
+    lessonId: string,
+    uploadId: string,
+    objectKey: string,
+  ) {
+    await this.assertLessonExists(lessonId);
+    if (!objectKey.startsWith(`lessons/${lessonId}/`)) {
+      throw new BadRequestException('Invalid R2 object key for this lesson');
+    }
+
+    const { bucket } = this.getR2Config();
+    try {
+      await this.getR2Client().send(
+        new AbortMultipartUploadCommand({
+          Bucket: bucket,
+          Key: objectKey,
+          UploadId: uploadId,
+        })
+      );
+    } catch (error) {
+      // It might have already been aborted or completed
+    }
+    return { status: 'ABORTED' };
+  }
+
 
   async confirmR2Upload(
     lessonId: string,

@@ -28,6 +28,9 @@ import { RequirePermission } from '../rbac/permissions.decorator';
 import {
   ConfirmR2UploadDto,
   CreateR2UploadDto,
+  CreateMultipartUploadDto,
+  CompleteMultipartUploadDto,
+  AbortMultipartUploadDto,
   YouTubeVideoDto,
 } from './video.dto';
 import { Delete } from '@nestjs/common';
@@ -114,6 +117,56 @@ export class AdminVideoController {
       body.objectKey,
       body.originalFileName,
       body.mimeType,
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Post(':lessonId/r2/multipart/create')
+  async createMultipartUpload(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+    @Body() body: CreateMultipartUploadDto,
+  ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
+    const data = await this.videoService.createR2MultipartUpload(
+      lessonId,
+      body.originalFileName,
+      body.mimeType,
+      body.fileSizeBytes,
+      body.partsCount,
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Post(':lessonId/r2/multipart/complete')
+  async completeMultipartUpload(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+    @Body() body: CompleteMultipartUploadDto,
+  ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
+    const data = await this.videoService.completeR2MultipartUpload(
+      lessonId,
+      body.uploadId,
+      body.objectKey,
+      body.originalFileName,
+      body.mimeType,
+      body.parts,
+    );
+    return { status: 'SUCCESS', data };
+  }
+
+  @Post(':lessonId/r2/multipart/abort')
+  async abortMultipartUpload(
+    @Req() request: AdminRequest,
+    @Param('lessonId') lessonId: string,
+    @Body() body: AbortMultipartUploadDto,
+  ) {
+    await this.assertLessonAccess(request.account.organizationId, lessonId);
+    const data = await this.videoService.abortR2MultipartUpload(
+      lessonId,
+      body.uploadId,
+      body.objectKey,
     );
     return { status: 'SUCCESS', data };
   }
