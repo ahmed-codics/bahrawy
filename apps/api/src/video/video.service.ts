@@ -398,8 +398,10 @@ export class VideoService {
           },
         })
       );
-    } catch (error) {
-      throw new BadRequestException('Failed to complete multipart upload. Parts may be invalid.');
+    } catch (error: any) {
+      console.error(`[CompleteMultipartUpload] Failed for ${uploadId}. Parts provided:`, parts.length);
+      console.error(`[CompleteMultipartUpload] Error detail:`, error);
+      throw new BadRequestException(`فشل تجميع الفيديو في R2. السبب: ${error?.message || 'Unknown'}`);
     }
 
     return this.replaceVideoLesson(lessonId, {

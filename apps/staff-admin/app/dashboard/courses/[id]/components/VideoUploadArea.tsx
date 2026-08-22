@@ -170,18 +170,24 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
             };
             
             xhr.onload = () => {
+              const allHeaders = xhr.getAllResponseHeaders();
+              console.log(`[Part ${part.partNumber}] Upload response: HTTP ${xhr.status}, Headers: \n${allHeaders}`);
               if (xhr.status >= 200 && xhr.status < 300) {
                 let etag = xhr.getResponseHeader('ETag');
                 if (!etag) {
-                  // Some proxies quote it, some don't. Fallback logic.
-                  etag = xhr.getAllResponseHeaders().match(/etag:\s*(.*)/i)?.[1] || null;
+                  etag = allHeaders.match(/etag:\s*(.*)/i)?.[1] || null;
                 }
+                
+                console.log(`[Part ${part.partNumber}] Extracted ETag (raw): ${etag}`);
+
                 if (!etag) {
-                  rej(new Error('Missing ETag'));
+                  rej(new Error(`Missing ETag for part ${part.partNumber}. Headers: ${allHeaders}`));
                   return;
                 }
-                // Strip quotes if they were added
-                etag = etag.replace(/^"|"$/g, '');
+                
+                // Ensure it has quotes because CompleteMultipartUpload expects quoted ETags
+                etag = etag.replace(/^"|"$/g, ''); // strip first
+                etag = `"${etag}"`; // add back exactly one set of quotes
                 
                 completedParts.push({ PartNumber: part.partNumber, ETag: etag });
                 partProgress[part.partNumber] = chunk.size;
@@ -189,11 +195,12 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
                 updateCombinedProgress();
                 res();
               } else {
-                rej(new Error('Part upload failed'));
+                console.error(`[Part ${part.partNumber}] Failed with status ${xhr.status}. Body: ${xhr.responseText}`);
+                rej(new Error(`Part ${part.partNumber} upload failed with HTTP ${xhr.status}. Body: ${xhr.responseText}`));
               }
             };
             
-            xhr.onerror = () => rej(new Error('Network error'));
+            xhr.onerror = () => rej(new Error(`Network error on part ${part.partNumber}`));
             xhr.onabort = () => rej(new Error('Aborted'));
             
             const abortHandler = () => {
@@ -209,6 +216,7 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
           });
         } catch (error) {
           if (isCancelled) return;
+          console.error(`[Part ${part.partNumber}] Error:`, error);
           if (retries < 3) {
             setUploadStats(prev => prev ? { ...prev, statusText: `فشل رفع جزء ${part.partNumber}، جاري إعادة المحاولة...` } : null);
             await new Promise(r => setTimeout(r, 1000 * Math.pow(2, retries))); // 1s, 2s, 4s
@@ -217,7 +225,8 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
               return uploadPart(part, retries + 1);
             }
           } else {
-            reject(new Error(`فشل رفع الجزء ${part.partNumber} بعد عدة محاولات.`));
+            const err = error as Error;
+            reject(new Error(`UploadId: ${uploadId} | فشل رفع الجزء ${part.partNumber} بشكل نهائي. السبب: ${err.message}`));
           }
         }
       };
@@ -231,8 +240,9 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
 
     setUploadStats(prev => prev ? { ...prev, statusText: 'جاري إكمال الرفع...' } : null);
 
+    console.log(`[Complete] Sending ${completedParts.length} parts to API for uploadId ${uploadId}...`);
     try {
-      await fetchApi(`/admin/v1/video/${lessonId}/r2/multipart/complete`, {
+      const completeRes = await fetchApi(`/admin/v1/video/${lessonId}/r2/multipart/complete`, {
         method: 'POST',
         timeoutMs: 60_000,
         body: JSON.stringify({
@@ -243,8 +253,10 @@ export function VideoUploadArea({ videoItem, onReload }: VideoUploadAreaProps) {
           parts: completedParts,
         }),
       });
-    } catch (e) {
-      throw new Error('فشل إكمال رفع الفيديو');
+      console.log('[Complete] Success:', completeRes);
+    } catch (e: any) {
+      console.error('[Complete] Failed:', e);
+      throw new Error(`UploadId: ${uploadId} | فشل إكمال الرفع. أجزاء تم تجميعها: ${completedParts.length}. السبب: ${e.message || 'Unknown'}`);
     } finally {
       setCancelUpload(null);
     }
