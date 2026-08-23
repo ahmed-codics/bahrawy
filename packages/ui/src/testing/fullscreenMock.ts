@@ -71,6 +71,7 @@ export type YouTubeMockPlayers = Array<{
       onReady: () => void;
       onStateChange: (event: { data: number }) => void;
       onPlaybackRateChange?: (event: { data: number }) => void;
+      onPlaybackQualityChange?: (event: { data: string }) => void;
       onError?: (event: { data: number }) => void;
     };
   };
@@ -84,6 +85,9 @@ export type YouTubeMockPlayers = Array<{
   seekTo: jest.Mock;
   getPlaybackRate: jest.Mock;
   setPlaybackRate: jest.Mock;
+  getAvailableQualityLevels: jest.Mock;
+  getPlaybackQuality: jest.Mock;
+  setPlaybackQuality: jest.Mock;
   destroy: jest.Mock;
 }>;
 
@@ -122,6 +126,11 @@ export function installYouTubeMock(): {
       setPlaybackRate: jest.fn((rate: number) => {
         instance.playbackRate = rate;
         instance.options.events.onPlaybackRateChange?.({ data: rate });
+      }),
+      getAvailableQualityLevels: jest.fn(() => ['hd1080', 'hd720', 'large']),
+      getPlaybackQuality: jest.fn(() => 'hd1080'),
+      setPlaybackQuality: jest.fn((quality: string) => {
+        instance.options.events.onPlaybackQualityChange?.({ data: quality });
       }),
       destroy: jest.fn(),
     };

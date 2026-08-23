@@ -31,6 +31,7 @@ export type ProviderVideoPlayerProps = {
   onReady?: () => void;
   /** Called when the underlying player reports a playback error. */
   onError?: () => void;
+  onPlaybackQualityChange?: (quality: string) => void;
 };
 
 export type VideoControlHandle = {
@@ -42,6 +43,9 @@ export type VideoControlHandle = {
   seekTo: (seconds: number) => void;
   getPlaybackRate: () => number;
   setPlaybackRate: (rate: number) => void;
+  getAvailableQualityLevels?: () => string[];
+  getPlaybackQuality?: () => string;
+  setPlaybackQuality?: (quality: string) => void;
 };
 
 export function ProviderVideoPlayer({
@@ -56,6 +60,7 @@ export function ProviderVideoPlayer({
   controlRef: controlRefProp,
   onReady,
   onError,
+  onPlaybackQualityChange,
 }: ProviderVideoPlayerProps) {
   const internalRef = useRef<VideoControlHandle | null>(null);
   const controlRef = controlRefProp ?? internalRef;
@@ -91,6 +96,7 @@ export function ProviderVideoPlayer({
           onPlayingChange={onPlayingChange}
           onEnded={onEnded}
           onProgress={onProgress}
+          onPlaybackQualityChange={onPlaybackQualityChange}
         />
       );
     }
@@ -141,6 +147,7 @@ type YouTubePlayerProps = {
   onPlayingChange?: () => void;
   onEnded?: () => void;
   onProgress?: (progress: number, currentTime: number, duration: number) => void;
+  onPlaybackQualityChange?: (quality: string) => void;
 };
 
 type YouTubePlayerInstance = {
@@ -153,6 +160,9 @@ type YouTubePlayerInstance = {
   getPlayerState: () => number;
   getPlaybackRate: () => number;
   setPlaybackRate: (rate: number) => void;
+  getAvailableQualityLevels: () => string[];
+  getPlaybackQuality: () => string;
+  setPlaybackQuality: (quality: string) => void;
 };
 
 type YouTubeNamespace = {
@@ -227,6 +237,7 @@ function YouTubePlayer({
   onPlayingChange,
   onEnded,
   onProgress,
+  onPlaybackQualityChange,
 }: YouTubePlayerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -237,6 +248,7 @@ function YouTubePlayer({
   const onPlayingChangeRef = useRef(onPlayingChange);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const onPlaybackQualityChangeRef = useRef(onPlaybackQualityChange);
   const [iframeOffsets, setIframeOffsets] = useState<{
     top: number;
     bottom: number;
@@ -250,7 +262,8 @@ function YouTubePlayer({
     onPlayingChangeRef.current = onPlayingChange;
     onReadyRef.current = onReady;
     onErrorRef.current = onError;
-  }, [onEnded, onProgress, onPlayingChange, onReady, onError]);
+    onPlaybackQualityChangeRef.current = onPlaybackQualityChange;
+  }, [onEnded, onProgress, onPlayingChange, onReady, onError, onPlaybackQualityChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,7 +299,7 @@ function YouTubePlayer({
           playsinline: 1,
           rel: 0,
         },
-        events: {
+        events: ({
           onReady: () => {
             controlRef.current = {
               play: () => playerRef.current?.playVideo(),
@@ -300,6 +313,9 @@ function YouTubePlayer({
               getPlaybackRate: () => playerRef.current?.getPlaybackRate() ?? 1,
               setPlaybackRate: (rate: number) =>
                 playerRef.current?.setPlaybackRate(rate),
+              getAvailableQualityLevels: () => playerRef.current?.getAvailableQualityLevels() || [],
+              getPlaybackQuality: () => playerRef.current?.getPlaybackQuality() || 'default',
+              setPlaybackQuality: (quality: string) => playerRef.current?.setPlaybackQuality(quality),
             };
             const player = playerRef.current;
             const duration = player?.getDuration() ?? 0;
@@ -310,7 +326,7 @@ function YouTubePlayer({
             onPlayingChangeRef.current?.();
             onReadyRef.current?.();
           },
-          onStateChange: ({ data }) => {
+          onStateChange: ({ data }: { data: number }) => {
             onPlayingChangeRef.current?.();
             if (data === 1 && !progressTimerRef.current) {
               progressTimerRef.current = setInterval(reportProgress, 1000);
@@ -324,7 +340,11 @@ function YouTubePlayer({
             onPlayingChangeRef.current?.();
           },
           onError: () => onErrorRef.current?.(),
-        },
+          onPlaybackQualityChange: (event: { data: string }) => {
+            onPlaybackQualityChangeRef.current?.(event.data);
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any),
       });
     });
 

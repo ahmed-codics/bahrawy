@@ -67,6 +67,8 @@ export function ProtectedVideoPlayer({
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const playbackRateRef = useRef(1);
+  const [currentQuality, setCurrentQuality] = useState<string>("default");
+  const [qualityLevels, setQualityLevels] = useState<string[]>([]);
 
   const {
     isFullscreen,
@@ -86,6 +88,10 @@ export function ProtectedVideoPlayer({
     if (rate !== 1 || playbackRateRef.current === 1) {
       playbackRateRef.current = rate;
       setPlaybackRateState(rate);
+    }
+    if (control) {
+      const levels = control.getAvailableQualityLevels?.() || [];
+      if (levels.length > 0) setQualityLevels(levels);
     }
   }, []);
 
@@ -116,6 +122,17 @@ export function ProtectedVideoPlayer({
     setPlaybackRateState(rate);
   }, []);
 
+  const handleQualityChange = useCallback((quality: string) => {
+    const control = controlRef.current;
+    if (!control) return;
+    control.setPlaybackQuality?.(quality);
+    setCurrentQuality(quality);
+  }, []);
+
+  const handlePlaybackQualityChange = useCallback((quality: string) => {
+    setCurrentQuality(quality);
+  }, []);
+
   const handleProgress = useCallback(
     (progress: number, time: number, videoDuration: number) => {
       if (Number.isFinite(videoDuration) && videoDuration > 0) {
@@ -131,6 +148,11 @@ export function ProtectedVideoPlayer({
 
   const handleReady = useCallback(() => {
     setIsVideoReady(true);
+    const control = controlRef.current;
+    if (control) {
+      setQualityLevels(control.getAvailableQualityLevels?.() || []);
+      setCurrentQuality(control.getPlaybackQuality?.() || "default");
+    }
   }, []);
 
   const handlePlayerError = useCallback(() => {
@@ -220,6 +242,7 @@ export function ProtectedVideoPlayer({
                   onEnded={onEnded}
                   onProgress={handleProgress}
                   onError={handlePlayerError}
+                  onPlaybackQualityChange={handlePlaybackQualityChange}
                 />
               </div>
 
@@ -237,6 +260,9 @@ export function ProtectedVideoPlayer({
               onSeek={handleSeek}
               onPlaybackRateChange={handlePlaybackRateChange}
               onExitFocus={focusMode ? handleExitFocus : undefined}
+              currentQuality={currentQuality}
+              qualityLevels={qualityLevels}
+              onQualityChange={handleQualityChange}
             />
 
             {!isPlaying && isVideoReady && (

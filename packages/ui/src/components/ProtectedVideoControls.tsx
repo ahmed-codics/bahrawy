@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Maximize, Minimize, Pause, Play, Undo2 } from 'lucide-react';
+import { Maximize, Minimize, Pause, Play, Settings2, Undo2 } from 'lucide-react';
 import { cn } from '../utils';
 import { VideoProgressBar } from './VideoProgressBar';
 
@@ -16,6 +16,9 @@ type ProtectedVideoControlsProps = {
   onToggleFullscreen: () => void;
   onSeek: (time: number) => void;
   onPlaybackRateChange: (rate: number) => void;
+  currentQuality?: string;
+  qualityLevels?: string[];
+  onQualityChange?: (quality: string) => void;
   onExitFocus?: () => void;
   className?: string;
 };
@@ -141,6 +144,102 @@ function PlaybackSpeedButton({
  * handle; the protection layer keeps blocking the iframe itself.
  * Accessible: labelled buttons, keyboard-focusable slider, visible focus state.
  */
+
+const QUALITY_LABELS: Record<string, string> = {
+  highres: "Highest available",
+  hd2160: "2160p",
+  hd1440: "1440p",
+  hd1080: "1080p",
+  hd720: "720p",
+  large: "480p",
+  medium: "360p",
+  small: "240p",
+  tiny: "144p",
+  auto: "Auto",
+  default: "Auto",
+};
+
+function VideoQualityButton({
+  currentQuality,
+  qualityLevels,
+  isVideoReady,
+  onQualityChange,
+}: {
+  currentQuality: string;
+  qualityLevels: string[];
+  isVideoReady: boolean;
+  onQualityChange: (quality: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    const keyClose = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", keyClose);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", keyClose);
+    };
+  }, [open]);
+
+  const selectQuality = (quality: string) => {
+    onQualityChange(quality);
+    setOpen(false);
+  };
+
+  const levels = Array.from(new Set(["default", ...qualityLevels])).filter((q) => q !== "auto");
+
+  if (levels.length <= 1) return null;
+
+  return (
+    <div className="relative">
+      <ControlButton
+        onClick={() => {
+          if (isVideoReady) setOpen((value) => !value);
+        }}
+        label="جودة الفيديو"
+      >
+        <Settings2 className="size-5 sm:size-6" />
+      </ControlButton>
+      {open && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="خيارات جودة الفيديو"
+          className="pointer-events-auto absolute bottom-full left-1/2 z-30 mb-2 max-h-60 -translate-x-1/2 overflow-y-auto rounded-xl border border-white/15 bg-black/90 p-1 shadow-2xl backdrop-blur-md"
+        >
+          {levels.map((level) => {
+            const selected = level === currentQuality || (level === "default" && currentQuality === "auto");
+            return (
+              <button
+                key={level}
+                type="button"
+                role="menuitemradio"
+                aria-checked={selected}
+                onClick={() => selectQuality(level)}
+                className={cn(
+                  "block w-32 whitespace-nowrap rounded-lg px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-brand-500/85 focus-visible:outline-2 focus-visible:outline-white",
+                  selected && "bg-brand-500 text-white",
+                )}
+              >
+                {selected ? "✓ " : ""}{QUALITY_LABELS[level] || level}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProtectedVideoControls({
   isPlaying,
   isFullscreen,
@@ -154,6 +253,9 @@ export function ProtectedVideoControls({
   onPlaybackRateChange,
   onExitFocus,
   className,
+  currentQuality = "default",
+  qualityLevels = [],
+  onQualityChange,
 }: ProtectedVideoControlsProps) {
   return (
     <div
@@ -187,6 +289,15 @@ export function ProtectedVideoControls({
           isVideoReady={isVideoReady}
           onPlaybackRateChange={onPlaybackRateChange}
         />
+
+        {onQualityChange && qualityLevels.length > 0 && (
+          <VideoQualityButton
+            currentQuality={currentQuality}
+            qualityLevels={qualityLevels}
+            isVideoReady={isVideoReady}
+            onQualityChange={onQualityChange}
+          />
+        )}
 
         <ControlButton
           onClick={() => onToggleFullscreen()}

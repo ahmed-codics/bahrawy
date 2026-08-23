@@ -25,6 +25,9 @@ jest.mock('@bahrawy/db', () => {
       deleteMany: jest.fn(),
       delete: jest.fn(),
     },
+    videoPlaybackSession: {
+      updateMany: jest.fn(),
+    },
     authSession: {
       findUnique: jest.fn(),
     },
@@ -153,6 +156,7 @@ describe('VideoService', () => {
       ).resolves.toEqual({
         provider: VideoProvider.YOUTUBE,
         videoId: 'M7lc1UVf-VE',
+        expiresInSeconds: 900,
       });
     });
 
