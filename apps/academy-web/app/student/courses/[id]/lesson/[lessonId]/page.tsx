@@ -67,6 +67,7 @@ export default function LessonDetailPage({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [playback, setPlayback] = useState<VideoPlayback | null>(null);
   const [resumePosition, setResumePosition] = useState(0);
+  const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null);
   const [accessError, setAccessError] = useState('');
   const [locked, setLocked] = useState<{ titleAr?: string } | null>(null);
   const [videoAccessBlocked, setVideoAccessBlocked] = useState(false);
@@ -155,6 +156,26 @@ export default function LessonDetailPage({
       .finally(() => setLoading(false));
   }, [id, lessonId]);
 
+  useEffect(() => {
+    if (!lesson) return;
+    const pdfSource = lesson.attachedPdfUrl || lesson.contentUrl;
+    if (!pdfSource) {
+      setSignedPdfUrl(null);
+      return;
+    }
+    if (/^https?:\/\//i.test(pdfSource)) {
+      setSignedPdfUrl(pdfSource);
+      return;
+    }
+    
+    const objectId = pdfSource.startsWith('/storage/') ? pdfSource.replace('/storage/', '') : pdfSource.startsWith('/') ? pdfSource.slice(1) : pdfSource;
+    if (objectId && !objectId.startsWith('/')) {
+      fetchApi(`/storage/${objectId}/sign`).then(res => setSignedPdfUrl(`${API_BASE}${res.data.url}`)).catch(() => setSignedPdfUrl(null));
+    } else {
+      setSignedPdfUrl(`${API_BASE}${pdfSource}`);
+    }
+  }, [lesson]);
+
   const reportProgress = (ratio: number, currentTime: number, duration: number) => {
     const watchedSeconds = Math.max(0, Math.floor(currentTime));
     const isComplete = ratio >= 0.9;
@@ -172,15 +193,6 @@ export default function LessonDetailPage({
   if (loading) return <PageSkeleton cards={2} />;
   const title = lesson?.titleAr || preview?.titleAr || 'الدرس غير متاح';
   const type = lesson?.contentType || preview?.contentType;
-
-  const pdfSource = lesson?.attachedPdfUrl || lesson?.contentUrl;
-  const pdfUrl = pdfSource
-    ? /^https?:\/\//i.test(pdfSource)
-      ? pdfSource
-      : pdfSource.startsWith('/')
-        ? `${API_BASE}${pdfSource}`
-        : `${API_BASE}/storage/${pdfSource}`
-    : null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-8">
@@ -235,17 +247,17 @@ export default function LessonDetailPage({
           ) : lesson.contentType === 'PDF' ? (
             <Card>
               <CardContent className="space-y-4 pt-6">
-                {pdfUrl ? (
+                {signedPdfUrl ? (
                   <>
                     <iframe
-                      src={pdfUrl}
+                      src={signedPdfUrl}
                       title={lesson.titleAr}
                       className="aspect-video h-auto min-h-0 w-full rounded-2xl border border-border-default bg-white sm:h-[70dvh] sm:min-h-[32rem]"
                     />
                     <Button
                       variant="outline"
                       leadingIcon={<FileText className="size-4" />}
-                      onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+                      onClick={() => window.open(signedPdfUrl, '_blank', 'noopener,noreferrer')}
                     >
                       فتح الملف في تبويب جديد
                     </Button>

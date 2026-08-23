@@ -79,7 +79,9 @@ describe('VideoAccessMailerService', () => {
     expect(arg.subject).toContain('تم فتح الفيديو');
     expect(arg.html).toContain('مدة الوصول');
     // Security: no signed playback/token/YouTube URLs anywhere in the mail.
-    expect(arg.html).not.toMatch(/https?:\/\/[^"]*(youtube|playback|token|sign)/i);
+    expect(arg.html).not.toMatch(
+      /https?:\/\/[^"]*(youtube|playback|token|sign)/i,
+    );
   });
 
   it('notifyStudentOfApproval uses the duration label for a permanent grant', async () => {

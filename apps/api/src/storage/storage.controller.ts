@@ -21,6 +21,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { db } from '@bahrawy/db';
+import { createHmac } from 'crypto';
 import { CatalogService } from '../catalog/catalog.service';
 
 @Controller('storage')
@@ -160,26 +161,19 @@ export class StorageController {
     fs.createReadStream(filePath).pipe(res);
   }
 
-  @Get(':id')
-  @UseGuards(SessionAuthGuard)
-  async getStoredObject(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Res() res: Response,
-  ) {
-    const obj = await this.storageService.getApprovedObject(id);
-    if (req.account.kind !== 'STAFF' && obj.uploadedBy !== req.account.id) {
+  private async verifyFileAccess(account: any, id: string, obj: any) {
+    if (account.kind !== 'STAFF' && obj.uploadedBy !== account.id) {
       const sharedCover = await db.$transaction([
         db.course.count({
           where: {
-            organizationId: req.account.organizationId,
+            organizationId: account.organizationId,
             coverImageUrl: `/storage/${id}`,
             status: 'PUBLISHED',
           },
         }),
         db.product.count({
           where: {
-            organizationId: req.account.organizationId,
+            organizationId: account.organizationId,
             coverImageUrl: `/storage/${id}`,
             status: { in: ['ACTIVE', 'PUBLISHED'] },
           },
@@ -191,7 +185,7 @@ export class StorageController {
           where: {
             unit: {
               chapter: {
-                course: { organizationId: req.account.organizationId },
+                course: { organizationId: account.organizationId },
               },
             },
             OR: [
@@ -205,9 +199,81 @@ export class StorageController {
         if (!lesson) {
           throw new ForbiddenException('You do not have access to this file');
         }
-        await this.catalogService.canAccessLesson(req.account.id, lesson.id);
+        await this.catalogService.canAccessLesson(account.id, lesson.id);
       }
     }
+  }
+
+  @Get(':id/sign')
+  @UseGuards(SessionAuthGuard)
+  async getSignedUrl(@Req() req: any, @Param('id') id: string) {
+    const obj = await this.storageService.getApprovedObject(id);
+    await this.verifyFileAccess(req.account, id, obj);
+
+    const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 6; // 6 hours
+    const payload = `${id}:${req.account.id}:${exp}`;
+    const sig = createHmac('sha256', process.env.COOKIE_SECRET || 'secret')
+      .update(payload)
+      .digest('hex');
+
+    return {
+      status: 'SUCCESS',
+      data: {
+        url: `/storage/${id}/signed?account=${req.account.id}&exp=${exp}&sig=${sig}`,
+      },
+    };
+  }
+
+  @Get(':id/signed')
+  async accessSignedUrl(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const accountId = req.query.account as string;
+    const exp = Number(req.query.exp);
+    const sig = req.query.sig as string;
+
+    if (!accountId || !exp || !sig)
+      throw new ForbiddenException('Missing signature');
+    if (Date.now() / 1000 > exp) throw new ForbiddenException('Link expired');
+    const payload = `${id}:${accountId}:${exp}`;
+    const expectedSig = createHmac(
+      'sha256',
+      process.env.COOKIE_SECRET || 'secret',
+    )
+      .update(payload)
+      .digest('hex');
+    if (sig !== expectedSig) throw new ForbiddenException('Invalid signature');
+
+    const obj = await this.storageService.getApprovedObject(id);
+    const filePath = path.join(
+      process.cwd(),
+      '.uploads',
+      'storage',
+      obj.objectKey,
+    );
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('File not found on disk');
+    }
+
+    res.setHeader('Content-Type', obj.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${obj.originalName}"`,
+    );
+    fs.createReadStream(filePath).pipe(res);
+  }
+
+  @Get(':id')
+  @UseGuards(SessionAuthGuard)
+  async getStoredObject(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const obj = await this.storageService.getApprovedObject(id);
+    await this.verifyFileAccess(req.account, id, obj);
 
     const filePath = path.join(
       process.cwd(),

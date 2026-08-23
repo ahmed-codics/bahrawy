@@ -61,7 +61,9 @@ describe('AuthService security behavior', () => {
           provide: DeviceLeaseService,
           useValue: {
             validateOrRegisterDevice: jest.fn().mockResolvedValue(undefined),
-            blockAccountForDevice: jest.fn().mockRejectedValue(new Error('blocked')),
+            blockAccountForDevice: jest
+              .fn()
+              .mockRejectedValue(new Error('blocked')),
           },
         },
       ],

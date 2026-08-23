@@ -83,7 +83,7 @@ export class StudentVideoAccessRequestService {
         'You already have access to this lesson — no request is needed',
       );
     } catch (error: any) {
-      const code = (error.getResponse?.() as any)?.code;
+      const code = error.getResponse?.()?.code;
       if (error instanceof ConflictException) throw error;
       if (
         error instanceof ForbiddenException &&
@@ -187,17 +187,12 @@ export class StudentVideoAccessRequestService {
     const title = `طلب فتح فيديو جديد: ${lesson.titleAr}`;
     const content = `${studentName} طلب فتح فيديو الدرس «${lesson.titleAr}»`;
     await this.notificationService
-      .createForStaff(
-        request.organizationId,
-        title,
-        content,
-        {
-          kind: 'VIDEO_ACCESS_REQUEST',
-          requestId: request.id,
-          lessonId: request.lessonId,
-          accountId: request.accountId,
-        },
-      )
+      .createForStaff(request.organizationId, title, content, {
+        kind: 'VIDEO_ACCESS_REQUEST',
+        requestId: request.id,
+        lessonId: request.lessonId,
+        accountId: request.accountId,
+      })
       .catch(() => undefined);
     await this.mailer
       .notifyAdminsOfNewRequest({
@@ -257,7 +252,10 @@ export class StudentVideoAccessRequestService {
     } catch (error: any) {
       if (error instanceof ForbiddenException) {
         const code = (error.getResponse() as any)?.code;
-        if (code === 'LESSON_LOCKED' || code === 'LESSON_PREREQUISITE_NOT_MET') {
+        if (
+          code === 'LESSON_LOCKED' ||
+          code === 'LESSON_PREREQUISITE_NOT_MET'
+        ) {
           return {
             lessonId,
             hasVideo,

@@ -231,7 +231,7 @@ function LessonCard({
       >
         {lesson.purchaseProduct?.coverImageUrl ? (
           <Image
-            src={`${API_BASE}${lesson.purchaseProduct.coverImageUrl}`}
+            src={`${API_BASE}${lesson.purchaseProduct.coverImageUrl.replace('/storage/', '/storage/public/')}`}
             alt={lesson.titleAr}
             fill
             sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"

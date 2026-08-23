@@ -79,7 +79,10 @@ describe('VideoService', () => {
       providers: [
         VideoService,
         { provide: CatalogService, useValue: mockCatalogService },
-        { provide: VideoAccessService, useValue: { findActiveGrant: jest.fn() } },
+        {
+          provide: VideoAccessService,
+          useValue: { findActiveGrant: jest.fn() },
+        },
       ],
     }).compile();
     service = module.get<VideoService>(VideoService);

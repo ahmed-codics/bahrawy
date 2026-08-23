@@ -25,9 +25,7 @@ const REQUEST_CREATE_WINDOW_MS = 60_000;
 @Controller('video-access-requests')
 @UseGuards(SessionAuthGuard)
 export class StudentVideoAccessRequestController {
-  constructor(
-    private readonly service: StudentVideoAccessRequestService,
-  ) {}
+  constructor(private readonly service: StudentVideoAccessRequestService) {}
 
   @Post()
   @Throttle(REQUEST_CREATE_LIMIT, REQUEST_CREATE_WINDOW_MS)
@@ -36,11 +34,7 @@ export class StudentVideoAccessRequestController {
     @Req() req: AuthedRequest,
     @Body() dto: CreateVideoAccessRequestDto,
   ) {
-    const data = await this.service.create(
-      req.account,
-      req.session?.id,
-      dto,
-    );
+    const data = await this.service.create(req.account, req.session?.id, dto);
     return { status: 'SUCCESS', data };
   }
 

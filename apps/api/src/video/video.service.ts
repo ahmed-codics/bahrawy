@@ -286,13 +286,8 @@ export class VideoService {
         'R2 videos must be MP4 files encoded for web playback',
       );
     }
-    if (
-      !Number.isSafeInteger(fileSizeBytes) ||
-      fileSizeBytes <= 0
-    ) {
-      throw new BadRequestException(
-        'Video size must be at least 1 byte',
-      );
+    if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes <= 0) {
+      throw new BadRequestException('Video size must be at least 1 byte');
     }
 
     const safeName = this.sanitizeFileName(originalFileName);
@@ -324,7 +319,9 @@ export class VideoService {
   ) {
     await this.assertLessonExists(lessonId);
     if (mimeType !== 'video/mp4') {
-      throw new BadRequestException('R2 videos must be MP4 files encoded for web playback');
+      throw new BadRequestException(
+        'R2 videos must be MP4 files encoded for web playback',
+      );
     }
     if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes <= 0) {
       throw new BadRequestException('Video size must be at least 1 byte');
@@ -333,7 +330,7 @@ export class VideoService {
     const safeName = this.sanitizeFileName(originalFileName);
     const objectKey = `lessons/${lessonId}/${randomUUID()}-${safeName}`;
     const { bucket } = this.getR2Config();
-    
+
     let uploadId: string;
     try {
       const response = await this.getR2Client().send(
@@ -341,12 +338,14 @@ export class VideoService {
           Bucket: bucket,
           Key: objectKey,
           ContentType: mimeType,
-        })
+        }),
       );
       if (!response.UploadId) throw new Error('No UploadId returned');
       uploadId = response.UploadId;
     } catch (error) {
-      throw new ServiceUnavailableException('Failed to initialize multipart upload');
+      throw new ServiceUnavailableException(
+        'Failed to initialize multipart upload',
+      );
     }
 
     const parts = await Promise.all(
@@ -362,7 +361,7 @@ export class VideoService {
           expiresIn: UPLOAD_URL_TTL_SECONDS * 4, // Allow more time for large multipart uploads
         });
         return { partNumber, url };
-      })
+      }),
     );
 
     return {
@@ -396,21 +395,31 @@ export class VideoService {
         Parts: sortedParts,
       },
     };
-    
-    console.log(`[CompleteMultipartUpload] Request payload:`, JSON.stringify(completeParams, null, 2));
+
+    console.log(
+      `[CompleteMultipartUpload] Request payload:`,
+      JSON.stringify(completeParams, null, 2),
+    );
 
     try {
-      await this.getR2Client().send(new CompleteMultipartUploadCommand(completeParams));
+      await this.getR2Client().send(
+        new CompleteMultipartUploadCommand(completeParams),
+      );
     } catch (error: any) {
-      console.error(`[CompleteMultipartUpload] Failed for ${uploadId}. Parts provided:`, parts.length);
+      console.error(
+        `[CompleteMultipartUpload] Failed for ${uploadId}. Parts provided:`,
+        parts.length,
+      );
       console.error(`[CompleteMultipartUpload] Error detail:`, error);
-      throw new BadRequestException(JSON.stringify({
-        message: 'فشل تجميع الفيديو في R2',
-        errorName: error.name,
-        errorMessage: error.message,
-        httpStatus: error.$metadata?.httpStatusCode,
-        requestId: error.$metadata?.requestId,
-      }));
+      throw new BadRequestException(
+        JSON.stringify({
+          message: 'فشل تجميع الفيديو في R2',
+          errorName: error.name,
+          errorMessage: error.message,
+          httpStatus: error.$metadata?.httpStatusCode,
+          requestId: error.$metadata?.requestId,
+        }),
+      );
     }
 
     return this.replaceVideoLesson(lessonId, {
@@ -439,14 +448,13 @@ export class VideoService {
           Bucket: bucket,
           Key: objectKey,
           UploadId: uploadId,
-        })
+        }),
       );
     } catch (error) {
       // It might have already been aborted or completed
     }
     return { status: 'ABORTED' };
   }
-
 
   async confirmR2Upload(
     lessonId: string,
@@ -751,9 +759,7 @@ export class VideoService {
           accountId,
           sessionId,
           provider,
-          expiresAt: new Date(
-            Date.now() + PLAYBACK_URL_TTL_SECONDS * 1000,
-          ),
+          expiresAt: new Date(Date.now() + PLAYBACK_URL_TTL_SECONDS * 1000),
         },
       });
     } catch {

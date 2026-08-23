@@ -31,8 +31,7 @@ export class VideoAccessMailerService {
   }): Promise<void> {
     const recipients = this.mail.adminRecipients;
     if (!recipients.length) return;
-    const dashboardUrl =
-      process.env.DASHBOARD_URL || 'http://localhost:3002';
+    const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3002';
     const date = new Date(params.requestedAt).toLocaleString('ar-EG', {
       timeZone: process.env.TZ || 'Africa/Cairo',
     });

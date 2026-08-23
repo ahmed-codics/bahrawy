@@ -123,21 +123,36 @@ export class VideoAccessService {
   async resolveDuration(
     durationType: VideoAccessGrantDuration,
     customDays: number | null,
-  ): Promise<{ expiresAt: Date | null; durationType: VideoAccessGrantDuration }> {
+  ): Promise<{
+    expiresAt: Date | null;
+    durationType: VideoAccessGrantDuration;
+  }> {
     const now = new Date();
     switch (durationType) {
       case 'SESSION':
         return { expiresAt: null, durationType };
       case 'ONE_DAY':
-        return { expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000), durationType };
+        return {
+          expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          durationType,
+        };
       case 'THREE_DAYS':
-        return { expiresAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), durationType };
+        return {
+          expiresAt: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+          durationType,
+        };
       case 'SEVEN_DAYS':
-        return { expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), durationType };
+        return {
+          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          durationType,
+        };
       case 'CUSTOM': {
         const days = customDays && Number.isFinite(customDays) ? customDays : 1;
         const clamped = Math.min(Math.max(days, 1), 90);
-        return { expiresAt: new Date(now.getTime() + clamped * 24 * 60 * 60 * 1000), durationType };
+        return {
+          expiresAt: new Date(now.getTime() + clamped * 24 * 60 * 60 * 1000),
+          durationType,
+        };
       }
       default:
         return { expiresAt: null, durationType: 'SESSION' as const };

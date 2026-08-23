@@ -325,6 +325,18 @@ export class AdminV1ProductsService {
       before: product,
       after: updated,
     });
+
+    try {
+      fetch(
+        `${process.env.FRONTEND_URL || 'http://localhost:3001'}/api/revalidate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: '/courses' }),
+        },
+      ).catch(() => {});
+    } catch {}
+
     return updated;
   }
 

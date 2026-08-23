@@ -164,6 +164,59 @@ export class CatalogController {
     return { status: 'SUCCESS', data };
   }
 
+  @Get('student-courses')
+  @UseGuards(SessionAuthGuard)
+  async getStudentCourses(@Req() req: any) {
+    if (req.account.kind !== 'STUDENT') {
+      return this.getPublishedCourses();
+    }
+    const profile = await db.studentProfile.findUnique({
+      where: { accountId: req.account.id },
+    });
+    const gradeId = profile?.gradeId || undefined;
+
+    const data = await db.course.findMany({
+      where: {
+        organizationId: req.account.organizationId,
+        status: 'PUBLISHED',
+        archivedAt: null,
+        ...(gradeId ? { gradeId } : {}),
+        OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }],
+        AND: [
+          {
+            OR: [{ unpublishAt: null }, { unpublishAt: { gt: new Date() } }],
+          },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        grade: true,
+        products: {
+          include: {
+            product: {
+              include: { prices: { where: { status: 'ACTIVE' } } },
+            },
+          },
+        },
+        chapters: {
+          where: { status: 'PUBLISHED' },
+          include: {
+            units: {
+              where: { status: 'PUBLISHED' },
+              include: {
+                lessons: {
+                  where: { status: 'PUBLISHED' },
+                  select: { id: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return { status: 'SUCCESS', data };
+  }
+
   @Get('my-courses')
   @UseGuards(SessionAuthGuard)
   async getEntitledCourses(@Req() req: any) {

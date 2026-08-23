@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import type { Response } from 'express';
 import * as fs from 'fs';
 import { db } from '@bahrawy/db';
@@ -131,3 +131,73 @@ describe('StorageController public covers', () => {
     expect(pipe).toHaveBeenCalledWith(response);
   });
 });
+
+import { createHmac } from 'crypto';
+describe('StorageController Signed URLs', () => {
+  const storageService = { getApprovedObject: jest.fn() };
+  const clamAvService = {};
+  const catalogService = { canAccessLesson: jest.fn(), getUnitAccess: jest.fn() };
+  const response = { setHeader: jest.fn() } as unknown as Response;
+  const pipe = jest.fn();
+  
+  const controller = new StorageController(
+    storageService as never,
+    clamAvService as never,
+    catalogService as never,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fs.existsSync as jest.Mock).mockReturnValue(true);
+    (fs.createReadStream as jest.Mock).mockReturnValue({ pipe });
+    process.env.COOKIE_SECRET = 'test-secret';
+  });
+
+  it('generates a signed URL for an authorized student', async () => {
+    storageService.getApprovedObject.mockResolvedValue({
+      id: 'pdf-1',
+      organizationId: 'org-1',
+      uploadedBy: 'staff-1',
+    });
+    (db.$transaction as jest.Mock).mockResolvedValue([0, 0]);
+    (db.lesson.findFirst as jest.Mock).mockResolvedValue({ id: 'lesson-1' });
+    catalogService.canAccessLesson.mockResolvedValue(true);
+
+    const result = await controller.getSignedUrl({
+      account: { id: 'student-1', kind: 'STUDENT', organizationId: 'org-1' }
+    }, 'pdf-1');
+
+    expect(result.status).toBe('SUCCESS');
+    expect(result.data.url).toContain('/storage/pdf-1/signed?account=student-1&exp=');
+    expect(result.data.url).toContain('&sig=');
+  });
+
+  it('allows access to signed URL with valid signature', async () => {
+    storageService.getApprovedObject.mockResolvedValue({
+      id: 'pdf-1',
+      mimeType: 'application/pdf',
+      objectKey: 'file.pdf',
+      originalName: 'file.pdf',
+    });
+
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const sig = createHmac('sha256', 'test-secret')
+      .update(`pdf-1:student-1:${exp}`)
+      .digest('hex');
+
+    await controller.accessSignedUrl('pdf-1', {
+      query: { account: 'student-1', exp, sig }
+    } as any, response);
+
+    expect(response.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+    expect(pipe).toHaveBeenCalledWith(response);
+  });
+
+  it('rejects access to signed URL with invalid signature', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    await expect(async () => await controller.accessSignedUrl('pdf-1', {
+      query: { account: 'student-1', exp, sig: 'invalid-sig' }
+    } as any, response)).rejects.toThrow(ForbiddenException);
+  });
+});
+

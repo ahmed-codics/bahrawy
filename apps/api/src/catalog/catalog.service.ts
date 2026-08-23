@@ -1013,6 +1013,25 @@ export class CatalogService {
     accountId?: string,
     isStaff = false,
   ): Promise<any> {
+    if (accountId && !isStaff) {
+      const profile = await db.studentProfile.findUnique({
+        where: { accountId },
+      });
+      if (profile && profile.gradeId) {
+        const checkCourse = await db.course.findUnique({
+          where: { id: courseId },
+          select: { gradeId: true },
+        });
+        if (
+          checkCourse &&
+          checkCourse.gradeId &&
+          checkCourse.gradeId !== profile.gradeId
+        ) {
+          throw new ForbiddenException('Course not available for your grade');
+        }
+      }
+    }
+
     const course = await db.course.findUnique({
       where: { id: courseId },
       include: {
@@ -1189,7 +1208,7 @@ export class CatalogService {
       await this.canAccessLesson(accountId, lessonId, isStaff);
     } catch (error: any) {
       if (isStaff) throw error;
-      const code = (error?.getResponse?.() as any)?.code;
+      const code = error?.getResponse?.()?.code;
       // A valid video-access grant lets a student view a video lesson they
       // don't own. Quiz/prerequisite gates are NOT bypassed by grants.
       if (code !== 'MISSING_ENTITLEMENT') throw error;

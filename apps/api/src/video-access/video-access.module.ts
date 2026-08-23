@@ -12,6 +12,10 @@ import { VideoAccessMailerService } from './video-access.mailer';
     VideoAccessService,
     VideoAccessMailerService,
   ],
-  exports: [VideoAccessService, StudentVideoAccessRequestService, VideoAccessMailerService],
+  exports: [
+    VideoAccessService,
+    StudentVideoAccessRequestService,
+    VideoAccessMailerService,
+  ],
 })
 export class VideoAccessModule {}

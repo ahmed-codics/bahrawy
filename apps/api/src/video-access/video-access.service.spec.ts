@@ -54,7 +54,9 @@ describe('StudentVideoAccessRequestService', () => {
         StudentVideoAccessRequestService,
         {
           provide: SecurityService,
-          useValue: { decrypt: jest.fn().mockReturnValue('student@bahrawy.test') },
+          useValue: {
+            decrypt: jest.fn().mockReturnValue('student@bahrawy.test'),
+          },
         },
         {
           provide: NotificationService,
@@ -166,7 +168,7 @@ describe('StudentVideoAccessRequestService', () => {
       caught = e;
     }
     expect(caught).toBeInstanceOf(ForbiddenException);
-    expect((caught.getResponse() as any).code).toBe('LESSON_NOT_REQUESTABLE');
+    expect(caught.getResponse().code).toBe('LESSON_NOT_REQUESTABLE');
   });
 
   it('throws ConflictException when an active grant already exists', async () => {

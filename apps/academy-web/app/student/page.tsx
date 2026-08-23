@@ -354,7 +354,7 @@ function ContinueCard({ course, onOpen }: { course: Course; onOpen: () => void }
       <div className="student-cover student-continue-cover relative aspect-video w-full overflow-hidden md:aspect-auto md:min-h-72">
         {course.coverImageUrl ? (
           <Image
-            src={`${API_BASE}${course.coverImageUrl}`}
+            src={`${API_BASE}${course.coverImageUrl.replace('/storage/', '/storage/public/')}`}
             alt={course.titleAr}
             fill
             sizes="(max-width: 767px) 100vw, 40vw"

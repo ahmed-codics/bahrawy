@@ -44,7 +44,7 @@ export default function StudentCoursesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([fetchApi('/catalog/courses'), fetchApi('/dashboard/student')])
+    Promise.all([fetchApi('/catalog/student-courses'), fetchApi('/dashboard/student')])
       .then(([catalog, dashboard]) => {
         setCourses(catalog.data || []);
         setOwned(dashboard.data?.enrolledCourses || []);
@@ -174,7 +174,7 @@ function CourseCard({
       <div className="student-cover relative aspect-[16/9] overflow-hidden">
         {course.coverImageUrl ? (
           <Image
-            src={`${API_BASE}${course.coverImageUrl}`}
+            src={`${API_BASE}${course.coverImageUrl.replace('/storage/', '/storage/public/')}`}
             alt={course.titleAr}
             fill
             sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"

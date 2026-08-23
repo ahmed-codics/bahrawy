@@ -38,7 +38,10 @@ export class AdminV1VideoAccessController {
   constructor(private readonly service: AdminV1VideoAccessService) {}
 
   @Get('requests')
-  list(@Req() request: AdminRequest, @Query() query: VideoAccessRequestListQueryDto) {
+  list(
+    @Req() request: AdminRequest,
+    @Query() query: VideoAccessRequestListQueryDto,
+  ) {
     return this.service.list(request.account.organizationId, query);
   }
 

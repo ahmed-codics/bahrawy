@@ -45,7 +45,9 @@ export class MailService {
   }
 
   private get from(): string {
-    return process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@bahrawy.test';
+    return (
+      process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@bahrawy.test'
+    );
   }
 
   get adminRecipients(): string[] {

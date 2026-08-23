@@ -38,23 +38,23 @@ describe('VideoAccessService (grants)', () => {
     });
 
     it('returns true for a permanent (never-expiring) grant', () => {
-      expect(
-        service.isGrantLive({ revokedAt: null, expiresAt: null }),
-      ).toBe(true);
+      expect(service.isGrantLive({ revokedAt: null, expiresAt: null })).toBe(
+        true,
+      );
     });
 
     it('returns true when the grant expires in the future', () => {
       const future = new Date(Date.now() + 60 * 60 * 1000);
-      expect(
-        service.isGrantLive({ revokedAt: null, expiresAt: future }),
-      ).toBe(true);
+      expect(service.isGrantLive({ revokedAt: null, expiresAt: future })).toBe(
+        true,
+      );
     });
 
     it('returns false when the grant already expired', () => {
       const past = new Date(Date.now() - 1000);
-      expect(
-        service.isGrantLive({ revokedAt: null, expiresAt: past }),
-      ).toBe(false);
+      expect(service.isGrantLive({ revokedAt: null, expiresAt: past })).toBe(
+        false,
+      );
     });
   });
 
@@ -74,8 +74,12 @@ describe('VideoAccessService (grants)', () => {
     });
 
     it('clamps CUSTOM days to [1, 90] and defaults to 1', async () => {
-      expect((await service.resolveDuration('CUSTOM', null)).expiresAt).toBeTruthy();
-      expect((await service.resolveDuration('CUSTOM', 0)).expiresAt).toBeTruthy();
+      expect(
+        (await service.resolveDuration('CUSTOM', null)).expiresAt,
+      ).toBeTruthy();
+      expect(
+        (await service.resolveDuration('CUSTOM', 0)).expiresAt,
+      ).toBeTruthy();
       const huge = await service.resolveDuration('CUSTOM', 5000);
       const delta = huge.expiresAt!.getTime() - Date.now();
       expect(delta).toBeLessThanOrEqual(90 * 24 * 60 * 60 * 1000 + 1000);

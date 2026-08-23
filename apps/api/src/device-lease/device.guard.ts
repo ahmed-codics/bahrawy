@@ -18,8 +18,7 @@ export class DeviceGuard implements CanActivate {
     const account = request.account;
     if (account && account.kind === 'STUDENT') {
       const header = request.headers['x-device-fingerprint'];
-      const fingerprint =
-        typeof header === 'string' ? header.trim() : '';
+      const fingerprint = typeof header === 'string' ? header.trim() : '';
       if (!fingerprint) {
         throw new BadRequestException(
           'Missing device fingerprint header (X-Device-Fingerprint)',

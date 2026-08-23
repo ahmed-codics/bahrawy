@@ -23,7 +23,13 @@ const MAX_PAGE_SIZE = 100;
 const MAX_SEARCH_LENGTH = 100;
 const MAX_FETCH_ROWS = 2000;
 
-const VALID_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'REVOKED'];
+const VALID_STATUSES = [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'EXPIRED',
+  'REVOKED',
+];
 
 @Injectable()
 export class AdminV1VideoAccessService {
@@ -66,7 +72,9 @@ export class AdminV1VideoAccessService {
               },
               {
                 account: {
-                  studentProfile: { studentNumber: { equals: this.toInt(search) ?? -1 } },
+                  studentProfile: {
+                    studentNumber: { equals: this.toInt(search) ?? -1 },
+                  },
                 },
               },
             ],
@@ -128,7 +136,8 @@ export class AdminV1VideoAccessService {
           studentNumber: request.account.studentProfile?.studentNumber ?? null,
           gradeId: request.account.studentProfile?.gradeId ?? null,
           gradeName: request.account.studentProfile?.gradeId
-            ? (gradeNameById.get(request.account.studentProfile.gradeId) ?? null)
+            ? (gradeNameById.get(request.account.studentProfile.gradeId) ??
+              null)
             : null,
         },
       }));

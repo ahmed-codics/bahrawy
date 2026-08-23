@@ -153,7 +153,12 @@ export class StorageService {
       const tmpPath = `${filePath}.opt`;
       await sharp(filePath)
         .rotate()
-        .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+        .resize({
+          width: 1920,
+          height: 1920,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
         .webp({ quality: 80 })
         .toFile(tmpPath);
       await fs.rename(tmpPath, filePath);

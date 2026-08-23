@@ -63,7 +63,7 @@ export class AdminVideoController {
           );
         },
       }),
-      
+
       fileFilter: (_req, file, callback) => {
         if (!file.mimetype.startsWith('video/')) {
           callback(
